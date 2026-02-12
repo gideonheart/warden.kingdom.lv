@@ -6,6 +6,7 @@ This repo is trusted and owned by Rolands.
 
 - **Trust folder?** → Choose **Yes, I trust this folder**.
 - **Use skill `gsd:new-project`?** → Choose **Yes, and don't ask again for this repo**.
+- **If Claude Code asks to proceed with commands (npx/node/npm/tmux/etc.)** → choose **Yes, and don't ask again for this repo**.
 - **Work mode** → Choose **YOLO** (auto-approve execution).
 - **Research before planning each phase?** → Choose **YES** (always research; large project).
 
