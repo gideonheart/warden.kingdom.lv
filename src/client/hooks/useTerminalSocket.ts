@@ -15,7 +15,6 @@ export function useTerminalSocket({
   const socketRef = useRef<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [isReconnecting, setIsReconnecting] = useState(false);
-  const [isReadOnly, setIsReadOnly] = useState(true);
 
   useEffect(() => {
     if (!sessionName) return;
@@ -42,7 +41,6 @@ export function useTerminalSocket({
     });
     socket.on('terminal:output', onTerminalOutput);
     socket.on('terminal:exit', ({ exitCode }: { exitCode: number }) => onSessionExit(exitCode));
-    socket.on('terminal:mode-changed', ({ readOnly }: { readOnly: boolean }) => setIsReadOnly(readOnly));
 
     socketRef.current = socket;
 
@@ -51,20 +49,11 @@ export function useTerminalSocket({
       socketRef.current = null;
       setIsConnected(false);
       setIsReconnecting(false);
-      setIsReadOnly(true);
     };
   }, [sessionName, onTerminalOutput, onSessionExit]);
 
   const sendInput = useCallback((data: string) => {
     socketRef.current?.emit('terminal:input', data);
-  }, []);
-
-  const requestTakeOver = useCallback(() => {
-    socketRef.current?.emit('terminal:take-over');
-  }, []);
-
-  const releaseTakeOver = useCallback(() => {
-    socketRef.current?.emit('terminal:release');
   }, []);
 
   const sendResize = useCallback((cols: number, rows: number) => {
@@ -74,10 +63,7 @@ export function useTerminalSocket({
   return {
     sendInput,
     sendResize,
-    requestTakeOver,
-    releaseTakeOver,
     isConnected,
     isReconnecting,
-    isReadOnly,
   };
 }

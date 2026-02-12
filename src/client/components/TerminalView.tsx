@@ -23,12 +23,11 @@ export function TerminalView({ tmuxSessionName, onSessionExit }: TerminalViewPro
     onSessionExit(tmuxSessionName, exitCode);
   }, [tmuxSessionName, onSessionExit]);
 
-  const { sendInput, sendResize, requestTakeOver, releaseTakeOver, isConnected, isReconnecting, isReadOnly } =
-    useTerminalSocket({
-      sessionName: tmuxSessionName,
-      onTerminalOutput: handleTerminalOutput,
-      onSessionExit: handleSessionExit,
-    });
+  const { sendInput, sendResize, isConnected, isReconnecting } = useTerminalSocket({
+    sessionName: tmuxSessionName,
+    onTerminalOutput: handleTerminalOutput,
+    onSessionExit: handleSessionExit,
+  });
 
   useEffect(() => {
     if (!terminalContainerRef.current) return;
@@ -71,9 +70,7 @@ export function TerminalView({ tmuxSessionName, onSessionExit }: TerminalViewPro
     });
 
     terminal.onData((userInput: string) => {
-      if (!isReadOnly) {
-        sendInput(userInput);
-      }
+      sendInput(userInput);
     });
 
     terminal.onResize(({ cols, rows }) => {
@@ -98,7 +95,7 @@ export function TerminalView({ tmuxSessionName, onSessionExit }: TerminalViewPro
       terminalInstanceRef.current = null;
       fitAddonRef.current = null;
     };
-  }, [tmuxSessionName, sendInput, sendResize, isReadOnly]);
+  }, [tmuxSessionName, sendInput, sendResize]);
 
   return (
     <div className="relative flex flex-col h-full">
@@ -106,26 +103,6 @@ export function TerminalView({ tmuxSessionName, onSessionExit }: TerminalViewPro
         <div className="flex items-center gap-2">
           <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-warden-success' : isReconnecting ? 'bg-warden-warning animate-pulse' : 'bg-warden-error'}`} />
           <span className="text-xs text-warden-text-dim font-mono">{tmuxSessionName}</span>
-        </div>
-        <div className="flex items-center gap-2">
-          {isReadOnly ? (
-            <button
-              onClick={requestTakeOver}
-              className="px-2 py-0.5 text-xs bg-warden-accent/20 text-warden-accent rounded hover:bg-warden-accent/30 transition-colors"
-            >
-              Take Over
-            </button>
-          ) : (
-            <button
-              onClick={releaseTakeOver}
-              className="px-2 py-0.5 text-xs bg-warden-warning/20 text-warden-warning rounded hover:bg-warden-warning/30 transition-colors"
-            >
-              Release
-            </button>
-          )}
-          <span className={`px-1.5 py-0.5 text-xs rounded ${isReadOnly ? 'bg-warden-accent/10 text-warden-accent' : 'bg-warden-warning/10 text-warden-warning'}`}>
-            {isReadOnly ? 'READ ONLY' : 'INTERACTIVE'}
-          </span>
         </div>
       </div>
 
