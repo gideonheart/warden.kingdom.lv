@@ -17,7 +17,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [ ] **Phase 3: Agent Integration** - OpenClaw config reading, prompt injection, and take-over mode
 - [ ] **Phase 4: History & Analytics** - Session archive, token usage dashboard, and log viewer
 - [ ] **Phase 5: Production Deployment** - Nginx config, Playwright tests, and graceful shutdown
-- [ ] **Phase 6: Close v1 Audit Gaps** - SOUL.md preview, memory status, stop button, README
+- [x] **Phase 6: Close v1 Audit Gaps** - SOUL.md preview, memory status, stop button, README
 
 ## Phase Details
 
@@ -104,20 +104,23 @@ Plans:
 - [ ] 05-01: TBD
 
 ### Phase 6: Close v1 Audit Gaps
-**Goal**: Close all partial requirements identified by milestone audit — SOUL.md preview, memory status, stop session button, and README with test documentation
+**Goal**: Close all partial requirements identified by milestone audit — SOUL.md preview, memory status, stop session button, always-interactive terminals, prompt panel clarity, and README with test documentation
 **Depends on**: Phase 5
-**Requirements**: AGNT-02, SESS-06, TEST-02
-**Gap Closure:** Closes gaps from v1.0 milestone audit
+**Requirements**: AGNT-02, SESS-06, TEST-02, INTV-01, INTV-02, INTV-03, INTV-04
+**Gap Closure:** Closes gaps from v1.0 milestone audit + user-reported bugs
 **Success Criteria** (what must be TRUE):
   1. Agent sidebar displays SOUL.md preview text read from agent's workspace directory
   2. Agent sidebar displays memory status (exists/size) for each agent
   3. Dashboard has a visible stop button that terminates a tmux session via the existing API endpoint
   4. README.md exists in project root with setup, run, and test instructions
-**Plans**: 2 plans in 1 wave
+  5. Terminal is always interactive — no take-over/release toggle exists
+  6. Prompt panel clearly indicates it sends to OpenClaw Gateway, not to terminal
+**Plans**: 3 plans in 1 wave
 
 Plans:
-- [ ] 06-01-PLAN.md — SOUL.md preview, memory status, and stop session button
-- [ ] 06-02-PLAN.md — README.md comprehensive test documentation
+- [x] 06-01-PLAN.md — SOUL.md preview, memory status, and stop session button
+- [x] 06-02-PLAN.md — README.md comprehensive test documentation
+- [x] 06-03-PLAN.md — Remove take-over/release mode, clarify prompt panel
 
 ## Progress
 
@@ -131,4 +134,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 3. Agent Integration | 1/1 | Complete | 18337f8 |
 | 4. History & Analytics | 1/1 | Complete | a5879f3 |
 | 5. Production Deployment | 1/1 | Complete | 46c87cb |
-| 6. Close v1 Audit Gaps | 0/2 | Planned | - |
+| 6. Close v1 Audit Gaps | 3/3 | Complete | f669408 |

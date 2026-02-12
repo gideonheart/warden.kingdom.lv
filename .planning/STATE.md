@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-12)
 
 **Core value:** Real-time visibility into all active Claude Code agent sessions from a single browser tab
-**Current focus:** All phases complete — app is built and running
+**Current focus:** All 6 phases complete — v1.0 milestone fully delivered
 
 ## Current Position
 
-Phase: 6 (Close v1 Audit Gaps)
-Plan: 1 of 3 complete
-Status: In progress
-Last activity: 2026-02-12 — Implemented SOUL.md preview, memory status display, and session stop button
+Phase: 6 of 6 (Close v1 Audit Gaps)
+Plan: All complete
+Status: v1.0 milestone complete
+Last activity: 2026-02-12 — Phase 6 executed (SOUL.md preview, memory status, stop button, README docs, always-interactive terminals)
 
-Progress: [███░░░░░░░] 33%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -31,6 +31,7 @@ Progress: [███░░░░░░░] 33%
 | 3 | Agent Integration | `18337f8` |
 | 4 | History & Analytics | `a5879f3` |
 | 5 | Testing & Deployment | `46c87cb` |
+| 6 | Close v1 Audit Gaps | `f669408` |
 
 **Post-completion fixes:**
 - `4f2404e` — Fix server tsconfig rootDir to include shared
@@ -42,6 +43,8 @@ Progress: [███░░░░░░░] 33%
 | Plan | Duration | Tasks | Files | Commit |
 |------|----------|-------|-------|--------|
 | 06-01 | 4min | 2 | 5 | `a727b28` |
+| 06-02 | 1min | 1 | 1 | `51588c2` |
+| 06-03 | 3min | 2 | 5 | `967db1a` |
 
 ## Accumulated Context
 
@@ -69,6 +72,6 @@ None — v1 is complete and running.
 
 ## Session Continuity
 
-Last session: 2026-02-12T15:48:53Z
-Stopped at: Completed 06-01-PLAN.md (SOUL.md preview, memory status, stop button)
+Last session: 2026-02-12
+Stopped at: Phase 6 complete — all v1.0 audit gaps closed
 Resume file: None
