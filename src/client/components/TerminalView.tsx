@@ -38,7 +38,7 @@ export function TerminalView({ tmuxSessionName, onSessionExit }: TerminalViewPro
         background: '#0a0a1a',
         foreground: '#e2e8f0',
         cursor: '#6366f1',
-        selectionBackground: '#1e1e3a',
+        selectionBackground: '#4f46e5',
         black: '#0a0a1a',
         red: '#ef4444',
         green: '#22c55e',
@@ -54,6 +54,7 @@ export function TerminalView({ tmuxSessionName, onSessionExit }: TerminalViewPro
       cursorBlink: true,
       scrollback: 5000,
       allowProposedApi: true,
+      macOptionClickForcesSelection: true,
     });
 
     const fitAddon = new FitAddon();
