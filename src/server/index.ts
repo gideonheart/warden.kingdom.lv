@@ -5,6 +5,7 @@ import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { instanceRoutes } from './routes/instanceRoutes.js';
+import { agentRoutes } from './routes/agentRoutes.js';
 import { terminalStreamService } from './services/TerminalStreamService.js';
 import { instanceTracker } from './services/InstanceTracker.js';
 import { database } from './database/DatabaseConnection.js';
@@ -37,6 +38,7 @@ app.use(cors({
 app.use(express.json());
 
 app.use(instanceRoutes);
+app.use(agentRoutes);
 
 app.get('/api/health', (_request, response) => {
   response.json({

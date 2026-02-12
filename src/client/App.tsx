@@ -2,11 +2,17 @@ import { useState, useCallback } from 'react';
 import { InstanceTabBar } from './components/InstanceTabBar.js';
 import { TerminalView } from './components/TerminalView.js';
 import { ErrorBoundary } from './components/ErrorBoundary.js';
+import { AgentSidebar } from './components/AgentSidebar.js';
+import { PromptPanel } from './components/PromptPanel.js';
 import { useActiveInstances } from './hooks/useActiveInstances.js';
+import { useAgentConfig } from './hooks/useAgentConfig.js';
 
 export function App() {
   const { instances, isLoading, error, refetch } = useActiveInstances();
+  const { agents, topicMappings } = useAgentConfig();
   const [selectedSessionName, setSelectedSessionName] = useState<string | null>(null);
+  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
+  const [showSidebar, setShowSidebar] = useState(true);
 
   const activeInstances = instances.filter(
     (instance) => instance.status === 'active' || instance.status === 'idle'
@@ -22,6 +28,10 @@ export function App() {
     },
     [refetch]
   );
+
+  const handleSelectAgent = useCallback((agentId: string) => {
+    setSelectedAgentId(agentId);
+  }, []);
 
   if (selectedSessionName && !activeInstances.some((i) => i.tmuxSessionName === selectedSessionName)) {
     if (activeInstances.length > 0) {
@@ -53,6 +63,12 @@ export function App() {
             </span>
           )}
           <button
+            onClick={() => setShowSidebar(!showSidebar)}
+            className={`px-2 py-1 text-xs transition-colors ${showSidebar ? 'text-warden-accent' : 'text-warden-text-dim hover:text-warden-text'}`}
+          >
+            Agents
+          </button>
+          <button
             onClick={refetch}
             className="px-2 py-1 text-xs text-warden-text-dim hover:text-warden-text transition-colors"
           >
@@ -67,33 +83,50 @@ export function App() {
         onSelectSession={handleSelectSession}
       />
 
-      <main className="flex-1 min-h-0">
-        {isLoading ? (
-          <div className="flex items-center justify-center h-full">
-            <div className="flex items-center gap-3">
-              <div className="w-5 h-5 border-2 border-warden-accent border-t-transparent rounded-full animate-spin" />
-              <span className="text-warden-text-dim">Loading sessions...</span>
-            </div>
+      <div className="flex flex-1 min-h-0">
+        <main className="flex-1 min-h-0 flex flex-col">
+          <div className="flex-1 min-h-0">
+            {isLoading ? (
+              <div className="flex items-center justify-center h-full">
+                <div className="flex items-center gap-3">
+                  <div className="w-5 h-5 border-2 border-warden-accent border-t-transparent rounded-full animate-spin" />
+                  <span className="text-warden-text-dim">Loading sessions...</span>
+                </div>
+              </div>
+            ) : selectedSessionName ? (
+              <ErrorBoundary key={selectedSessionName}>
+                <TerminalView
+                  tmuxSessionName={selectedSessionName}
+                  onSessionExit={handleSessionExit}
+                />
+              </ErrorBoundary>
+            ) : (
+              <div className="flex items-center justify-center h-full">
+                <div className="text-center">
+                  <div className="text-4xl mb-4 opacity-20">&#9678;</div>
+                  <p className="text-warden-text-dim text-lg">No active agent sessions</p>
+                  <p className="text-warden-text-dim/60 text-sm mt-1">
+                    tmux sessions with agent prefixes (warden-*, scout-*, builder-*) will appear here
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
-        ) : selectedSessionName ? (
-          <ErrorBoundary key={selectedSessionName}>
-            <TerminalView
-              tmuxSessionName={selectedSessionName}
-              onSessionExit={handleSessionExit}
-            />
-          </ErrorBoundary>
-        ) : (
-          <div className="flex items-center justify-center h-full">
-            <div className="text-center">
-              <div className="text-4xl mb-4 opacity-20">&#9678;</div>
-              <p className="text-warden-text-dim text-lg">No active agent sessions</p>
-              <p className="text-warden-text-dim/60 text-sm mt-1">
-                tmux sessions with agent prefixes (warden-*, scout-*, builder-*) will appear here
-              </p>
-            </div>
-          </div>
+
+          {agents.length > 0 && (
+            <PromptPanel agents={agents} selectedAgentId={selectedAgentId} />
+          )}
+        </main>
+
+        {showSidebar && agents.length > 0 && (
+          <AgentSidebar
+            agents={agents}
+            topicMappings={topicMappings}
+            selectedAgentId={selectedAgentId}
+            onSelectAgent={handleSelectAgent}
+          />
         )}
-      </main>
+      </div>
     </div>
   );
 }
