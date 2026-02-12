@@ -31,11 +31,11 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. Terminal auto-reconnects after network interruption without losing session data
   5. ANSI escape codes and colors from Claude Code output render correctly
   6. SQLite database persists session metadata with WAL mode and graceful shutdown checkpointing
-**Plans**: TBD
+**Plans**: 2 plans in 2 waves
 
 Plans:
-- [ ] 01-01: TBD
-- [ ] 01-02: TBD
+- [ ] 01-01-PLAN.md — Complete backend foundation (graceful shutdown, connection recovery, PTY cleanup)
+- [ ] 01-02-PLAN.md — Backend verification and testing infrastructure
 
 ### Phase 2: Terminal Integration
 **Goal**: Working dashboard UI that streams live terminal output with multi-session tabs, responsive resizing, and read-only observation mode
@@ -109,7 +109,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Core Infrastructure | 0/? | Not started | - |
+| 1. Core Infrastructure | 0/2 | Ready to execute | - |
 | 2. Terminal Integration | 0/? | Not started | - |
 | 3. Agent Integration | 0/? | Not started | - |
 | 4. History & Analytics | 0/? | Not started | - |
