@@ -38,6 +38,13 @@ export function App() {
     setSelectedAgentId(agentId);
   }, []);
 
+  const handleSessionStopped = useCallback(
+    (_sessionName: string) => {
+      refetch();
+    },
+    [refetch]
+  );
+
   if (selectedSessionName && !activeInstances.some((i) => i.tmuxSessionName === selectedSessionName)) {
     if (activeInstances.length > 0) {
       setSelectedSessionName(activeInstances[0].tmuxSessionName);
@@ -100,6 +107,7 @@ export function App() {
           instances={activeInstances}
           selectedSessionName={selectedSessionName}
           onSelectSession={handleSelectSession}
+          onSessionStopped={handleSessionStopped}
         />
       )}
 

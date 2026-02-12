@@ -7,6 +7,17 @@ interface AgentSidebarProps {
   onSelectAgent: (agentId: string) => void;
 }
 
+function formatBytes(bytes: number | null | undefined): string {
+  if (bytes === null || bytes === undefined) return 'N/A';
+  if (bytes === 0) return '0 bytes';
+
+  const units = ['bytes', 'KB', 'MB', 'GB'];
+  const unitIndex = Math.floor(Math.log(bytes) / Math.log(1024));
+  const size = bytes / Math.pow(1024, unitIndex);
+
+  return `${size.toFixed(1)} ${units[unitIndex]}`;
+}
+
 export function AgentSidebar({ agents, topicMappings, selectedAgentId, onSelectAgent }: AgentSidebarProps) {
   const selectedAgent = agents.find((a) => a.id === selectedAgentId);
   const agentTopics = topicMappings.filter((t) => t.agentId === selectedAgentId);
@@ -49,6 +60,23 @@ export function AgentSidebar({ agents, topicMappings, selectedAgentId, onSelectA
             <div>
               <span className="text-warden-text-dim">Model</span>
               <p className="text-warden-text font-mono mt-0.5">{selectedAgent.model}</p>
+            </div>
+            <div>
+              <span className="text-warden-text-dim">SOUL.md</span>
+              {selectedAgent.soulPreview ? (
+                <p className="text-warden-text-dim/80 mt-0.5 text-xs leading-relaxed">{selectedAgent.soulPreview}</p>
+              ) : (
+                <p className="text-warden-text-dim/50 mt-0.5 italic">No SOUL.md found</p>
+              )}
+            </div>
+            <div>
+              <span className="text-warden-text-dim">Memory</span>
+              <div className="flex items-center gap-2 mt-0.5">
+                <div className={`w-2 h-2 rounded-full ${selectedAgent.memoryExists ? 'bg-warden-success' : 'bg-warden-text-dim/30'}`} />
+                <span className="text-warden-text">
+                  {selectedAgent.memoryExists ? formatBytes(selectedAgent.memorySizeBytes) : 'No MEMORY.md'}
+                </span>
+              </div>
             </div>
           </div>
 
