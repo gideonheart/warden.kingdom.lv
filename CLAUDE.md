@@ -9,6 +9,17 @@ This repo is trusted and owned by Rolands.
 - **Work mode** → Choose **YOLO** (auto-approve execution).
 - **Research before planning each phase?** → Choose **YES** (always research; large project).
 
+## GSD standard operating procedure (SOP)
+
+If using GSD, follow `.planning/GSD_WORKFLOW.md`.
+
+Default GSD sequence:
+
+- `/gsd:new-project @PRD.md`
+- If supported: `/gsd:research-phase 1`
+
+If GSD prompts become disruptive mid-run, stop using `/gsd:*` and proceed in vanilla Claude Code while continuing to maintain `.planning/RESEARCH.md` + `.planning/PLAN.md`.
+
 ## Product requirements
 
 - UI style: match **OpenClaw Gateway UI / dashboard panel style** (sessions/jobs web panel look).
