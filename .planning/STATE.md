@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-12)
 ## Current Position
 
 Phase: 6 (Close v1 Audit Gaps)
-Plan: 3 of 3 complete
-Status: Complete
-Last activity: 2026-02-12 — Removed terminal mode toggle, made terminal always interactive, clarified prompt panel destination
+Plan: 1 of 3 complete
+Status: In progress
+Last activity: 2026-02-12 — Implemented SOUL.md preview, memory status display, and session stop button
 
-Progress: [██████████] 100%
+Progress: [███░░░░░░░] 33%
 
 ## Performance Metrics
 
@@ -41,8 +41,7 @@ Progress: [██████████] 100%
 
 | Plan | Duration | Tasks | Files | Commit |
 |------|----------|-------|-------|--------|
-| 06-02 | 1min | 1 | 1 | `51588c2` |
-| 06-03 | 3min | 2 | 5 | `f616914` |
+| 06-01 | 4min | 2 | 5 | `a727b28` |
 
 ## Accumulated Context
 
@@ -54,11 +53,11 @@ Progress: [██████████] 100%
 - PTY resize needs isAlive guard — ioctl EBADF crashes server when tmux session exits
 - OpenClaw config read from ~/.openclaw/openclaw.json with JSON5 comment stripping
 - Gateway API at localhost:3434 with bearer token auth
-- [Phase 06]: Consolidated three test sections into unified Testing section with Prerequisites → Run → What it tests → Expected output → Troubleshooting pattern
-- [Phase 06]: Added comprehensive troubleshooting guidance for test failures (browser launch, health check, auto-discovery, database issues)
-- [Phase 06]: Removed take-over/release mode toggle — terminal now always interactive per user requirement
-- [Phase 06]: Fixed Bug 1 (terminal buffer clearing) by removing isReadOnly from useEffect deps
-- [Phase 06]: Fixed Bug 2 (prompt destination confusion) by adding "via OpenClaw Gateway" labels to prompt panel
+- [Phase 06 Plan 01]: Truncate SOUL.md preview at last newline after 100 chars (max 200 chars) for clean display
+- [Phase 06 Plan 01]: Format memory size using KB/MB/GB units with 1 decimal place
+- [Phase 06 Plan 01]: Show green status dot when MEMORY.md exists, dim dot when missing
+- [Phase 06 Plan 01]: Stop button shows "Stopping..." during API call and is disabled for already-stopped sessions
+- [Phase 06 Plan 01]: Use graceful fallbacks for missing SOUL.md and MEMORY.md files
 
 ### Pending Todos
 
@@ -70,6 +69,6 @@ None — v1 is complete and running.
 
 ## Session Continuity
 
-Last session: 2026-02-12
-Stopped at: Completed 06-03-PLAN.md (removed terminal mode toggle, made terminal always interactive)
+Last session: 2026-02-12T15:48:53Z
+Stopped at: Completed 06-01-PLAN.md (SOUL.md preview, memory status, stop button)
 Resume file: None
