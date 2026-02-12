@@ -107,7 +107,6 @@ Which phases cover which requirements. Updated during roadmap creation.
 |-------------|-------|--------|
 | INFR-01 | Phase 1 | Pending |
 | INFR-02 | Phase 1 | Pending |
-| INFR-03 | Phase 1 | Pending |
 | INFR-04 | Phase 1 | Pending |
 | TERM-01 | Phase 1 | Pending |
 | TERM-02 | Phase 1 | Pending |
@@ -137,6 +136,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | HIST-01 | Phase 4 | Pending |
 | HIST-02 | Phase 4 | Pending |
 | HIST-03 | Phase 4 | Pending |
+| INFR-03 | Phase 5 | Pending |
 | INFR-05 | Phase 5 | Pending |
 | TEST-01 | Phase 5 | Pending |
 | TEST-02 | Phase 5 | Pending |
@@ -148,4 +148,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-02-12*
-*Last updated: 2026-02-12 after initial definition*
+*Last updated: 2026-02-12 after roadmap creation*
