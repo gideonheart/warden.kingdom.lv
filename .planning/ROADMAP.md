@@ -113,9 +113,11 @@ Plans:
   2. Agent sidebar displays memory status (exists/size) for each agent
   3. Dashboard has a visible stop button that terminates a tmux session via the existing API endpoint
   4. README.md exists in project root with setup, run, and test instructions
+**Plans**: 2 plans in 1 wave
 
 Plans:
-- [ ] 06-01: TBD
+- [ ] 06-01-PLAN.md — SOUL.md preview, memory status, and stop session button
+- [ ] 06-02-PLAN.md — README.md comprehensive test documentation
 
 ## Progress
 
@@ -129,4 +131,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 3. Agent Integration | 1/1 | Complete | 18337f8 |
 | 4. History & Analytics | 1/1 | Complete | a5879f3 |
 | 5. Production Deployment | 1/1 | Complete | 46c87cb |
-| 6. Close v1 Audit Gaps | 0/? | Ready to plan | - |
+| 6. Close v1 Audit Gaps | 0/2 | Planned | - |
