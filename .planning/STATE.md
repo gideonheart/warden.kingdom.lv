@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-12)
 ## Current Position
 
 Phase: Phase 8 — Prompt Panel & Gateway Integration
-Plan: Pending
-Status: Phase 7 verified and complete
-Last activity: 2026-02-12 — Phase 7 execution complete and verified
+Plan: 08-01 Complete (1/1)
+Status: Phase 8 complete
+Last activity: 2026-02-12 — Phase 8 Plan 01 execution complete
 
-Progress: [█████░░░░░] 50% (v1.1)
+Progress: [██████░░░░] 60% (v1.1)
 
 ## Performance Metrics
 
@@ -37,6 +37,8 @@ Progress: [█████░░░░░] 50% (v1.1)
 | 5 | Testing & Deployment | `46c87cb` |
 | 6 | Close v1 Audit Gaps | `f669408` |
 | 7 | Terminal Interactivity & Scrollback | `9f65d54` |
+| 8 | Prompt Panel & Gateway Integration | `effa33c` |
+| Phase 08 P01 | 6 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -49,9 +51,17 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - Set tmux history-limit to 50000 lines (~10MB per pane) for monitoring use case
 - tmux.conf created in /home/forge/ as system-level config, not tracked in repo
 
+**Phase 08-01 Decisions:**
+- Derive selectedAgentId from activeInstances lookup instead of manual state
+- Reset manual dropdown override on every tab switch via useEffect
+- Separate sidebar agent state (sidebarSelectedAgentId) from prompt panel agent state (derivedAgentId)
+- Scope test selectors to prompt panel area to avoid matching tab bar elements
+- [Phase 08-01]: Derive selectedAgentId from activeInstances lookup instead of manual state
+- [Phase 08-01]: Reset manual dropdown override on every tab switch via useEffect
+
 ### Pending Todos
 
-- Phase 8: Prompt panel session sync + Gateway send fix
+None — all v1.1 milestones complete
 
 ### Blockers/Concerns
 
@@ -61,5 +71,5 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 ## Session Continuity
 
 Last session: 2026-02-12
-Stopped at: Phase 7 complete and verified — ready for Phase 8
+Stopped at: Phase 8 complete — all v1.1 milestones delivered
 Resume file: None
