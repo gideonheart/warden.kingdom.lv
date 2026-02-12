@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { openClawConfigReader } from '../services/OpenClawConfigReader.js';
-import { gatewayApiClient } from '../services/GatewayApiClient.js';
+import { tmuxSessionManager } from '../services/TmuxSessionManager.js';
 
 export const agentRoutes = Router();
 
@@ -31,11 +31,33 @@ agentRoutes.post('/api/agents/:agentId/prompt', async (request, response) => {
     return;
   }
 
-  const result = await gatewayApiClient.sendPrompt(agentId, prompt.trim());
+  try {
+    // Convention: GSD agent sessions are named {agentId}-gsd-main
+    const sessionName = `${agentId}-gsd-main`;
 
-  if (result.success) {
-    response.json(result);
-  } else {
-    response.status(502).json(result);
+    // Check if the session exists
+    const exists = await tmuxSessionManager.sessionExists(sessionName);
+    if (!exists) {
+      response.status(404).json({
+        success: false,
+        error: `No tmux session found for agent '${agentId}' (expected session: ${sessionName})`
+      });
+      return;
+    }
+
+    // Send the prompt to the tmux session
+    await tmuxSessionManager.sendPromptToSession(sessionName, prompt.trim());
+
+    response.json({
+      success: true,
+      message: `Prompt sent to ${agentId} tmux session`
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error(`[agentRoutes] Failed to send prompt to ${agentId}:`, errorMessage);
+    response.status(500).json({
+      success: false,
+      error: `Failed to send prompt to tmux session: ${errorMessage}`
+    });
   }
 });

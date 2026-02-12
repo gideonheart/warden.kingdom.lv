@@ -51,6 +51,13 @@ export class TmuxSessionManager {
     await this.executeTmuxCommand('kill-session', ['-t', sessionName]);
   }
 
+  async sendPromptToSession(sessionName: string, prompt: string): Promise<void> {
+    // Send the prompt text literally (using -l flag to avoid special character interpretation)
+    await this.executeTmuxCommand('send-keys', ['-t', `${sessionName}:0.0`, '-l', '--', prompt]);
+    // Send Enter key to submit the prompt
+    await this.executeTmuxCommand('send-keys', ['-t', `${sessionName}:0.0`, 'Enter']);
+  }
+
   extractAgentIdFromSessionName(sessionName: string): string {
     return sessionName.split('-')[0];
   }
