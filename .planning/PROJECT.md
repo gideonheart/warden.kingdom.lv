@@ -43,14 +43,14 @@ Real-time visibility into all active Claude Code agent sessions from a single br
 - Agents run in tmux sessions with naming convention: `<agentId>-<projectSlug>-<shortId>`
 - Session keys follow pattern: `agent:<id>:telegram:group:<groupId>:topic:<topicId>`
 - Nginx handles SSL termination, IP whitelist (94.30.169.76), WebSocket upgrade
-- Node.js binds to 127.0.0.1:3535, not exposed to internet directly
+- Node.js binds to 127.0.0.1:3001 , not exposed to internet directly
 - Bearer token auth injected at Nginx proxy level
 
 ## Constraints
 
 - **Tech Stack**: Node.js 22+, Express 5, React 19, TypeScript 5, Vite 6, Socket.IO 4, xterm.js 5, SQLite (better-sqlite3), Tailwind CSS 4, node-pty — per PRD specification
 - **Server**: Single Ubuntu 24 server, `forge` user, Laravel Forge managed
-- **Port**: 3535 (behind Nginx reverse proxy)
+- **Port**: 3001  (behind Nginx reverse proxy)
 - **Security**: IP whitelist + bearer token at Nginx level, no application-level auth needed
 - **Process**: tmux 3.4+ for session persistence
 
