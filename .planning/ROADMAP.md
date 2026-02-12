@@ -21,8 +21,8 @@
 
 ### v1.1 UX Fixes & Prompt Panel (Active)
 
-- [ ] Phase 7: Terminal Interactivity & Scrollback — **Plans:** 1 plan
-  - [ ] 07-01-PLAN.md — Terminal auto-focus + tmux mouse scrollback
+- [x] Phase 7: Terminal Interactivity & Scrollback (1/1 plan) — completed 2026-02-12
+  - [x] 07-01-PLAN.md — Terminal auto-focus + tmux mouse scrollback
 - [ ] Phase 8: Prompt Panel & Gateway Integration
 
 ## Progress
@@ -35,5 +35,5 @@
 | 4. History & Analytics | v1.0 | 1/1 | Complete | 2026-02-12 |
 | 5. Production Deployment | v1.0 | 1/1 | Complete | 2026-02-12 |
 | 6. Close v1 Audit Gaps | v1.0 | 3/3 | Complete | 2026-02-12 |
-| 7. Terminal Interactivity & Scrollback | v1.1 | 0/1 | Planned | — |
+| 7. Terminal Interactivity & Scrollback | v1.1 | 1/1 | Complete | 2026-02-12 |
 | 8. Prompt Panel & Gateway Integration | v1.1 | 0/1 | Pending | — |

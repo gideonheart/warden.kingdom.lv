@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-12)
 
 **Core value:** Real-time visibility into all active Claude Code agent sessions from a single browser tab
-**Current focus:** v1.0 shipped — planning next milestone
+**Current focus:** v1.1 — Phase 7 complete, Phase 8 next
 
 ## Current Position
 
-Phase: Phase 7 — Terminal Interactivity & Scrollback
-Plan: 07-01 Complete
-Status: Terminal auto-focus and tmux scrollback implemented
-Last activity: 2026-02-12 — Completed 07-01-PLAN.md (terminal interactivity)
+Phase: Phase 8 — Prompt Panel & Gateway Integration
+Plan: Pending
+Status: Phase 7 verified and complete
+Last activity: 2026-02-12 — Phase 7 execution complete and verified
 
-Progress: [██░░░░░░░░] 20% (v1.1)
+Progress: [█████░░░░░] 50% (v1.1)
 
 ## Performance Metrics
 
@@ -36,7 +36,7 @@ Progress: [██░░░░░░░░] 20% (v1.1)
 | 4 | History & Analytics | `a5879f3` |
 | 5 | Testing & Deployment | `46c87cb` |
 | 6 | Close v1 Audit Gaps | `f669408` |
-| Phase 07 P01 | 164 | 2 tasks | 2 files |
+| 7 | Terminal Interactivity & Scrollback | `9f65d54` |
 
 ## Accumulated Context
 
@@ -52,7 +52,6 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 ### Pending Todos
 
 - Phase 8: Prompt panel session sync + Gateway send fix
-- Phase 7: Continue with additional terminal UX improvements if needed
 
 ### Blockers/Concerns
 
@@ -62,5 +61,5 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 ## Session Continuity
 
 Last session: 2026-02-12
-Stopped at: Completed 07-01-PLAN.md execution — terminal auto-focus and tmux scrollback
+Stopped at: Phase 7 complete and verified — ready for Phase 8
 Resume file: None
