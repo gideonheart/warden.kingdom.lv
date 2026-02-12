@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import type { AgentDetails } from '../../shared/openclawTypes.js';
 
 interface PromptPanelProps {
@@ -11,6 +11,13 @@ export function PromptPanel({ agents, selectedAgentId }: PromptPanelProps) {
   const [targetAgentId, setTargetAgentId] = useState<string>(selectedAgentId ?? '');
   const [isSending, setIsSending] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Sync dropdown with tab selection - resets manual override on tab switch
+  useEffect(() => {
+    if (selectedAgentId) {
+      setTargetAgentId(selectedAgentId);
+    }
+  }, [selectedAgentId]);
 
   const effectiveAgentId = targetAgentId || selectedAgentId || agents[0]?.id || '';
 

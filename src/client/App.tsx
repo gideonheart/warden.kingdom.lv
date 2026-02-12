@@ -14,13 +14,19 @@ export function App() {
   const { instances, isLoading, error, refetch } = useActiveInstances();
   const { agents, topicMappings } = useAgentConfig();
   const [selectedSessionName, setSelectedSessionName] = useState<string | null>(null);
-  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
+  const [sidebarSelectedAgentId, setSidebarSelectedAgentId] = useState<string | null>(null);
   const [showSidebar, setShowSidebar] = useState(true);
   const [currentView, setCurrentView] = useState<AppView>('terminals');
 
   const activeInstances = instances.filter(
     (instance) => instance.status === 'active' || instance.status === 'idle'
   );
+
+  // Derive agent ID from selected session for prompt panel sync
+  const selectedInstance = activeInstances.find(
+    (instance) => instance.tmuxSessionName === selectedSessionName
+  );
+  const derivedAgentId = selectedInstance?.agentId ?? null;
 
   const handleSelectSession = useCallback((sessionName: string) => {
     setSelectedSessionName(sessionName);
@@ -34,8 +40,8 @@ export function App() {
     [refetch]
   );
 
-  const handleSelectAgent = useCallback((agentId: string) => {
-    setSelectedAgentId(agentId);
+  const handleSidebarSelectAgent = useCallback((agentId: string) => {
+    setSidebarSelectedAgentId(agentId);
   }, []);
 
   const handleSessionStopped = useCallback(
@@ -144,7 +150,7 @@ export function App() {
               </div>
 
               {agents.length > 0 && (
-                <PromptPanel agents={agents} selectedAgentId={selectedAgentId} />
+                <PromptPanel agents={agents} selectedAgentId={derivedAgentId} />
               )}
             </>
           ) : (
@@ -156,8 +162,8 @@ export function App() {
           <AgentSidebar
             agents={agents}
             topicMappings={topicMappings}
-            selectedAgentId={selectedAgentId}
-            onSelectAgent={handleSelectAgent}
+            selectedAgentId={sidebarSelectedAgentId}
+            onSelectAgent={handleSidebarSelectAgent}
           />
         )}
       </div>
