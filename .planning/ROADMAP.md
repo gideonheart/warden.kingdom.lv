@@ -23,7 +23,8 @@
 
 - [x] Phase 7: Terminal Interactivity & Scrollback (1/1 plan) — completed 2026-02-12
   - [x] 07-01-PLAN.md — Terminal auto-focus + tmux mouse scrollback
-- [ ] Phase 8: Prompt Panel & Gateway Integration
+- [ ] Phase 8: Prompt Panel & Gateway Integration (1 plan)
+  - [ ] 08-01-PLAN.md — Fix dropdown session sync, Send button, and Playwright E2E tests
 
 ## Progress
 
@@ -36,4 +37,4 @@
 | 5. Production Deployment | v1.0 | 1/1 | Complete | 2026-02-12 |
 | 6. Close v1 Audit Gaps | v1.0 | 3/3 | Complete | 2026-02-12 |
 | 7. Terminal Interactivity & Scrollback | v1.1 | 1/1 | Complete | 2026-02-12 |
-| 8. Prompt Panel & Gateway Integration | v1.1 | 0/1 | Pending | — |
+| 8. Prompt Panel & Gateway Integration | v1.1 | 0/1 | Planned | — |
