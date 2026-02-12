@@ -85,6 +85,17 @@ npm run test:backend
 - **Database persistence**: SQLite database exists with WAL mode, all tables created
 - **Socket.IO**: WebSocket endpoint is accessible
 
+## Verifying PTY Resize Safety
+
+The terminal resize handler guards against EBADF/EINVAL errors when a PTY process has already exited. To verify manually:
+
+1. Start the server: `npm run dev:all`
+2. Open the dashboard in a browser and connect to a tmux session
+3. Kill the tmux session externally: `tmux kill-session -t <name>`
+4. Resize the browser window — the server should log a warning but **not crash**
+5. Check server logs for: `[TerminalStream] Ignoring resize error (EBADF)` (expected)
+6. Confirm `/api/health` still returns 200
+
 ## Production Deployment
 
 ### Build

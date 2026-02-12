@@ -6,6 +6,7 @@ interface ActiveTerminalStream {
   socketId: string;
   sessionName: string;
   isReadOnly: boolean;
+  isAlive: boolean;
 }
 
 export class TerminalStreamService {
@@ -62,12 +63,30 @@ export class TerminalStreamService {
     });
 
     ptyProcess.onExit(({ exitCode }) => {
+      const stream = this.activeStreams.get(socket.id);
+      if (stream) {
+        stream.isAlive = false;
+      }
       socket.emit('terminal:exit', { sessionName, exitCode });
       this.activeStreams.delete(socket.id);
     });
 
     socket.on('terminal:resize', ({ cols, rows }: { cols: number; rows: number }) => {
-      ptyProcess.resize(cols, rows);
+      const stream = this.activeStreams.get(socket.id);
+      if (!stream || !stream.isAlive) {
+        return;
+      }
+      try {
+        stream.ptyProcess.resize(cols, rows);
+      } catch (error: unknown) {
+        const code = (error as NodeJS.ErrnoException).code;
+        if (code === 'EBADF' || code === 'EINVAL' || code === 'EIO') {
+          console.warn(`[TerminalStream] Ignoring resize error (${code}) for ${socket.id} — PTY likely exited`);
+          stream.isAlive = false;
+        } else {
+          console.error(`[TerminalStream] Unexpected resize error for ${socket.id}:`, error);
+        }
+      }
     });
 
     this.activeStreams.set(socket.id, {
@@ -75,6 +94,7 @@ export class TerminalStreamService {
       socketId: socket.id,
       sessionName,
       isReadOnly: options.readOnly,
+      isAlive: true,
     });
   }
 
