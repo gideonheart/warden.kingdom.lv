@@ -57,6 +57,8 @@ export interface AgentDetails {
   model: string;
   isDefault: boolean;
   soulPreview: string | null;
+  memoryExists?: boolean;
+  memorySizeBytes?: number | null;
 }
 
 export interface TopicMapping {

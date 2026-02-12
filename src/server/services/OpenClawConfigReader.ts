@@ -1,4 +1,4 @@
-import { readFile } from 'fs/promises';
+import { readFile, stat } from 'fs/promises';
 import path from 'path';
 import type { OpenClawConfig, AgentDetails, TopicMapping } from '../../shared/openclawTypes.js';
 
@@ -35,25 +35,89 @@ class OpenClawConfigReader {
     }
   }
 
+  private async readSoulPreview(workspacePath: string): Promise<string | null> {
+    if (!workspacePath) {
+      return null;
+    }
+
+    try {
+      // Resolve workspace path
+      const resolvedPath = path.isAbsolute(workspacePath)
+        ? workspacePath
+        : path.join(process.env.HOME ?? '/home/forge', '.openclaw', workspacePath);
+
+      const soulPath = path.join(resolvedPath, 'SOUL.md');
+      const content = await readFile(soulPath, 'utf-8');
+
+      // Extract first 200 characters, then find last newline after char 100
+      const truncated = content.slice(0, 200);
+      const lastNewlineIndex = truncated.lastIndexOf('\n', 200);
+
+      if (lastNewlineIndex > 100) {
+        return truncated.slice(0, lastNewlineIndex).trim();
+      }
+      return truncated.trim();
+    } catch (error: any) {
+      if (error.code !== 'ENOENT') {
+        console.error('[OpenClawConfig] Error reading SOUL.md:', error);
+      }
+      return null;
+    }
+  }
+
+  private async getMemoryStatus(workspacePath: string): Promise<{ exists: boolean; sizeBytes: number | null }> {
+    if (!workspacePath) {
+      return { exists: false, sizeBytes: null };
+    }
+
+    try {
+      // Resolve workspace path
+      const resolvedPath = path.isAbsolute(workspacePath)
+        ? workspacePath
+        : path.join(process.env.HOME ?? '/home/forge', '.openclaw', workspacePath);
+
+      const memoryPath = path.join(resolvedPath, 'MEMORY.md');
+      const stats = await stat(memoryPath);
+
+      return {
+        exists: stats.isFile(),
+        sizeBytes: stats.size,
+      };
+    } catch (error: any) {
+      if (error.code !== 'ENOENT') {
+        console.error('[OpenClawConfig] Error checking MEMORY.md:', error);
+      }
+      return { exists: false, sizeBytes: null };
+    }
+  }
+
   async getAgents(): Promise<AgentDetails[]> {
     const config = await this.getConfig();
     const defaults = config.agents.defaults;
 
-    return config.agents.list.map((agent) => {
-      const modelConfig = agent.model ?? defaults?.model;
-      const model = typeof modelConfig === 'string'
-        ? modelConfig
-        : modelConfig?.primary ?? 'unknown';
+    return await Promise.all(
+      config.agents.list.map(async (agent) => {
+        const modelConfig = agent.model ?? defaults?.model;
+        const model = typeof modelConfig === 'string'
+          ? modelConfig
+          : modelConfig?.primary ?? 'unknown';
 
-      return {
-        id: agent.id,
-        name: agent.name,
-        workspace: agent.workspace ?? defaults?.workspace ?? '',
-        model,
-        isDefault: agent.default ?? false,
-        soulPreview: null,
-      };
-    });
+        const workspace = agent.workspace ?? defaults?.workspace ?? '';
+        const soulPreview = await this.readSoulPreview(workspace);
+        const memoryStatus = await this.getMemoryStatus(workspace);
+
+        return {
+          id: agent.id,
+          name: agent.name,
+          workspace,
+          model,
+          isDefault: agent.default ?? false,
+          soulPreview,
+          memoryExists: memoryStatus.exists,
+          memorySizeBytes: memoryStatus.sizeBytes,
+        };
+      })
+    );
   }
 
   async getTopicMappings(): Promise<TopicMapping[]> {
