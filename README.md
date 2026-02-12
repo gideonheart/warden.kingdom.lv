@@ -22,10 +22,49 @@ Server runs at `http://127.0.0.1:3001`, client dev server at `http://localhost:5
 | `npm start` | Run production server |
 | `npm run typecheck` | TypeScript type check |
 | `npm run test:backend` | Run backend verification tests |
+| `npm run test:e2e` | Run Playwright UI tests |
+| `npm run test:e2e:ui` | Run Playwright with interactive UI |
+
+## Playwright E2E Tests
+
+Desktop UI tests verify core dashboard flows using Playwright.
+
+### Prerequisites
+
+```bash
+npx playwright install chromium
+```
+
+### Run
+
+```bash
+# Start dev servers and run tests
+npm run test:e2e
+
+# Or with interactive Playwright UI
+npm run test:e2e:ui
+```
+
+If servers are already running, Playwright reuses them automatically.
+
+### What it tests
+
+- **Dashboard load**: Header, navigation buttons, active session count
+- **View navigation**: Switch between Terminals and History views
+- **Agent sidebar**: Toggle visibility
+- **Session history**: Filter controls (agent ID, status, date range)
+- **Token usage**: Per-agent summary, daily breakdown
+- **Log viewer**: Agent filter, auto-refresh toggle
+- **Tab bar**: Session tabs presence on terminals view
+
+### Test files
+
+- `tests/e2e/dashboard.spec.ts` — Core dashboard flow tests
+- `playwright.config.ts` — Playwright configuration (Chromium, 1280x800 viewport)
 
 ## Backend Verification
 
-Test Phase 1 backend functionality without UI.
+Test backend functionality without UI.
 
 ### Prerequisites
 
@@ -46,39 +85,28 @@ npm run test:backend
 - **Database persistence**: SQLite database exists with WAL mode, all tables created
 - **Socket.IO**: WebSocket endpoint is accessible
 
-### Expected output
+## Production Deployment
 
+### Build
+
+```bash
+npm run build
+NODE_ENV=production npm start
 ```
-━━━ Health Check ━━━
-  PASS Server responds 200 OK on /api/health
-  PASS Health response contains status: ok
-  PASS Health response contains uptime
-  PASS Health response contains activeStreams count
 
-━━━ Session Auto-Discovery ━━━
-  PASS Test tmux session created: gideon-test-verify-12345
-  PASS Test session auto-discovered in /api/instances
-  PASS Instance has agentId field
-  PASS Instance has tmuxSessionName field
-  PASS Instance has status field
+### Nginx
 
-━━━ Session Management ━━━
-  PASS Stop endpoint returns 200 OK
-  PASS tmux session killed after stop
+A reference Nginx config is provided at `deploy/nginx.conf`. It includes:
 
-━━━ Database Persistence ━━━
-  PASS SQLite database file exists
-  PASS WAL mode confirmed
-  PASS instances table exists
-  PASS session_logs table exists
-  PASS token_usage table exists
+- SSL termination (Let's Encrypt)
+- IP whitelist (94.30.169.76)
+- WebSocket upgrade for Socket.IO
+- Security headers
 
-━━━ Socket.IO Configuration ━━━
-  PASS Socket.IO endpoint accessible
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  Results: 17 passed, 0 failed, 17 total
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```bash
+sudo cp deploy/nginx.conf /etc/nginx/sites-available/warden.kingdom.lv
+sudo ln -s /etc/nginx/sites-available/warden.kingdom.lv /etc/nginx/sites-enabled/
+sudo nginx -t && sudo systemctl reload nginx
 ```
 
 ## Architecture
@@ -86,3 +114,18 @@ npm run test:backend
 - **Backend**: Node.js 22+, Express 5, Socket.IO 4, better-sqlite3, node-pty
 - **Frontend**: React 19, Vite 6, xterm.js, Tailwind CSS 4
 - **Data**: SQLite with WAL mode in `data/warden.db`
+
+### API Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/health` | Server health check |
+| GET | `/api/instances` | List active instances |
+| GET | `/api/instances/:id` | Get instance details |
+| POST | `/api/instances/:id/stop` | Stop a session |
+| GET | `/api/agents` | List agents from openclaw.json |
+| GET | `/api/agents/topics` | Telegram topic mappings |
+| POST | `/api/agents/:agentId/prompt` | Send prompt to agent |
+| GET | `/api/history/sessions` | Search session archive |
+| GET | `/api/history/token-usage` | Token usage data |
+| GET | `/api/history/logs` | Gateway log tail |
