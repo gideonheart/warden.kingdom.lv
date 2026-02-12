@@ -28,10 +28,6 @@ export interface TmuxSessionInfo {
   isAttached: boolean;
 }
 
-export interface TerminalAttachOptions {
-  readOnly: boolean;
-}
-
 export interface TerminalResizePayload {
   cols: number;
   rows: number;
