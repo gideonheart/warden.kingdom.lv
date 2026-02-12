@@ -41,6 +41,11 @@ export function InstanceTabBar({ instances, selectedSessionName, onSelectSession
             <div className={`w-2 h-2 rounded-full ${statusColor}`} />
             <span className="font-medium">{instance.agentName || instance.agentId}</span>
             <span className="text-xs opacity-60 font-mono">{instance.tmuxSessionName.split('-').slice(1).join('-')}</span>
+            {instance.projectPath && (
+              <span className="text-xs opacity-40 font-mono hidden lg:inline" title={instance.projectPath}>
+                {instance.projectPath.split('/').pop()}
+              </span>
+            )}
           </button>
         );
       })}

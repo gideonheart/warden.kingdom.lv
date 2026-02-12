@@ -14,6 +14,7 @@ export function useTerminalSocket({
 }: UseTerminalSocketParams) {
   const socketRef = useRef<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
+  const [isReconnecting, setIsReconnecting] = useState(false);
   const [isReadOnly, setIsReadOnly] = useState(true);
 
   useEffect(() => {
@@ -26,8 +27,19 @@ export function useTerminalSocket({
       reconnectionAttempts: 10,
     });
 
-    socket.on('connect', () => setIsConnected(true));
-    socket.on('disconnect', () => setIsConnected(false));
+    socket.on('connect', () => {
+      setIsConnected(true);
+      setIsReconnecting(false);
+    });
+    socket.on('disconnect', () => {
+      setIsConnected(false);
+    });
+    socket.io.on('reconnect_attempt', () => {
+      setIsReconnecting(true);
+    });
+    socket.io.on('reconnect_failed', () => {
+      setIsReconnecting(false);
+    });
     socket.on('terminal:output', onTerminalOutput);
     socket.on('terminal:exit', ({ exitCode }: { exitCode: number }) => onSessionExit(exitCode));
     socket.on('terminal:mode-changed', ({ readOnly }: { readOnly: boolean }) => setIsReadOnly(readOnly));
@@ -38,6 +50,7 @@ export function useTerminalSocket({
       socket.disconnect();
       socketRef.current = null;
       setIsConnected(false);
+      setIsReconnecting(false);
       setIsReadOnly(true);
     };
   }, [sessionName, onTerminalOutput, onSessionExit]);
@@ -64,6 +77,7 @@ export function useTerminalSocket({
     requestTakeOver,
     releaseTakeOver,
     isConnected,
+    isReconnecting,
     isReadOnly,
   };
 }

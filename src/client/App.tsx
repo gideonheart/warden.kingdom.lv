@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { InstanceTabBar } from './components/InstanceTabBar.js';
 import { TerminalView } from './components/TerminalView.js';
+import { ErrorBoundary } from './components/ErrorBoundary.js';
 import { useActiveInstances } from './hooks/useActiveInstances.js';
 
 export function App() {
@@ -75,11 +76,12 @@ export function App() {
             </div>
           </div>
         ) : selectedSessionName ? (
-          <TerminalView
-            key={selectedSessionName}
-            tmuxSessionName={selectedSessionName}
-            onSessionExit={handleSessionExit}
-          />
+          <ErrorBoundary key={selectedSessionName}>
+            <TerminalView
+              tmuxSessionName={selectedSessionName}
+              onSessionExit={handleSessionExit}
+            />
+          </ErrorBoundary>
         ) : (
           <div className="flex items-center justify-center h-full">
             <div className="text-center">

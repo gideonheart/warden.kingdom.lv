@@ -23,7 +23,7 @@ export function TerminalView({ tmuxSessionName, onSessionExit }: TerminalViewPro
     onSessionExit(tmuxSessionName, exitCode);
   }, [tmuxSessionName, onSessionExit]);
 
-  const { sendInput, sendResize, requestTakeOver, releaseTakeOver, isConnected, isReadOnly } =
+  const { sendInput, sendResize, requestTakeOver, releaseTakeOver, isConnected, isReconnecting, isReadOnly } =
     useTerminalSocket({
       sessionName: tmuxSessionName,
       onTerminalOutput: handleTerminalOutput,
@@ -96,7 +96,7 @@ export function TerminalView({ tmuxSessionName, onSessionExit }: TerminalViewPro
     <div className="relative flex flex-col h-full">
       <div className="flex items-center justify-between px-3 py-1.5 bg-warden-panel border-b border-warden-border">
         <div className="flex items-center gap-2">
-          <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-warden-success' : 'bg-warden-error'}`} />
+          <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-warden-success' : isReconnecting ? 'bg-warden-warning animate-pulse' : 'bg-warden-error'}`} />
           <span className="text-xs text-warden-text-dim font-mono">{tmuxSessionName}</span>
         </div>
         <div className="flex items-center gap-2">
@@ -124,8 +124,10 @@ export function TerminalView({ tmuxSessionName, onSessionExit }: TerminalViewPro
       {!isConnected && (
         <div className="absolute inset-0 top-8 flex items-center justify-center bg-warden-bg/80 z-10">
           <div className="flex items-center gap-2">
-            <div className="w-4 h-4 border-2 border-warden-accent border-t-transparent rounded-full animate-spin" />
-            <span className="text-warden-text-dim text-sm">Connecting to {tmuxSessionName}...</span>
+            <div className={`w-4 h-4 border-2 ${isReconnecting ? 'border-warden-warning' : 'border-warden-accent'} border-t-transparent rounded-full animate-spin`} />
+            <span className="text-warden-text-dim text-sm">
+              {isReconnecting ? 'Reconnecting' : 'Connecting'} to {tmuxSessionName}...
+            </span>
           </div>
         </div>
       )}
