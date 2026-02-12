@@ -17,6 +17,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [ ] **Phase 3: Agent Integration** - OpenClaw config reading, prompt injection, and take-over mode
 - [ ] **Phase 4: History & Analytics** - Session archive, token usage dashboard, and log viewer
 - [ ] **Phase 5: Production Deployment** - Nginx config, Playwright tests, and graceful shutdown
+- [ ] **Phase 6: Close v1 Audit Gaps** - SOUL.md preview, memory status, stop button, README
 
 ## Phase Details
 
@@ -102,15 +103,30 @@ Plans:
 Plans:
 - [ ] 05-01: TBD
 
+### Phase 6: Close v1 Audit Gaps
+**Goal**: Close all partial requirements identified by milestone audit — SOUL.md preview, memory status, stop session button, and README with test documentation
+**Depends on**: Phase 5
+**Requirements**: AGNT-02, SESS-06, TEST-02
+**Gap Closure:** Closes gaps from v1.0 milestone audit
+**Success Criteria** (what must be TRUE):
+  1. Agent sidebar displays SOUL.md preview text read from agent's workspace directory
+  2. Agent sidebar displays memory status (exists/size) for each agent
+  3. Dashboard has a visible stop button that terminates a tmux session via the existing API endpoint
+  4. README.md exists in project root with setup, run, and test instructions
+
+Plans:
+- [ ] 06-01: TBD
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
+Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Core Infrastructure | 0/2 | Ready to execute | - |
-| 2. Terminal Integration | 0/? | Not started | - |
-| 3. Agent Integration | 0/? | Not started | - |
-| 4. History & Analytics | 0/? | Not started | - |
-| 5. Production Deployment | 0/? | Not started | - |
+| 1. Core Infrastructure | 2/2 | Complete | 0341445 |
+| 2. Terminal Integration | 1/1 | Complete | e7e726a |
+| 3. Agent Integration | 1/1 | Complete | 18337f8 |
+| 4. History & Analytics | 1/1 | Complete | a5879f3 |
+| 5. Production Deployment | 1/1 | Complete | 46c87cb |
+| 6. Close v1 Audit Gaps | 0/? | Ready to plan | - |

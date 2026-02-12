@@ -115,7 +115,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SESS-01 | Phase 1 | Pending |
 | SESS-04 | Phase 1 | Pending |
 | SESS-05 | Phase 1 | Pending |
-| SESS-06 | Phase 1 | Pending |
+| SESS-06 | Phase 1, Phase 6 | Pending (UI gap) |
 | UIDN-01 | Phase 2 | Pending |
 | UIDN-02 | Phase 2 | Pending |
 | UIDN-03 | Phase 2 | Pending |
@@ -126,7 +126,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SESS-03 | Phase 2 | Pending |
 | INTV-01 | Phase 2 | Pending |
 | AGNT-01 | Phase 3 | Pending |
-| AGNT-02 | Phase 3 | Pending |
+| AGNT-02 | Phase 3, Phase 6 | Pending (partial gap) |
 | AGNT-03 | Phase 3 | Pending |
 | AGNT-04 | Phase 3 | Pending |
 | AGNT-05 | Phase 3 | Pending |
@@ -139,7 +139,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | INFR-03 | Phase 5 | Pending |
 | INFR-05 | Phase 5 | Pending |
 | TEST-01 | Phase 5 | Pending |
-| TEST-02 | Phase 5 | Pending |
+| TEST-02 | Phase 5, Phase 6 | Pending (partial gap) |
 
 **Coverage:**
 - v1 requirements: 35 total
