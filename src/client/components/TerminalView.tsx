@@ -59,6 +59,7 @@ export function TerminalView({ tmuxSessionName, onSessionExit }: TerminalViewPro
     terminal.loadAddon(fitAddon);
     terminal.loadAddon(new WebLinksAddon());
     terminal.open(terminalContainerRef.current);
+    terminal.focus();
 
     requestAnimationFrame(() => {
       try {
