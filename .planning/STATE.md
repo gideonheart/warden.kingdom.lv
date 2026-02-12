@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-12)
 ## Current Position
 
 Phase: 6 (Close v1 Audit Gaps)
-Plan: 2 of 3 complete
-Status: In progress
-Last activity: 2026-02-12 — Enhanced README.md with comprehensive test documentation
+Plan: 3 of 3 complete
+Status: Complete
+Last activity: 2026-02-12 — Removed terminal mode toggle, made terminal always interactive, clarified prompt panel destination
 
-Progress: [██████░░░░] 67%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -42,6 +42,7 @@ Progress: [██████░░░░] 67%
 | Plan | Duration | Tasks | Files | Commit |
 |------|----------|-------|-------|--------|
 | 06-02 | 1min | 1 | 1 | `51588c2` |
+| 06-03 | 3min | 2 | 5 | `f616914` |
 
 ## Accumulated Context
 
@@ -55,6 +56,9 @@ Progress: [██████░░░░] 67%
 - Gateway API at localhost:3434 with bearer token auth
 - [Phase 06]: Consolidated three test sections into unified Testing section with Prerequisites → Run → What it tests → Expected output → Troubleshooting pattern
 - [Phase 06]: Added comprehensive troubleshooting guidance for test failures (browser launch, health check, auto-discovery, database issues)
+- [Phase 06]: Removed take-over/release mode toggle — terminal now always interactive per user requirement
+- [Phase 06]: Fixed Bug 1 (terminal buffer clearing) by removing isReadOnly from useEffect deps
+- [Phase 06]: Fixed Bug 2 (prompt destination confusion) by adding "via OpenClaw Gateway" labels to prompt panel
 
 ### Pending Todos
 
@@ -67,5 +71,5 @@ None — v1 is complete and running.
 ## Session Continuity
 
 Last session: 2026-02-12
-Stopped at: Completed 06-02-PLAN.md (test documentation enhancement)
+Stopped at: Completed 06-03-PLAN.md (removed terminal mode toggle, made terminal always interactive)
 Resume file: None
