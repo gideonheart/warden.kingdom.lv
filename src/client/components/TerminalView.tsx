@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 import { Terminal } from 'xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
@@ -14,6 +14,7 @@ export function TerminalView({ tmuxSessionName, onSessionExit }: TerminalViewPro
   const terminalContainerRef = useRef<HTMLDivElement>(null);
   const terminalInstanceRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
+  const [showCopiedToast, setShowCopiedToast] = useState(false);
 
   const handleTerminalOutput = useCallback((data: string) => {
     terminalInstanceRef.current?.write(data);
@@ -78,6 +79,17 @@ export function TerminalView({ tmuxSessionName, onSessionExit }: TerminalViewPro
       sendResize(cols, rows);
     });
 
+    terminal.onSelectionChange(() => {
+      const selectedText = terminal.getSelection();
+      if (selectedText) {
+        navigator.clipboard.writeText(selectedText).then(() => {
+          setShowCopiedToast(true);
+        }).catch(() => {
+          // Clipboard write failed (e.g. permissions not granted)
+        });
+      }
+    });
+
     terminalInstanceRef.current = terminal;
     fitAddonRef.current = fitAddon;
 
@@ -97,6 +109,12 @@ export function TerminalView({ tmuxSessionName, onSessionExit }: TerminalViewPro
       fitAddonRef.current = null;
     };
   }, [tmuxSessionName, sendInput, sendResize]);
+
+  useEffect(() => {
+    if (!showCopiedToast) return;
+    const timer = setTimeout(() => setShowCopiedToast(false), 1500);
+    return () => clearTimeout(timer);
+  }, [showCopiedToast]);
 
   return (
     <div className="relative flex flex-col h-full">
@@ -119,6 +137,12 @@ export function TerminalView({ tmuxSessionName, onSessionExit }: TerminalViewPro
       )}
 
       <div ref={terminalContainerRef} className="flex-1 min-h-0" />
+
+      {showCopiedToast && (
+        <div className="absolute bottom-4 right-4 px-3 py-1.5 bg-warden-accent text-white text-xs rounded shadow-lg z-20">
+          Copied!
+        </div>
+      )}
     </div>
   );
 }

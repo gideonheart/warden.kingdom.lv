@@ -53,6 +53,12 @@ Progress: [██████████] 100% (v1.1)
 
 See PROJECT.md Key Decisions table for full list with outcomes.
 
+### Quick Tasks Completed
+
+| # | Description | Date | Commit |
+|---|-------------|------|--------|
+| 2 | Terminal auto-copy selection to clipboard with toast | 2026-02-12 | pending |
+
 ### Pending Todos
 
 None — all milestones complete
