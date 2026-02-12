@@ -3,6 +3,7 @@
 ## Milestones
 
 - ✅ **v1.0 MVP** — Phases 1-6 (shipped 2026-02-12)
+- 🔨 **v1.1 UX Fixes & Prompt Panel** — Phases 7-8 (active)
 
 ## Phases
 
@@ -18,6 +19,12 @@
 
 </details>
 
+### v1.1 UX Fixes & Prompt Panel (Active)
+
+- [ ] Phase 7: Terminal Interactivity & Scrollback — **Plans:** 1 plan
+  - [ ] 07-01-PLAN.md — Terminal auto-focus + tmux mouse scrollback
+- [ ] Phase 8: Prompt Panel & Gateway Integration
+
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
@@ -28,3 +35,5 @@
 | 4. History & Analytics | v1.0 | 1/1 | Complete | 2026-02-12 |
 | 5. Production Deployment | v1.0 | 1/1 | Complete | 2026-02-12 |
 | 6. Close v1 Audit Gaps | v1.0 | 3/3 | Complete | 2026-02-12 |
+| 7. Terminal Interactivity & Scrollback | v1.1 | 0/1 | Planned | — |
+| 8. Prompt Panel & Gateway Integration | v1.1 | 0/1 | Pending | — |
