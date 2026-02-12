@@ -1,0 +1,44 @@
+{
+  "name": "warden-dashboard",
+  "version": "1.0.0",
+  "description": "Browser-based terminal multiplexer for OpenClaw agent sessions",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server/index.ts",
+    "dev:client": "vite",
+    "dev:all": "concurrently \"npm run dev\" \"npm run dev:client\"",
+    "build": "vite build && tsc -p tsconfig.server.json",
+    "start": "node dist/server/index.js",
+    "typecheck": "tsc --noEmit",
+    "test:backend": "bash tests/backend-verify.sh"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.0.0",
+    "cors": "^2.8.5",
+    "express": "^5.0.0",
+    "node-pty": "^1.0.0",
+    "socket.io": "^4.8.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.0",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^4.3.0",
+    "@xterm/addon-fit": "^0.10.0",
+    "@xterm/addon-web-links": "^0.11.0",
+    "autoprefixer": "^10.4.0",
+    "concurrently": "^9.0.0",
+    "postcss": "^8.4.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "socket.io-client": "^4.8.0",
+    "tailwindcss": "^4.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0",
+    "vite": "^6.0.0",
+    "xterm": "^5.3.0"
+  }
+}

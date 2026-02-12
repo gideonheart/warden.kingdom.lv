@@ -1,0 +1,8 @@
+node_modules/
+dist/
+data/warden.db
+data/warden.db-wal
+data/warden.db-shm
+*.log
+.env
+.env.local
