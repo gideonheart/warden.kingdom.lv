@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-02-12)
 
 ## Current Position
 
-Phase: 5 of 5 (Production Deployment)
-Plan: All complete
-Status: v1 complete
-Last activity: 2026-02-12 — Fixed Tailwind CSS v4 setup and FitAddon dimensions crash
+Phase: 6 (Close v1 Audit Gaps)
+Plan: 2 of 3 complete
+Status: In progress
+Last activity: 2026-02-12 — Enhanced README.md with comprehensive test documentation
 
-Progress: [██████████] 100%
+Progress: [██████░░░░] 67%
 
 ## Performance Metrics
 
@@ -37,6 +37,12 @@ Progress: [██████████] 100%
 - `21c03ed` — Guard PTY resize against EBADF crash
 - `c0a328e` — Enable Tailwind CSS v4 and guard FitAddon dimensions crash
 
+**Phase 06 (Close v1 Audit Gaps):**
+
+| Plan | Duration | Tasks | Files | Commit |
+|------|----------|-------|-------|--------|
+| 06-02 | 1min | 1 | 1 | `51588c2` |
+
 ## Accumulated Context
 
 ### Decisions
@@ -47,6 +53,8 @@ Progress: [██████████] 100%
 - PTY resize needs isAlive guard — ioctl EBADF crashes server when tmux session exits
 - OpenClaw config read from ~/.openclaw/openclaw.json with JSON5 comment stripping
 - Gateway API at localhost:3434 with bearer token auth
+- [Phase 06]: Consolidated three test sections into unified Testing section with Prerequisites → Run → What it tests → Expected output → Troubleshooting pattern
+- [Phase 06]: Added comprehensive troubleshooting guidance for test failures (browser launch, health check, auto-discovery, database issues)
 
 ### Pending Todos
 
@@ -59,5 +67,5 @@ None — v1 is complete and running.
 ## Session Continuity
 
 Last session: 2026-02-12
-Stopped at: All phases complete, dev servers running, Playwright 12/12 passing
+Stopped at: Completed 06-02-PLAN.md (test documentation enhancement)
 Resume file: None
