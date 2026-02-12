@@ -5,7 +5,7 @@
 See: .planning/PROJECT.md (updated 2026-02-12)
 
 **Core value:** Real-time visibility into all active Claude Code agent sessions from a single browser tab
-**Current focus:** v1.1 — Phase 7 complete, Phase 8 next
+**Current focus:** v1.1 complete — all phases delivered
 
 ## Current Position
 
@@ -14,7 +14,7 @@ Plan: 08-01 Complete (1/1)
 Status: Phase 8 complete
 Last activity: 2026-02-12 — Phase 8 Plan 01 execution complete
 
-Progress: [██████░░░░] 60% (v1.1)
+Progress: [██████████] 100% (v1.1)
 
 ## Performance Metrics
 
@@ -38,7 +38,6 @@ Progress: [██████░░░░] 60% (v1.1)
 | 6 | Close v1 Audit Gaps | `f669408` |
 | 7 | Terminal Interactivity & Scrollback | `9f65d54` |
 | 8 | Prompt Panel & Gateway Integration | `effa33c` |
-| Phase 08 P01 | 6 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -56,8 +55,6 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - Reset manual dropdown override on every tab switch via useEffect
 - Separate sidebar agent state (sidebarSelectedAgentId) from prompt panel agent state (derivedAgentId)
 - Scope test selectors to prompt panel area to avoid matching tab bar elements
-- [Phase 08-01]: Derive selectedAgentId from activeInstances lookup instead of manual state
-- [Phase 08-01]: Reset manual dropdown override on every tab switch via useEffect
 
 ### Pending Todos
 
