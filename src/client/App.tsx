@@ -4,8 +4,11 @@ import { TerminalView } from './components/TerminalView.js';
 import { ErrorBoundary } from './components/ErrorBoundary.js';
 import { AgentSidebar } from './components/AgentSidebar.js';
 import { PromptPanel } from './components/PromptPanel.js';
+import { HistoryView } from './components/HistoryView.js';
 import { useActiveInstances } from './hooks/useActiveInstances.js';
 import { useAgentConfig } from './hooks/useAgentConfig.js';
+
+type AppView = 'terminals' | 'history';
 
 export function App() {
   const { instances, isLoading, error, refetch } = useActiveInstances();
@@ -13,6 +16,7 @@ export function App() {
   const [selectedSessionName, setSelectedSessionName] = useState<string | null>(null);
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [showSidebar, setShowSidebar] = useState(true);
+  const [currentView, setCurrentView] = useState<AppView>('terminals');
 
   const activeInstances = instances.filter(
     (instance) => instance.status === 'active' || instance.status === 'idle'
@@ -20,6 +24,7 @@ export function App() {
 
   const handleSelectSession = useCallback((sessionName: string) => {
     setSelectedSessionName(sessionName);
+    setCurrentView('terminals');
   }, []);
 
   const handleSessionExit = useCallback(
@@ -63,6 +68,19 @@ export function App() {
             </span>
           )}
           <button
+            onClick={() => setCurrentView('terminals')}
+            className={`px-2 py-1 text-xs transition-colors ${currentView === 'terminals' ? 'text-warden-accent' : 'text-warden-text-dim hover:text-warden-text'}`}
+          >
+            Terminals
+          </button>
+          <button
+            onClick={() => setCurrentView('history')}
+            className={`px-2 py-1 text-xs transition-colors ${currentView === 'history' ? 'text-warden-accent' : 'text-warden-text-dim hover:text-warden-text'}`}
+          >
+            History
+          </button>
+          <span className="w-px h-4 bg-warden-border" />
+          <button
             onClick={() => setShowSidebar(!showSidebar)}
             className={`px-2 py-1 text-xs transition-colors ${showSidebar ? 'text-warden-accent' : 'text-warden-text-dim hover:text-warden-text'}`}
           >
@@ -77,44 +95,52 @@ export function App() {
         </div>
       </header>
 
-      <InstanceTabBar
-        instances={activeInstances}
-        selectedSessionName={selectedSessionName}
-        onSelectSession={handleSelectSession}
-      />
+      {currentView === 'terminals' && (
+        <InstanceTabBar
+          instances={activeInstances}
+          selectedSessionName={selectedSessionName}
+          onSelectSession={handleSelectSession}
+        />
+      )}
 
       <div className="flex flex-1 min-h-0">
         <main className="flex-1 min-h-0 flex flex-col">
-          <div className="flex-1 min-h-0">
-            {isLoading ? (
-              <div className="flex items-center justify-center h-full">
-                <div className="flex items-center gap-3">
-                  <div className="w-5 h-5 border-2 border-warden-accent border-t-transparent rounded-full animate-spin" />
-                  <span className="text-warden-text-dim">Loading sessions...</span>
-                </div>
+          {currentView === 'terminals' ? (
+            <>
+              <div className="flex-1 min-h-0">
+                {isLoading ? (
+                  <div className="flex items-center justify-center h-full">
+                    <div className="flex items-center gap-3">
+                      <div className="w-5 h-5 border-2 border-warden-accent border-t-transparent rounded-full animate-spin" />
+                      <span className="text-warden-text-dim">Loading sessions...</span>
+                    </div>
+                  </div>
+                ) : selectedSessionName ? (
+                  <ErrorBoundary key={selectedSessionName}>
+                    <TerminalView
+                      tmuxSessionName={selectedSessionName}
+                      onSessionExit={handleSessionExit}
+                    />
+                  </ErrorBoundary>
+                ) : (
+                  <div className="flex items-center justify-center h-full">
+                    <div className="text-center">
+                      <div className="text-4xl mb-4 opacity-20">&#9678;</div>
+                      <p className="text-warden-text-dim text-lg">No active agent sessions</p>
+                      <p className="text-warden-text-dim/60 text-sm mt-1">
+                        tmux sessions with agent prefixes (warden-*, scout-*, builder-*) will appear here
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
-            ) : selectedSessionName ? (
-              <ErrorBoundary key={selectedSessionName}>
-                <TerminalView
-                  tmuxSessionName={selectedSessionName}
-                  onSessionExit={handleSessionExit}
-                />
-              </ErrorBoundary>
-            ) : (
-              <div className="flex items-center justify-center h-full">
-                <div className="text-center">
-                  <div className="text-4xl mb-4 opacity-20">&#9678;</div>
-                  <p className="text-warden-text-dim text-lg">No active agent sessions</p>
-                  <p className="text-warden-text-dim/60 text-sm mt-1">
-                    tmux sessions with agent prefixes (warden-*, scout-*, builder-*) will appear here
-                  </p>
-                </div>
-              </div>
-            )}
-          </div>
 
-          {agents.length > 0 && (
-            <PromptPanel agents={agents} selectedAgentId={selectedAgentId} />
+              {agents.length > 0 && (
+                <PromptPanel agents={agents} selectedAgentId={selectedAgentId} />
+              )}
+            </>
+          ) : (
+            <HistoryView />
           )}
         </main>
 

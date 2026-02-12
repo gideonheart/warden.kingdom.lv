@@ -99,6 +99,87 @@ class DatabaseConnection {
     `).run(...activeSessionNames);
   }
 
+  searchInstances(filters: { agentId?: string; status?: string; dateFrom?: string; dateTo?: string; limit?: number; offset?: number }): { instances: AgentInstance[]; total: number } {
+    const conditions: string[] = [];
+    const params: (string | number)[] = [];
+
+    if (filters.agentId) {
+      conditions.push('agent_id = ?');
+      params.push(filters.agentId);
+    }
+    if (filters.status) {
+      conditions.push('status = ?');
+      params.push(filters.status);
+    }
+    if (filters.dateFrom) {
+      conditions.push('created_at >= ?');
+      params.push(filters.dateFrom);
+    }
+    if (filters.dateTo) {
+      conditions.push('created_at <= ?');
+      params.push(filters.dateTo + ' 23:59:59');
+    }
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+    const limit = filters.limit ?? 50;
+    const offset = filters.offset ?? 0;
+
+    const total = (this.db.prepare(
+      `SELECT COUNT(*) as count FROM instances ${whereClause}`
+    ).get(...params) as { count: number }).count;
+
+    const instances = this.db.prepare(`
+      SELECT id, agent_id as agentId, agent_name as agentName, tmux_session_name as tmuxSessionName,
+             status, project_path as projectPath, telegram_topic_id as telegramTopicId,
+             created_at as createdAt, last_active_at as lastActiveAt
+      FROM instances ${whereClause}
+      ORDER BY created_at DESC
+      LIMIT ? OFFSET ?
+    `).all(...params, limit, offset) as AgentInstance[];
+
+    return { instances, total };
+  }
+
+  getTokenUsage(filters: { agentId?: string; dateFrom?: string; dateTo?: string }): { agentId: string; date: string; inputTokens: number; outputTokens: number; costUsd: number }[] {
+    const conditions: string[] = [];
+    const params: string[] = [];
+
+    if (filters.agentId) {
+      conditions.push('agent_id = ?');
+      params.push(filters.agentId);
+    }
+    if (filters.dateFrom) {
+      conditions.push('date >= ?');
+      params.push(filters.dateFrom);
+    }
+    if (filters.dateTo) {
+      conditions.push('date <= ?');
+      params.push(filters.dateTo);
+    }
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    return this.db.prepare(`
+      SELECT agent_id as agentId, date, input_tokens as inputTokens,
+             output_tokens as outputTokens, cost_usd as costUsd
+      FROM token_usage ${whereClause}
+      ORDER BY date DESC, agent_id
+    `).all(...params) as { agentId: string; date: string; inputTokens: number; outputTokens: number; costUsd: number }[];
+  }
+
+  getTokenUsageSummary(): { agentId: string; totalInputTokens: number; totalOutputTokens: number; totalCostUsd: number; dayCount: number }[] {
+    return this.db.prepare(`
+      SELECT agent_id as agentId,
+             SUM(input_tokens) as totalInputTokens,
+             SUM(output_tokens) as totalOutputTokens,
+             SUM(cost_usd) as totalCostUsd,
+             COUNT(DISTINCT date) as dayCount
+      FROM token_usage
+      GROUP BY agent_id
+      ORDER BY totalCostUsd DESC
+    `).all() as { agentId: string; totalInputTokens: number; totalOutputTokens: number; totalCostUsd: number; dayCount: number }[];
+  }
+
   close(): void {
     console.log('[Database] Checkpointing WAL before close');
     this.db.pragma('wal_checkpoint(TRUNCATE)');
