@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import type { AgentDetails } from '../../shared/openclawTypes.js';
 
 interface PromptPanelProps {
@@ -11,6 +11,7 @@ export function PromptPanel({ agents, selectedAgentId }: PromptPanelProps) {
   const [targetAgentId, setTargetAgentId] = useState<string>(selectedAgentId ?? '');
   const [isSending, setIsSending] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Sync dropdown with tab selection - resets manual override on tab switch
   useEffect(() => {
@@ -19,6 +20,13 @@ export function PromptPanel({ agents, selectedAgentId }: PromptPanelProps) {
     }
   }, [selectedAgentId]);
 
+  // Clean up timer on unmount
+  useEffect(() => {
+    return () => {
+      if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
+    };
+  }, []);
+
   const effectiveAgentId = targetAgentId || selectedAgentId || agents[0]?.id || '';
 
   const handleSend = useCallback(async () => {
@@ -26,6 +34,10 @@ export function PromptPanel({ agents, selectedAgentId }: PromptPanelProps) {
 
     setIsSending(true);
     setStatusMessage(null);
+    if (dismissTimerRef.current) {
+      clearTimeout(dismissTimerRef.current);
+      dismissTimerRef.current = null;
+    }
 
     try {
       const response = await fetch(`/api/agents/${effectiveAgentId}/prompt`, {
@@ -37,14 +49,25 @@ export function PromptPanel({ agents, selectedAgentId }: PromptPanelProps) {
       const result = await response.json();
 
       if (response.ok) {
-        setStatusMessage({ type: 'success', text: result.message ?? 'Prompt sent' });
+        const successText = result.message
+          ? `${result.message} — watch the terminal above for the agent response`
+          : 'Prompt sent — watch the terminal above for the agent response';
+        setStatusMessage({ type: 'success', text: successText });
         setPrompt('');
+
+        // Auto-dismiss success after 5 seconds
+        const currentMessage = successText;
+        dismissTimerRef.current = setTimeout(() => {
+          setStatusMessage((prev) =>
+            prev?.type === 'success' && prev.text === currentMessage ? null : prev
+          );
+        }, 5000);
       } else {
         setStatusMessage({ type: 'error', text: result.error ?? 'Failed to send prompt' });
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Network error';
-      setStatusMessage({ type: 'error', text: message });
+      setStatusMessage({ type: 'error', text: `Could not reach Warden server: ${message}` });
     } finally {
       setIsSending(false);
     }
@@ -60,10 +83,18 @@ export function PromptPanel({ agents, selectedAgentId }: PromptPanelProps) {
     [handleSend]
   );
 
+  const handleDismissStatus = useCallback(() => {
+    setStatusMessage(null);
+    if (dismissTimerRef.current) {
+      clearTimeout(dismissTimerRef.current);
+      dismissTimerRef.current = null;
+    }
+  }, []);
+
   return (
     <div className="border-t border-warden-border bg-warden-panel px-3 py-2">
       <div className="flex items-center gap-2 mb-1.5">
-        <span className="text-xs text-warden-text-dim">Send prompt via OpenClaw Gateway to</span>
+        <span className="text-xs text-warden-text-dim">Send prompt to Claude Code in session:</span>
         <select
           value={effectiveAgentId}
           onChange={(e) => setTargetAgentId(e.target.value)}
@@ -75,22 +106,33 @@ export function PromptPanel({ agents, selectedAgentId }: PromptPanelProps) {
             </option>
           ))}
         </select>
-        {statusMessage && (
-          <span
-            className={`text-xs ml-auto ${statusMessage.type === 'success' ? 'text-warden-success' : 'text-warden-error'}`}
-          >
-            {statusMessage.text}
-          </span>
-        )}
       </div>
+      {statusMessage && (
+        <div
+          className={`flex items-center justify-between rounded px-2 py-1.5 mb-1.5 border ${
+            statusMessage.type === 'success'
+              ? 'bg-warden-success/15 border-warden-success/40 text-warden-success'
+              : 'bg-warden-error/15 border-warden-error/40 text-warden-error'
+          }`}
+        >
+          <span className="text-xs flex-1">{statusMessage.text}</span>
+          <button
+            onClick={handleDismissStatus}
+            className="ml-2 text-xs text-current opacity-60 hover:opacity-100"
+            aria-label="Dismiss"
+          >
+            ✕
+          </button>
+        </div>
+      )}
       <div className="flex flex-col gap-1">
-        <span className="text-[10px] text-warden-text-dim/50">Sends to agent via Gateway API — not typed into the terminal</span>
+        <span className="text-[10px] text-warden-text-dim/50">Sends prompt to the AI agent running in the tmux session (requires Claude Code to be running)</span>
         <div className="flex gap-2">
           <textarea
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Type a prompt for the agent via OpenClaw Gateway... (Ctrl+Enter to send)"
+            placeholder="Type a prompt for the AI agent... (Ctrl+Enter to send)"
             rows={2}
             className="flex-1 bg-warden-bg border border-warden-border rounded px-2 py-1.5 text-sm text-warden-text placeholder:text-warden-text-dim/40 resize-none focus:outline-none focus:border-warden-accent/50"
           />

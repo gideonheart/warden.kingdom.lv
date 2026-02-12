@@ -51,6 +51,22 @@ export class TmuxSessionManager {
     await this.executeTmuxCommand('kill-session', ['-t', sessionName]);
   }
 
+  async isClaudeCodeRunning(sessionName: string): Promise<boolean> {
+    try {
+      const output = await this.executeTmuxCommand('list-panes', [
+        '-t',
+        sessionName,
+        '-F',
+        '#{pane_current_command}',
+      ]);
+      // Check if any pane is running claude (case-insensitive)
+      const commands = output.trim().split('\n');
+      return commands.some(cmd => cmd.toLowerCase().includes('claude'));
+    } catch {
+      return false;
+    }
+  }
+
   async sendPromptToSession(sessionName: string, prompt: string): Promise<void> {
     // Send the prompt text literally (using -l flag to avoid special character interpretation)
     await this.executeTmuxCommand('send-keys', ['-t', `${sessionName}:0.0`, '-l', '--', prompt]);

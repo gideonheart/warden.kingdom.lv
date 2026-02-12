@@ -45,12 +45,22 @@ agentRoutes.post('/api/agents/:agentId/prompt', async (request, response) => {
       return;
     }
 
+    // Check if Claude Code is actually running in the session
+    const isClaudeRunning = await tmuxSessionManager.isClaudeCodeRunning(sessionName);
+    if (!isClaudeRunning) {
+      response.status(400).json({
+        success: false,
+        error: `Claude Code is not running in session '${sessionName}'. Please start Claude Code in this session first (e.g., run 'claude --dangerously-skip-permissions' in the ${agentId} terminal).`
+      });
+      return;
+    }
+
     // Send the prompt to the tmux session
     await tmuxSessionManager.sendPromptToSession(sessionName, prompt.trim());
 
     response.json({
       success: true,
-      message: `Prompt sent to ${agentId} tmux session`
+      message: `Prompt sent to ${agentId} (Claude Code)`
     });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
