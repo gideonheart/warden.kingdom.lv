@@ -4,7 +4,9 @@ import { fileURLToPath } from 'url';
 import type { AgentInstance, AgentInstanceCreateParams, AgentInstanceStatus } from '../../shared/types.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DATABASE_PATH = path.resolve(__dirname, '../../../data/warden.db');
+
+// Resolve from project root so it works regardless of build output nesting (src vs dist).
+const DATABASE_PATH = path.resolve(process.cwd(), 'data/warden.db');
 
 class DatabaseConnection {
   private db: Database.Database;

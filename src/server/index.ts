@@ -3,6 +3,7 @@ import { createServer } from 'http';
 import { Server as SocketIOServer } from 'socket.io';
 import cors from 'cors';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { instanceRoutes } from './routes/instanceRoutes.js';
 import { agentRoutes } from './routes/agentRoutes.js';
@@ -15,7 +16,27 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = parseInt(process.env.PORT ?? '3001', 10);
 const HOST = process.env.HOST ?? '127.0.0.1';
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
-const CLIENT_DIST_PATH = path.resolve(__dirname, '../client');
+
+function resolveClientDistPath(): string | null {
+  // In production builds, __dirname points at dist/server and ../client exists.
+  // In dev (tsx watch), __dirname points at src/server, so we prefer dist/client from cwd.
+  const candidates = [
+    path.resolve(process.cwd(), 'dist/client'),
+    path.resolve(__dirname, '../client'),
+  ];
+
+  for (const candidate of candidates) {
+    try {
+      if (fs.existsSync(path.join(candidate, 'index.html'))) return candidate;
+    } catch {
+      // ignore
+    }
+  }
+
+  return null;
+}
+
+const CLIENT_DIST_PATH = resolveClientDistPath();
 
 const app = express();
 const httpServer = createServer(app);
@@ -51,11 +72,14 @@ app.get('/api/health', (_request, response) => {
   });
 });
 
-if (IS_PRODUCTION) {
+if (CLIENT_DIST_PATH) {
   app.use(express.static(CLIENT_DIST_PATH));
-  app.get('*', (_request, response) => {
+  // SPA fallback (Express 5 / path-to-regexp v6: use RegExp instead of "*")
+  app.get(/.*/, (_request, response) => {
     response.sendFile(path.join(CLIENT_DIST_PATH, 'index.html'));
   });
+} else if (IS_PRODUCTION) {
+  console.warn('[Warden] Production mode but client dist not found; UI will not be served');
 }
 
 terminalStreamService.setSocketServer(socketServer);
