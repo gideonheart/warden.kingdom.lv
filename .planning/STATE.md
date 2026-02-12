@@ -5,22 +5,26 @@
 See: .planning/PROJECT.md (updated 2026-02-12)
 
 **Core value:** Real-time visibility into all active Claude Code agent sessions from a single browser tab
-**Current focus:** All 6 phases complete — v1.0 milestone fully delivered
+**Current focus:** v1.0 shipped — planning next milestone
 
 ## Current Position
 
-Phase: 6 of 6 (Close v1 Audit Gaps)
-Plan: All complete
-Status: v1.0 milestone complete
-Last activity: 2026-02-12 — Phase 6 executed (SOUL.md preview, memory status, stop button, README docs, always-interactive terminals)
+Phase: Milestone complete
+Plan: N/A
+Status: v1.0 MVP shipped
+Last activity: 2026-02-12 — v1.0 milestone archived
 
-Progress: [██████████] 100%
+Progress: [██████████] 100% (v1.0)
 
 ## Performance Metrics
 
-**Velocity:**
-- Total plans completed: 5 phases (executed directly, not via GSD plan-by-plan)
-- Total execution time: Single session
+**v1.0 MVP:**
+- Phases: 6 (1-6)
+- Plans: 9
+- Commits: 32
+- Files: 66
+- LOC: 2,385 TypeScript
+- Timeline: 2026-02-12 (single day)
 
 **Completed Phases:**
 
@@ -33,34 +37,11 @@ Progress: [██████████] 100%
 | 5 | Testing & Deployment | `46c87cb` |
 | 6 | Close v1 Audit Gaps | `f669408` |
 
-**Post-completion fixes:**
-- `4f2404e` — Fix server tsconfig rootDir to include shared
-- `21c03ed` — Guard PTY resize against EBADF crash
-- `c0a328e` — Enable Tailwind CSS v4 and guard FitAddon dimensions crash
-
-**Phase 06 (Close v1 Audit Gaps):**
-
-| Plan | Duration | Tasks | Files | Commit |
-|------|----------|-------|-------|--------|
-| 06-01 | 4min | 2 | 5 | `a727b28` |
-| 06-02 | 1min | 1 | 1 | `51588c2` |
-| 06-03 | 3min | 2 | 5 | `967db1a` |
-
 ## Accumulated Context
 
 ### Decisions
 
-- Express 5 + Socket.IO 4 + React 19 + xterm.js 5 + node-pty + SQLite stack — confirmed working
-- @tailwindcss/vite plugin required for Tailwind v4 (not just postcss/autoprefixer)
-- FitAddon.fit() needs try/catch — throws when container has zero dimensions
-- PTY resize needs isAlive guard — ioctl EBADF crashes server when tmux session exits
-- OpenClaw config read from ~/.openclaw/openclaw.json with JSON5 comment stripping
-- Gateway API at localhost:3434 with bearer token auth
-- [Phase 06 Plan 01]: Truncate SOUL.md preview at last newline after 100 chars (max 200 chars) for clean display
-- [Phase 06 Plan 01]: Format memory size using KB/MB/GB units with 1 decimal place
-- [Phase 06 Plan 01]: Show green status dot when MEMORY.md exists, dim dot when missing
-- [Phase 06 Plan 01]: Stop button shows "Stopping..." during API call and is disabled for already-stopped sessions
-- [Phase 06 Plan 01]: Use graceful fallbacks for missing SOUL.md and MEMORY.md files
+See PROJECT.md Key Decisions table for full list with outcomes.
 
 ### Pending Todos
 
@@ -68,10 +49,10 @@ None.
 
 ### Blockers/Concerns
 
-None — v1 is complete and running.
+None — v1.0 shipped and running.
 
 ## Session Continuity
 
 Last session: 2026-02-12
-Stopped at: Phase 6 complete — all v1.0 audit gaps closed
+Stopped at: v1.0 milestone archived
 Resume file: None

@@ -5,7 +5,7 @@ import type { TmuxSessionInfo } from '../../shared/types.js';
 
 const execFileAsync = promisify(execFile);
 
-const KNOWN_AGENT_PREFIXES = ['gideon', 'warden', 'scout', 'builder'];
+const KNOWN_AGENT_PREFIXES = ['gideon', 'warden', 'scout', 'builder', 'forge'];
 
 export class TmuxSessionManager {
   async listAgentSessions(): Promise<TmuxSessionInfo[]> {
