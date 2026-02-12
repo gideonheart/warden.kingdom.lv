@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-02-12)
 
 ## Current Position
 
-Phase: Milestone complete
-Plan: N/A
-Status: v1.0 MVP shipped
-Last activity: 2026-02-12 — v1.0 milestone archived
+Phase: Phase 7 — Terminal Interactivity & Scrollback
+Plan: 07-01 Complete
+Status: Terminal auto-focus and tmux scrollback implemented
+Last activity: 2026-02-12 — Completed 07-01-PLAN.md (terminal interactivity)
 
-Progress: [██████████] 100% (v1.0)
+Progress: [██░░░░░░░░] 20% (v1.1)
 
 ## Performance Metrics
 
@@ -36,6 +36,7 @@ Progress: [██████████] 100% (v1.0)
 | 4 | History & Analytics | `a5879f3` |
 | 5 | Testing & Deployment | `46c87cb` |
 | 6 | Close v1 Audit Gaps | `f669408` |
+| Phase 07 P01 | 164 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -43,16 +44,23 @@ Progress: [██████████] 100% (v1.0)
 
 See PROJECT.md Key Decisions table for full list with outcomes.
 
+**Phase 07-01 Decisions:**
+- Call terminal.focus() immediately after terminal.open() (not in requestAnimationFrame) to eliminate visible focus delay
+- Set tmux history-limit to 50000 lines (~10MB per pane) for monitoring use case
+- tmux.conf created in /home/forge/ as system-level config, not tracked in repo
+
 ### Pending Todos
 
-None.
+- Phase 8: Prompt panel session sync + Gateway send fix
+- Phase 7: Continue with additional terminal UX improvements if needed
 
 ### Blockers/Concerns
 
-None — v1.0 shipped and running.
+- Gateway `/v1/chat/completions` endpoint may need explicit enabling in openclaw.json
+- tmux mouse mode verified working — no agent workflow breakage detected
 
 ## Session Continuity
 
 Last session: 2026-02-12
-Stopped at: v1.0 milestone archived
+Stopped at: Completed 07-01-PLAN.md execution — terminal auto-focus and tmux scrollback
 Resume file: None
