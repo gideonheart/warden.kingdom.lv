@@ -10,6 +10,10 @@ interface TerminalViewProps {
   onSessionExit: (sessionName: string, exitCode: number) => void;
 }
 
+// Strip mouse-tracking enable sequences so xterm.js uses native selection
+// instead of forwarding mouse events to tmux (which has `set -g mouse on`).
+const MOUSE_TRACKING_ENABLE_PATTERN = /\x1b\[\?(1000|1002|1003|1006)h/g;
+
 export function TerminalView({ tmuxSessionName, onSessionExit }: TerminalViewProps) {
   const terminalContainerRef = useRef<HTMLDivElement>(null);
   const terminalInstanceRef = useRef<Terminal | null>(null);
@@ -17,7 +21,8 @@ export function TerminalView({ tmuxSessionName, onSessionExit }: TerminalViewPro
   const [showCopiedToast, setShowCopiedToast] = useState(false);
 
   const handleTerminalOutput = useCallback((data: string) => {
-    terminalInstanceRef.current?.write(data);
+    const filtered = data.replace(MOUSE_TRACKING_ENABLE_PATTERN, '');
+    terminalInstanceRef.current?.write(filtered);
   }, []);
 
   const handleSessionExit = useCallback((exitCode: number) => {
@@ -54,7 +59,6 @@ export function TerminalView({ tmuxSessionName, onSessionExit }: TerminalViewPro
       cursorBlink: true,
       scrollback: 5000,
       allowProposedApi: true,
-      macOptionClickForcesSelection: true,
     });
 
     const fitAddon = new FitAddon();
