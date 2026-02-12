@@ -25,69 +25,106 @@ Server runs at `http://127.0.0.1:3001`, client dev server at `http://localhost:5
 | `npm run test:e2e` | Run Playwright UI tests |
 | `npm run test:e2e:ui` | Run Playwright with interactive UI |
 
-## Playwright E2E Tests
+## Testing
 
-Desktop UI tests verify core dashboard flows using Playwright.
+Warden includes three test layers: backend verification, Playwright E2E, and manual verification.
 
 ### Prerequisites
 
-```bash
-npx playwright install chromium
-```
+Before running tests, ensure the following are installed:
 
-### Run
+- **Node.js 22+**: Check with `node --version`
+- **tmux**: Check with `tmux -V`
+  - Ubuntu/Debian: `sudo apt install tmux`
+  - macOS: `brew install tmux`
+- **Playwright browsers**: `npx playwright install chromium`
+- **Note**: Some tests require the server running on port 3001
 
-```bash
-# Start dev servers and run tests
-npm run test:e2e
-
-# Or with interactive Playwright UI
-npm run test:e2e:ui
-```
-
-If servers are already running, Playwright reuses them automatically.
-
-### What it tests
-
-- **Dashboard load**: Header, navigation buttons, active session count
-- **View navigation**: Switch between Terminals and History views
-- **Agent sidebar**: Toggle visibility
-- **Session history**: Filter controls (agent ID, status, date range)
-- **Token usage**: Per-agent summary, daily breakdown
-- **Log viewer**: Agent filter, auto-refresh toggle
-- **Tab bar**: Session tabs presence on terminals view
-
-### Test files
-
-- `tests/e2e/dashboard.spec.ts` — Core dashboard flow tests
-- `playwright.config.ts` — Playwright configuration (Chromium, 1280x800 viewport)
-
-## Backend Verification
+### Backend Verification
 
 Test backend functionality without UI.
 
-### Prerequisites
+**Prerequisites**: Server must be running (`npm run dev`)
 
-- tmux installed
-- Server running on port 3001 (`npm run dev`)
-
-### Run
+**Run**:
 
 ```bash
 npm run test:backend
 ```
 
-### What it tests
+**What it tests**:
 
-- **Health check**: Server responds 200 OK on `/api/health`
-- **Auto-discovery**: tmux sessions with agent naming convention appear in `/api/instances`
-- **Session stop**: Sessions can be stopped via `POST /api/instances/:id/stop`
-- **Database persistence**: SQLite database exists with WAL mode, all tables created
-- **Socket.IO**: WebSocket endpoint is accessible
+- ✓ **Health check**: Server responds 200 OK on `/api/health`
+- ✓ **Auto-discovery**: tmux sessions with agent naming convention appear in `/api/instances`
+- ✓ **Session stop**: Sessions can be stopped via `POST /api/instances/:id/stop`
+- ✓ **Database persistence**: SQLite database exists with WAL mode, all tables created
+- ✓ **Socket.IO**: WebSocket endpoint is accessible
 
-## Verifying PTY Resize Safety
+**Expected output**:
 
-The terminal resize handler guards against EBADF/EINVAL errors when a PTY process has already exited. To verify manually:
+```
+✓ GET /api/health should return 200 OK
+✓ GET /api/instances should return active tmux sessions
+✓ POST /api/instances/:id/stop should stop a session
+✓ Database should exist with WAL mode
+✓ Socket.IO endpoint should be accessible
+
+5 passed
+```
+
+**Troubleshooting**:
+
+- **Health check fails**: Verify server is running on port 3001 (`npm run dev`)
+- **Auto-discovery fails**: Create a test tmux session (`tmux new-session -d -s test-agent-123`)
+- **Database fails**: Check `data/warden.db` exists and is writable
+
+### Playwright E2E Tests
+
+Desktop UI tests verify core dashboard flows.
+
+**Prerequisites**: Chromium via `npx playwright install chromium`
+
+**Run**:
+
+```bash
+# Headless mode
+npm run test:e2e
+
+# Interactive UI mode
+npm run test:e2e:ui
+```
+
+**What it tests**:
+
+- ✓ **Dashboard load**: Header, navigation buttons, active session count
+- ✓ **View navigation**: Switch between Terminals and History views
+- ✓ **Agent sidebar**: Toggle visibility
+- ✓ **Session history**: Filter controls (agent ID, status, date range)
+- ✓ **Token usage**: Per-agent summary, daily breakdown
+- ✓ **Log viewer**: Agent filter, auto-refresh toggle
+- ✓ **Tab bar**: Session tabs presence on terminals view
+
+**Test file locations**:
+
+- `tests/e2e/dashboard.spec.ts` — Core dashboard flow tests
+- `tests/e2e/screenshot.spec.ts` — Screenshot capture tests
+- `playwright.config.ts` — Playwright configuration
+
+**Expected output**: `12 passed (12/12)`
+
+**Troubleshooting**:
+
+- **Browser launch fails**: Run `npx playwright install chromium` to install browsers
+- **Tests timeout**: Increase timeout in `playwright.config.ts` or check server performance
+- **Server not found**: Verify dev servers are running or let Playwright start them automatically
+
+### Manual Verification
+
+#### PTY Resize Safety
+
+The terminal resize handler guards against EBADF/EINVAL errors when a PTY process has already exited.
+
+**Steps to verify**:
 
 1. Start the server: `npm run dev:all`
 2. Open the dashboard in a browser and connect to a tmux session
@@ -95,6 +132,29 @@ The terminal resize handler guards against EBADF/EINVAL errors when a PTY proces
 4. Resize the browser window — the server should log a warning but **not crash**
 5. Check server logs for: `[TerminalStream] Ignoring resize error (EBADF)` (expected)
 6. Confirm `/api/health` still returns 200
+
+**Expected behavior**: Server continues running, logs warning, dashboard shows disconnected session.
+
+#### Stop Button
+
+Verify that the stop button correctly terminates tmux sessions.
+
+**Steps to verify**:
+
+1. Start the dashboard: `npm run dev:all`
+2. Create a test tmux session: `tmux new-session -d -s test-warden-stop`
+3. In the dashboard, click the "Stop" button next to the test session
+4. Verify the button shows a loading state during the operation
+5. Verify the session is removed from the UI after stopping
+6. Verify the session is terminated: `tmux list-sessions` should not show `test-warden-stop`
+
+### Test Coverage Summary
+
+| Layer | Type | Files | Purpose |
+|-------|------|-------|---------|
+| Backend | Integration | `tests/backend/` | Verify API endpoints, database, Socket.IO |
+| E2E | UI Automation | `tests/e2e/` | Verify dashboard flows in Chromium browser |
+| Manual | Verification | N/A | Verify edge cases (PTY safety, stop button) |
 
 ## Production Deployment
 
