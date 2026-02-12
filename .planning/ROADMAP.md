@@ -19,12 +19,13 @@
 
 </details>
 
-### v1.1 UX Fixes & Prompt Panel (Active)
+<details>
+<summary>✅ v1.1 UX Fixes & Prompt Panel (Phases 7-8) — SHIPPED 2026-02-12</summary>
 
 - [x] Phase 7: Terminal Interactivity & Scrollback (1/1 plan) — completed 2026-02-12
-  - [x] 07-01-PLAN.md — Terminal auto-focus + tmux mouse scrollback
 - [x] Phase 8: Prompt Panel & Gateway Integration (1/1 plan) — completed 2026-02-12
-  - [x] 08-01-PLAN.md — Fix dropdown session sync, Send button, and Playwright E2E tests
+
+</details>
 
 ## Progress
 

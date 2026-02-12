@@ -32,3 +32,31 @@
 See `.planning/milestones/v1.0-ROADMAP.md` for full phase details.
 
 ---
+
+## v1.1 UX Fixes & Prompt Panel (Shipped: 2026-02-12)
+
+**Phases:** 2 (Phases 7-8) | **Plans:** 2 | **Tasks:** 4 | **Commits:** 14
+**Timeline:** 2026-02-12 (~2 hours)
+**Git range:** `733e78a..595e5e9`
+
+**Delivered:** Terminal interactivity overhaul (auto-focus, tmux mouse scrollback) and session-aware prompt panel with auto-syncing agent dropdown and working Gateway API delivery.
+
+**Key accomplishments:**
+1. Terminal auto-focus on load and tab switch — immediately interactive without click-to-focus
+2. tmux mouse scrollback with 50,000-line history buffer for session debugging
+3. Session-aware prompt panel with auto-syncing agent dropdown on tab switch
+4. Working Send button and Ctrl+Enter prompt delivery via Gateway API
+5. 8 new Playwright E2E tests covering terminal focus and prompt panel behaviors
+
+**Phases:**
+- Phase 7: Terminal Interactivity & Scrollback (1/1 plan) — `9f65d54`
+- Phase 8: Prompt Panel & Gateway Integration (1/1 plan) — `effa33c`
+
+**Tech debt accepted:**
+- Gateway `/v1/chat/completions` endpoint may need explicit enabling in openclaw.json per agent
+- tmux.conf is system-level (/home/forge/.tmux.conf), not tracked in repo
+
+See `.planning/milestones/v1.1-ROADMAP.md` for full phase details.
+
+---
+

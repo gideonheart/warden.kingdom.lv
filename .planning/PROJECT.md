@@ -2,7 +2,7 @@
 
 ## What This Is
 
-A browser-based terminal multiplexer hosted at `warden.kingdom.lv` that streams live Claude Code output via xterm.js, shows which OpenClaw agent owns each session, maps sessions to Telegram topics, and lets the operator inject prompts or type directly into terminals. It is the observation and override layer for the multi-agent system orchestrated by Gideon.
+A browser-based terminal multiplexer hosted at `warden.kingdom.lv` that streams live Claude Code output via xterm.js, shows which OpenClaw agent owns each session, maps sessions to Telegram topics, and lets the operator inject prompts or type directly into terminals — with auto-focusing terminals, mouse scrollback, and session-aware prompt delivery via Gateway. It is the observation and override layer for the multi-agent system orchestrated by Gideon.
 
 ## Core Value
 
@@ -25,10 +25,16 @@ Real-time visibility into all active Claude Code agent sessions from a single br
 - ✓ Gateway log tail viewer filtered by agent — v1.0
 - ✓ Per-session stop button — v1.0
 - ✓ Comprehensive README with test documentation — v1.0
+- ✓ Terminal auto-focus on load and tab switch (no click needed) — v1.1
+- ✓ Mouse wheel scrollback via tmux history (50,000 lines) — v1.1
+- ✓ Prompt dropdown reflects selected session and auto-syncs on tab switch — v1.1
+- ✓ Prompt dropdown allows manual override to any configured agent — v1.1
+- ✓ Send button delivers prompts via Gateway API — v1.1
+- ✓ Ctrl+Enter sends prompts — v1.1
 
 ### Active
 
-(None — define in next milestone via `/gsd:new-milestone`)
+(None — define in next milestone)
 
 ### Out of Scope
 
@@ -44,10 +50,11 @@ Real-time visibility into all active Claude Code agent sessions from a single br
 
 ## Context
 
-Shipped v1.0 with 2,385 LOC TypeScript across 66 files.
+Shipped v1.1 with 2,644 LOC TypeScript (src + tests).
 Tech stack: Express 5, Socket.IO 4, React 19, xterm.js 5, node-pty, SQLite (better-sqlite3), Tailwind CSS 4, Vite 6.
 Runs on Ubuntu 24 server (Laravel Forge managed), same host as gideons.kingdom.lv.
-12 Playwright E2E tests passing. Production Nginx config with SSL + IP whitelist + WebSocket.
+20 Playwright E2E tests passing (12 from v1.0 + 8 from v1.1). Production Nginx config with SSL + IP whitelist + WebSocket.
+tmux configured with mouse mode and 50,000-line scrollback buffer for monitoring workflows.
 
 ## Constraints
 
@@ -68,6 +75,10 @@ Runs on Ubuntu 24 server (Laravel Forge managed), same host as gideons.kingdom.l
 | Tailwind CSS 4 | Utility-first, matches OpenClaw dark UI aesthetic | ✓ Good — requires @tailwindcss/vite plugin |
 | SRP service architecture | Each service does one thing: TmuxSessionManager, TerminalStreamService, etc. | ✓ Good — clean separation |
 | Always-interactive terminals | Read-only mode adds friction, single operator model | ✓ Good — simplified codebase, fixed buffer-clearing bug |
+| Immediate terminal.focus() after open() | Eliminates visible focus delay vs requestAnimationFrame | ✓ Good — instant interactive feel |
+| tmux 50,000-line history-limit | ~10MB/pane, adequate for monitoring use | ✓ Good — enables session debugging |
+| Derived state for prompt panel sync | Compute derivedAgentId from activeInstances lookup | ✓ Good — reliable, no manual tracking |
+| Separate sidebar/prompt panel agent state | Clean separation of concerns, avoids state conflicts | ✓ Good — independent behavior |
 
 ---
-*Last updated: 2026-02-12 after v1.0 milestone*
+*Last updated: 2026-02-12 after v1.1 milestone*

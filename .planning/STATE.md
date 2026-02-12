@@ -5,14 +5,13 @@
 See: .planning/PROJECT.md (updated 2026-02-12)
 
 **Core value:** Real-time visibility into all active Claude Code agent sessions from a single browser tab
-**Current focus:** v1.1 complete — all phases delivered
+**Current focus:** v1.1 shipped — planning next milestone
 
 ## Current Position
 
-Phase: Phase 8 — Prompt Panel & Gateway Integration
-Plan: 08-01 Complete (1/1)
-Status: Phase 8 complete
-Last activity: 2026-02-12 — Phase 8 Plan 01 execution complete
+Phase: All phases complete (v1.0 Phases 1-6, v1.1 Phases 7-8)
+Status: Milestone v1.1 complete
+Last activity: 2026-02-12 — v1.1 milestone archived
 
 Progress: [██████████] 100% (v1.1)
 
@@ -26,18 +25,27 @@ Progress: [██████████] 100% (v1.1)
 - LOC: 2,385 TypeScript
 - Timeline: 2026-02-12 (single day)
 
+**v1.1 UX Fixes & Prompt Panel:**
+- Phases: 2 (7-8)
+- Plans: 2
+- Tasks: 4
+- Commits: 14
+- Files modified: 25
+- LOC: 2,644 TypeScript (total src + tests)
+- Timeline: 2026-02-12 (~2 hours)
+
 **Completed Phases:**
 
-| Phase | Description | Commit |
-|-------|-------------|--------|
-| 1 | Core Infrastructure | `0341445` |
-| 2 | Frontend Terminal UI | `e7e726a` |
-| 3 | Agent Integration | `18337f8` |
-| 4 | History & Analytics | `a5879f3` |
-| 5 | Testing & Deployment | `46c87cb` |
-| 6 | Close v1 Audit Gaps | `f669408` |
-| 7 | Terminal Interactivity & Scrollback | `9f65d54` |
-| 8 | Prompt Panel & Gateway Integration | `effa33c` |
+| Phase | Description | Milestone | Commit |
+|-------|-------------|-----------|--------|
+| 1 | Core Infrastructure | v1.0 | `0341445` |
+| 2 | Frontend Terminal UI | v1.0 | `e7e726a` |
+| 3 | Agent Integration | v1.0 | `18337f8` |
+| 4 | History & Analytics | v1.0 | `a5879f3` |
+| 5 | Testing & Deployment | v1.0 | `46c87cb` |
+| 6 | Close v1 Audit Gaps | v1.0 | `f669408` |
+| 7 | Terminal Interactivity & Scrollback | v1.1 | `9f65d54` |
+| 8 | Prompt Panel & Gateway Integration | v1.1 | `effa33c` |
 
 ## Accumulated Context
 
@@ -45,28 +53,17 @@ Progress: [██████████] 100% (v1.1)
 
 See PROJECT.md Key Decisions table for full list with outcomes.
 
-**Phase 07-01 Decisions:**
-- Call terminal.focus() immediately after terminal.open() (not in requestAnimationFrame) to eliminate visible focus delay
-- Set tmux history-limit to 50000 lines (~10MB per pane) for monitoring use case
-- tmux.conf created in /home/forge/ as system-level config, not tracked in repo
-
-**Phase 08-01 Decisions:**
-- Derive selectedAgentId from activeInstances lookup instead of manual state
-- Reset manual dropdown override on every tab switch via useEffect
-- Separate sidebar agent state (sidebarSelectedAgentId) from prompt panel agent state (derivedAgentId)
-- Scope test selectors to prompt panel area to avoid matching tab bar elements
-
 ### Pending Todos
 
-None — all v1.1 milestones complete
+None — all milestones complete
 
 ### Blockers/Concerns
 
-- Gateway `/v1/chat/completions` endpoint may need explicit enabling in openclaw.json
-- tmux mouse mode verified working — no agent workflow breakage detected
+- Gateway `/v1/chat/completions` endpoint may need explicit enabling in openclaw.json per agent
+- tmux.conf is system-level config (/home/forge/.tmux.conf), not tracked in repo
 
 ## Session Continuity
 
 Last session: 2026-02-12
-Stopped at: Phase 8 complete — all v1.1 milestones delivered
+Stopped at: v1.1 milestone archived
 Resume file: None
