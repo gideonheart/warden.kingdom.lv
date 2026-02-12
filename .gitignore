@@ -6,3 +6,10 @@ data/warden.db-shm
 *.log
 .env
 .env.local
+playwright-report/
+test-results/
+*.png
+*.b64
+tmp_b64.txt
+src/shared/*.js
+memory/

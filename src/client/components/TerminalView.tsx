@@ -62,8 +62,12 @@ export function TerminalView({ tmuxSessionName, onSessionExit }: TerminalViewPro
     terminal.open(terminalContainerRef.current);
 
     requestAnimationFrame(() => {
-      fitAddon.fit();
-      sendResize(terminal.cols, terminal.rows);
+      try {
+        fitAddon.fit();
+        sendResize(terminal.cols, terminal.rows);
+      } catch {
+        // Container may not have dimensions yet (zero-size layout)
+      }
     });
 
     terminal.onData((userInput: string) => {
@@ -80,7 +84,11 @@ export function TerminalView({ tmuxSessionName, onSessionExit }: TerminalViewPro
     fitAddonRef.current = fitAddon;
 
     const handleWindowResize = () => {
-      fitAddon.fit();
+      try {
+        fitAddon.fit();
+      } catch {
+        // Container may have zero dimensions during layout transitions
+      }
     };
     window.addEventListener('resize', handleWindowResize);
 
