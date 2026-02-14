@@ -57,7 +57,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 
 | # | Description | Date | Commit |
 |---|-------------|------|--------|
-| 2 | Terminal auto-copy selection to clipboard with toast | 2026-02-12 | pending |
+| 2 | Terminal auto-copy selection to clipboard with toast | 2026-02-12 | `3204868` |
 
 ### Pending Todos
 

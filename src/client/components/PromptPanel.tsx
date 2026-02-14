@@ -49,9 +49,7 @@ export function PromptPanel({ agents, selectedAgentId }: PromptPanelProps) {
       const result = await response.json();
 
       if (response.ok) {
-        const successText = result.message
-          ? `${result.message} — watch the terminal above for the agent response`
-          : 'Prompt sent — watch the terminal above for the agent response';
+        const successText = result.message ?? `Prompt delivered to ${effectiveAgentId}`;
         setStatusMessage({ type: 'success', text: successText });
         setPrompt('');
 
@@ -94,7 +92,7 @@ export function PromptPanel({ agents, selectedAgentId }: PromptPanelProps) {
   return (
     <div className="border-t border-warden-border bg-warden-panel px-3 py-2">
       <div className="flex items-center gap-2 mb-1.5">
-        <span className="text-xs text-warden-text-dim">Send prompt to Claude Code in session:</span>
+        <span className="text-xs text-warden-text-dim">Send prompt to agent:</span>
         <select
           value={effectiveAgentId}
           onChange={(e) => setTargetAgentId(e.target.value)}
@@ -126,7 +124,7 @@ export function PromptPanel({ agents, selectedAgentId }: PromptPanelProps) {
         </div>
       )}
       <div className="flex flex-col gap-1">
-        <span className="text-[10px] text-warden-text-dim/50">Sends prompt to the AI agent running in the tmux session (requires Claude Code to be running)</span>
+        <span className="text-[10px] text-warden-text-dim/50">Sends prompt to the AI agent via OpenClaw Gateway — the agent interprets and acts</span>
         <div className="flex gap-2">
           <textarea
             value={prompt}

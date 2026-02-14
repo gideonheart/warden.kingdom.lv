@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { openClawConfigReader } from '../services/OpenClawConfigReader.js';
-import { tmuxSessionManager } from '../services/TmuxSessionManager.js';
+import { gatewayApiClient } from '../services/GatewayApiClient.js';
 
 export const agentRoutes = Router();
 
@@ -32,42 +32,24 @@ agentRoutes.post('/api/agents/:agentId/prompt', async (request, response) => {
   }
 
   try {
-    // Convention: GSD agent sessions are named {agentId}-gsd-main
-    const sessionName = `${agentId}-gsd-main`;
+    const result = await gatewayApiClient.sendPrompt(agentId, prompt.trim());
 
-    // Check if the session exists
-    const exists = await tmuxSessionManager.sessionExists(sessionName);
-    if (!exists) {
-      response.status(404).json({
-        success: false,
-        error: `No tmux session found for agent '${agentId}' (expected session: ${sessionName})`
-      });
-      return;
+    if (result.success) {
+      response.json({ success: true, message: result.message });
+    } else {
+      const statusCode = result.errorCategory === 'auth' ? 401
+        : result.errorCategory === 'not_found' ? 404
+        : result.errorCategory === 'server' ? 502
+        : result.errorCategory === 'network' ? 503
+        : 500;
+      response.status(statusCode).json({ success: false, error: result.error });
     }
-
-    // Check if Claude Code is actually running in the session
-    const isClaudeRunning = await tmuxSessionManager.isClaudeCodeRunning(sessionName);
-    if (!isClaudeRunning) {
-      response.status(400).json({
-        success: false,
-        error: `Claude Code is not running in session '${sessionName}'. Please start Claude Code in this session first (e.g., run 'claude --dangerously-skip-permissions' in the ${agentId} terminal).`
-      });
-      return;
-    }
-
-    // Send the prompt to the tmux session
-    await tmuxSessionManager.sendPromptToSession(sessionName, prompt.trim());
-
-    response.json({
-      success: true,
-      message: `Prompt sent to ${agentId} (Claude Code)`
-    });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     console.error(`[agentRoutes] Failed to send prompt to ${agentId}:`, errorMessage);
     response.status(500).json({
       success: false,
-      error: `Failed to send prompt to tmux session: ${errorMessage}`
+      error: `Failed to send prompt: ${errorMessage}`
     });
   }
 });

@@ -19,53 +19,79 @@ send_cmd() {
 }
 
 get_tail() {
-  tmux capture-pane -p -J -t "$TARGET" -S -120 2>/dev/null || true
+  # Note: -J (join wrapped lines) can return empty output with some TUIs; avoid it.
+  tmux capture-pane -p -t "$TARGET" -S -120 2>/dev/null || true
 }
 
 is_idle_prompt() {
-  # We treat it as idle when the bottom area contains a lone prompt line.
-  # Claude Code sometimes shows "❯" or "❯ <prefilled>".
+  # We treat it as idle when the bottom area contains a prompt line.
+  # Claude Code uses Unicode whitespace sometimes (e.g. NBSP), so match any prompt.
   local text="$1"
-  echo "$text" | tail -n 8 | grep -Eq '^❯( |$)'
+  echo "$text" | tail -n 12 | grep -Eq '^❯'
 }
 
 main() {
   local loops=0
-  local last_hash=""
+  local last_action_sig=""
 
   while (( loops < MAX_IDLE_LOOPS )); do
     loops=$((loops+1))
+
     local t
     t="$(get_tail)"
-    local h
-    h="$(printf '%s' "$t" | sha1sum | awk '{print $1}')"
 
-    # Only act when output changed and we're idle.
-    if [[ "$h" != "$last_hash" ]]; then
-      last_hash="$h"
+    if is_idle_prompt "$t"; then
+      # Derive an action signature from the visible "Next Up" recommendations to avoid spamming.
+      local sig
+      sig="$(echo "$t" | tail -n 120 | grep -E '/gsd:|/clear' | tr '\n' ' ' | sed 's/[[:space:]]\+/ /g' | head -c 200)"
 
-      if is_idle_prompt "$t"; then
-        # Common next-steps
+      if [[ -n "$sig" && "$sig" != "$last_action_sig" ]]; then
+        echo "[poller] idle prompt detected; sig=$sig" >&2
+        last_action_sig="$sig"
+
         if echo "$t" | grep -q '/clear first' && echo "$t" | grep -q '/gsd:execute-phase'; then
-          send_cmd "/clear"
-          sleep 1
-          # Extract phase number if present; default 6.
           local phase
           phase="$(echo "$t" | grep -oE '/gsd:execute-phase [0-9]+' | tail -n1 | awk '{print $2}')"
-          phase="${phase:-6}"
+          phase="${phase:-1}"
+          echo "[poller] sending: /clear then /gsd:execute-phase $phase" >&2
+          send_cmd "/clear"
+          sleep 1
           send_cmd "/gsd:execute-phase $phase"
+
+        elif echo "$t" | grep -q '/clear first' && echo "$t" | grep -q '/gsd:plan-phase'; then
+          local phase
+          phase="$(echo "$t" | grep -oE '/gsd:plan-phase [0-9]+' | tail -n1 | awk '{print $2}')"
+          phase="${phase:-1}"
+          echo "[poller] sending: /clear then /gsd:plan-phase $phase" >&2
+          send_cmd "/clear"
+          sleep 1
+          send_cmd "/gsd:plan-phase $phase"
+
+        elif echo "$t" | grep -q '/clear first' && echo "$t" | grep -q '/gsd:new-milestone'; then
+          echo "[poller] sending: /clear then /gsd:new-milestone" >&2
+          send_cmd "/clear"
+          sleep 1
+          send_cmd "/gsd:new-milestone"
+
         elif echo "$t" | grep -q '/gsd:verify-work'; then
           local phase
           phase="$(echo "$t" | grep -oE '/gsd:verify-work [0-9]+' | tail -n1 | awk '{print $2}')"
-          phase="${phase:-}"
           if [[ -n "$phase" ]]; then
+            echo "[poller] sending: /clear then /gsd:verify-work $phase" >&2
             send_cmd "/clear"
             sleep 1
             send_cmd "/gsd:verify-work $phase"
           fi
-        elif echo "$t" | grep -q '/gsd:complete-milestone'; then
-          # Don't auto-complete milestone without explicit human OK.
-          echo "[poller] Detected /gsd:complete-milestone suggestion; pausing for human confirmation." >&2
+
+        elif echo "$t" | grep -q '/clear first' && echo "$t" | grep -q '/gsd:complete-milestone' && ! echo "$t" | grep -q '/gsd:verify-work'; then
+          # Only complete milestone when it's the only next-step (verification already done).
+          echo "[poller] sending: /clear then /gsd:complete-milestone" >&2
+          send_cmd "/clear"
+          sleep 1
+          send_cmd "/gsd:complete-milestone"
+
+        else
+          echo "[poller] idle prompt but no recognized next-step; doing nothing" >&2
         fi
       fi
     fi
