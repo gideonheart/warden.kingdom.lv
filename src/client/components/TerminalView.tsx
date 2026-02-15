@@ -21,8 +21,7 @@ function getResponsiveFontSize(): number {
   return window.innerWidth < 640 ? 11 : 14;
 }
 
-const MOBILE_KEYS: Array<{ label: string; seq: string; wide?: boolean }> = [
-  { label: 'Esc', seq: '\x1b' },
+const MOBILE_KEYS: Array<{ label: string; seq: string }> = [
   { label: 'Tab', seq: '\t' },
   { label: 'Ctrl+C', seq: '\x03' },
   { label: 'Ctrl+D', seq: '\x04' },
@@ -34,21 +33,98 @@ const MOBILE_KEYS: Array<{ label: string; seq: string; wide?: boolean }> = [
   { label: 'PgDn', seq: '\x1b[6~' },
 ];
 
-function MobileKeyToolbar({ sendInput }: { sendInput: (data: string) => void }) {
+interface MobileKeyToolbarProps {
+  sendInput: (data: string) => void;
+  selectMode: boolean;
+  onToggleCopyMode: () => void;
+}
+
+function MobileKeyToolbar({ sendInput, selectMode, onToggleCopyMode }: MobileKeyToolbarProps) {
+  const [showPasteInput, setShowPasteInput] = useState(false);
+  const pasteInputRef = useRef<HTMLTextAreaElement>(null);
+
+  const handlePaste = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text) {
+        sendInput(text);
+        return;
+      }
+    } catch {
+      // Clipboard API unavailable or denied — show manual paste input
+    }
+    setShowPasteInput(true);
+  };
+
+  useEffect(() => {
+    if (showPasteInput) {
+      pasteInputRef.current?.focus();
+    }
+  }, [showPasteInput]);
+
   return (
-    <div className="flex items-center gap-1 px-2 py-1.5 bg-warden-panel border-t border-warden-border overflow-x-auto touch-scroll">
-      {MOBILE_KEYS.map((key) => (
+    <div className="relative z-40 flex flex-col bg-warden-panel border-t border-warden-border">
+      {showPasteInput && (
+        <div className="flex items-center gap-2 px-2 py-1.5 border-b border-warden-border">
+          <textarea
+            ref={pasteInputRef}
+            onPaste={(event) => {
+              event.preventDefault();
+              const text = event.clipboardData.getData('text');
+              if (text) {
+                sendInput(text);
+              }
+              setShowPasteInput(false);
+            }}
+            placeholder="Tap and paste here"
+            rows={1}
+            className="flex-1 px-2 py-1 text-xs font-mono bg-warden-bg text-warden-text rounded border border-warden-border resize-none"
+          />
+          <button
+            onTouchStart={(event) => { event.preventDefault(); setShowPasteInput(false); }}
+            onClick={() => setShowPasteInput(false)}
+            className="px-2 py-1.5 min-h-[36px] text-xs text-warden-text-dim bg-warden-border/40 rounded"
+          >
+            Cancel
+          </button>
+        </div>
+      )}
+      <div className="flex items-center gap-1 px-2 py-1.5 overflow-x-auto touch-scroll">
         <button
-          key={key.label}
-          onTouchStart={(e) => {
-            e.preventDefault();
-            sendInput(key.seq);
-          }}
+          onTouchStart={(event) => { event.preventDefault(); onToggleCopyMode(); }}
+          className={`px-2 py-1.5 min-w-[40px] min-h-[36px] text-xs font-mono rounded whitespace-nowrap select-none ${
+            selectMode
+              ? 'bg-warden-accent/30 text-warden-accent border border-warden-accent/50'
+              : 'text-warden-text-dim bg-warden-border/40 active:bg-warden-accent/30 active:text-warden-accent'
+          }`}
+        >
+          {selectMode ? 'Close' : 'Copy'}
+        </button>
+        <button
+          onTouchStart={(event) => { event.preventDefault(); handlePaste(); }}
           className="px-2 py-1.5 min-w-[40px] min-h-[36px] text-xs font-mono text-warden-text-dim bg-warden-border/40 rounded active:bg-warden-accent/30 active:text-warden-accent whitespace-nowrap select-none"
         >
-          {key.label}
+          Paste
         </button>
-      ))}
+        <button
+          onTouchStart={(event) => { event.preventDefault(); sendInput('\x1b'); }}
+          className="px-2 py-1.5 min-w-[40px] min-h-[36px] text-xs font-mono text-warden-text-dim bg-warden-border/40 rounded active:bg-warden-accent/30 active:text-warden-accent whitespace-nowrap select-none"
+        >
+          Esc
+        </button>
+        {MOBILE_KEYS.map((key) => (
+          <button
+            key={key.label}
+            onTouchStart={(event) => {
+              event.preventDefault();
+              sendInput(key.seq);
+            }}
+            className="px-2 py-1.5 min-w-[40px] min-h-[36px] text-xs font-mono text-warden-text-dim bg-warden-border/40 rounded active:bg-warden-accent/30 active:text-warden-accent whitespace-nowrap select-none"
+          >
+            {key.label}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
@@ -76,6 +152,30 @@ export function TerminalView({ tmuxSessionName, onSessionExit }: TerminalViewPro
     onTerminalOutput: handleTerminalOutput,
     onSessionExit: handleSessionExit,
   });
+
+  const handleToggleCopyMode = useCallback(() => {
+    if (selectMode) {
+      setSelectMode(false);
+      window.getSelection()?.removeAllRanges();
+      requestAnimationFrame(() => {
+        terminalInstanceRef.current?.focus();
+      });
+    } else {
+      const terminal = terminalInstanceRef.current;
+      if (terminal) {
+        const buffer = terminal.buffer.active;
+        const lines: string[] = [];
+        for (let i = 0; i < buffer.length; i++) {
+          const line = buffer.getLine(i);
+          if (line) {
+            lines.push(line.translateToString());
+          }
+        }
+        setTerminalText(lines.join('\n'));
+      }
+      setSelectMode(true);
+    }
+  }, [selectMode]);
 
   useEffect(() => {
     if (!terminalContainerRef.current) return;
@@ -193,8 +293,7 @@ export function TerminalView({ tmuxSessionName, onSessionExit }: TerminalViewPro
     };
     container.addEventListener('wheel', handleWheel, { passive: false });
 
-    // Mobile: touch scroll + long-press detection
-    let longPressTimer: ReturnType<typeof setTimeout> | null = null;
+    // Mobile: touch scroll (copy mode is toggled via toolbar button, not long-press)
     let touchStartY = 0;
     let touchAccumulator = 0;
     let isScrolling = false;
@@ -203,22 +302,6 @@ export function TerminalView({ tmuxSessionName, onSessionExit }: TerminalViewPro
       touchStartY = event.touches[0].clientY;
       touchAccumulator = 0;
       isScrolling = false;
-
-      longPressTimer = setTimeout(() => {
-        if (isScrolling) return;
-
-        // Extract full buffer history for copy overlay
-        const buffer = terminal.buffer.active;
-        const lines: string[] = [];
-        for (let i = 0; i < buffer.length; i++) {
-          const line = buffer.getLine(i);
-          if (line) {
-            lines.push(line.translateToString());
-          }
-        }
-        setTerminalText(lines.join('\n'));
-        setSelectMode(true);
-      }, 500);
     };
 
     const handleTouchMove = (event: TouchEvent) => {
@@ -226,13 +309,8 @@ export function TerminalView({ tmuxSessionName, onSessionExit }: TerminalViewPro
       const deltaY = touchStartY - currentY;
       touchStartY = currentY;
 
-      // Cancel long-press once user starts scrolling
       if (Math.abs(deltaY) > 2 && !isScrolling) {
         isScrolling = true;
-        if (longPressTimer) {
-          clearTimeout(longPressTimer);
-          longPressTimer = null;
-        }
       }
 
       if (isScrolling) {
@@ -245,18 +323,14 @@ export function TerminalView({ tmuxSessionName, onSessionExit }: TerminalViewPro
         touchAccumulator += deltaY;
         const linesToScroll = Math.trunc(touchAccumulator / cellHeight);
         if (linesToScroll !== 0) {
-          // deltaY positive = finger moved up = scroll up in tmux
-          sendScrollToTmux(linesToScroll);
+          // Natural scrolling: finger up = see newer content = scroll down in tmux
+          sendScrollToTmux(-linesToScroll);
           touchAccumulator -= linesToScroll * cellHeight;
         }
       }
     };
 
     const handleTouchEnd = () => {
-      if (longPressTimer) {
-        clearTimeout(longPressTimer);
-        longPressTimer = null;
-      }
       isScrolling = false;
       touchAccumulator = 0;
     };
@@ -292,7 +366,6 @@ export function TerminalView({ tmuxSessionName, onSessionExit }: TerminalViewPro
         container.removeEventListener('touchmove', handleTouchMove);
         container.removeEventListener('touchend', handleTouchEnd);
       }
-      if (longPressTimer) clearTimeout(longPressTimer);
       terminal.dispose();
       terminalInstanceRef.current = null;
       fitAddonRef.current = null;
@@ -306,7 +379,7 @@ export function TerminalView({ tmuxSessionName, onSessionExit }: TerminalViewPro
   }, [showCopiedToast]);
 
   return (
-    <div className="relative flex flex-col h-full">
+    <div className="flex flex-col h-full">
       <div className="flex items-center justify-between px-3 py-1.5 bg-warden-panel border-b border-warden-border">
         <div className="flex items-center gap-2">
           <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-warden-success' : isReconnecting ? 'bg-warden-warning animate-pulse' : 'bg-warden-error'}`} />
@@ -315,63 +388,64 @@ export function TerminalView({ tmuxSessionName, onSessionExit }: TerminalViewPro
         <span className="text-[10px] text-warden-text-dim/40 hidden sm:inline">Alt+click to position cursor</span>
       </div>
 
-      {!isConnected && (
-        <div className="absolute inset-0 top-8 flex items-center justify-center bg-warden-bg/80 z-10">
-          <div className="flex items-center gap-2">
-            <div className={`w-4 h-4 border-2 ${isReconnecting ? 'border-warden-warning' : 'border-warden-accent'} border-t-transparent rounded-full animate-spin`} />
-            <span className="text-warden-text-dim text-sm">
-              {isReconnecting ? 'Reconnecting' : 'Connecting'} to {tmuxSessionName}...
-            </span>
+      {/* Terminal content area — overlays scoped here, toolbar stays outside */}
+      <div className="relative flex-1 min-h-0 min-w-0">
+        {!isConnected && (
+          <div className="absolute inset-0 flex items-center justify-center bg-warden-bg/80 z-10">
+            <div className="flex items-center gap-2">
+              <div className={`w-4 h-4 border-2 ${isReconnecting ? 'border-warden-warning' : 'border-warden-accent'} border-t-transparent rounded-full animate-spin`} />
+              <span className="text-warden-text-dim text-sm">
+                {isReconnecting ? 'Reconnecting' : 'Connecting'} to {tmuxSessionName}...
+              </span>
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      <div ref={terminalContainerRef} className="flex-1 min-h-0 min-w-0 overflow-hidden" />
+        <div ref={terminalContainerRef} className="h-full w-full overflow-hidden" />
 
-      {/* Mobile key toolbar */}
-      {IS_TOUCH_DEVICE && (
-        <MobileKeyToolbar sendInput={sendInput} />
-      )}
+        {/* Alt+click visual indicator */}
+        {clickIndicator && (
+          <div
+            className="absolute w-3 h-3 rounded-full bg-warden-accent/60 pointer-events-none z-20 animate-ping"
+            style={{ left: clickIndicator.x - 6, top: clickIndicator.y }}
+          />
+        )}
 
-      {/* Alt+click visual indicator */}
-      {clickIndicator && (
-        <div
-          className="absolute w-3 h-3 rounded-full bg-warden-accent/60 pointer-events-none z-20 animate-ping"
-          style={{ left: clickIndicator.x - 6, top: clickIndicator.y + 28 }}
-        />
-      )}
-
-      {/* Mobile long-press text selection overlay */}
-      {selectMode && (
-        <div className="absolute inset-0 z-30 bg-warden-bg/95 overflow-auto p-3 flex flex-col">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs text-warden-text-dim">Long-press text to select and copy</span>
-            <button
-              onClick={() => {
-                setSelectMode(false);
-                window.getSelection()?.removeAllRanges();
-                requestAnimationFrame(() => {
-                  terminalInstanceRef.current?.focus();
-                });
-              }}
-              className="px-2 py-1 text-xs text-warden-text-dim hover:text-warden-text bg-warden-border/50 rounded transition-colors min-h-[44px] min-w-[44px]"
+        {/* Mobile copy mode text selection overlay — scoped to terminal area */}
+        {selectMode && (
+          <div className="absolute inset-0 z-30 bg-warden-bg/95 overflow-auto p-3 flex flex-col">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs text-warden-text-dim">Long-press text to select and copy</span>
+              <button
+                onClick={handleToggleCopyMode}
+                className="px-2 py-1 text-xs text-warden-text-dim hover:text-warden-text bg-warden-border/50 rounded transition-colors min-h-[44px] min-w-[44px]"
+              >
+                Close
+              </button>
+            </div>
+            <pre
+              className="flex-1 select-text text-warden-text font-mono text-xs leading-relaxed whitespace-pre overflow-auto"
+              style={{ fontFamily: "'JetBrains Mono', 'Fira Code', monospace", fontSize: '12px' }}
             >
-              Close
-            </button>
+              {terminalText}
+            </pre>
           </div>
-          <pre
-            className="flex-1 select-text text-warden-text font-mono text-xs leading-relaxed whitespace-pre overflow-auto"
-            style={{ fontFamily: "'JetBrains Mono', 'Fira Code', monospace", fontSize: '12px' }}
-          >
-            {terminalText}
-          </pre>
-        </div>
-      )}
+        )}
 
-      {showCopiedToast && (
-        <div className="absolute bottom-4 right-4 px-3 py-1.5 bg-warden-accent text-white text-xs rounded shadow-lg z-20">
-          Copied!
-        </div>
+        {showCopiedToast && (
+          <div className="absolute bottom-4 right-4 px-3 py-1.5 bg-warden-accent text-white text-xs rounded shadow-lg z-20">
+            Copied!
+          </div>
+        )}
+      </div>
+
+      {/* Mobile key toolbar — always visible, outside overlay scope */}
+      {IS_TOUCH_DEVICE && (
+        <MobileKeyToolbar
+          sendInput={sendInput}
+          selectMode={selectMode}
+          onToggleCopyMode={handleToggleCopyMode}
+        />
       )}
     </div>
   );

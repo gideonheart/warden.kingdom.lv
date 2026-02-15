@@ -117,7 +117,7 @@ export function App() {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-warden-bg">
+    <div className="flex flex-col app-height bg-warden-bg overflow-x-hidden">
       <header className="flex items-center justify-between px-4 py-2 bg-warden-panel border-b border-warden-border">
         <div className="flex items-center gap-3">
           <h1 className="text-base font-semibold text-warden-text">
