@@ -206,13 +206,36 @@ export function App() {
           )}
         </main>
 
+        {/* Desktop: inline sidebar */}
         {showSidebar && agents.length > 0 && (
-          <AgentSidebar
-            agents={agents}
-            topicMappings={topicMappings}
-            selectedAgentId={sidebarSelectedAgentId}
-            onSelectAgent={handleSidebarSelectAgent}
-          />
+          <div className="hidden lg:block">
+            <AgentSidebar
+              agents={agents}
+              topicMappings={topicMappings}
+              selectedAgentId={sidebarSelectedAgentId}
+              onSelectAgent={handleSidebarSelectAgent}
+              onClose={() => setShowSidebar(false)}
+            />
+          </div>
+        )}
+
+        {/* Mobile: overlay sidebar */}
+        {showSidebar && agents.length > 0 && (
+          <div className="fixed inset-0 z-50 lg:hidden">
+            <div
+              className="absolute inset-0 sidebar-backdrop"
+              onClick={() => setShowSidebar(false)}
+            />
+            <div className="absolute right-0 top-0 h-full w-[85vw] max-w-sm">
+              <AgentSidebar
+                agents={agents}
+                topicMappings={topicMappings}
+                selectedAgentId={sidebarSelectedAgentId}
+                onSelectAgent={handleSidebarSelectAgent}
+                onClose={() => setShowSidebar(false)}
+              />
+            </div>
+          </div>
         )}
       </div>
     </div>

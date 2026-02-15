@@ -91,7 +91,7 @@ export function PromptPanel({ agents, selectedAgentId }: PromptPanelProps) {
 
   return (
     <div className="border-t border-warden-border bg-warden-panel px-3 py-2">
-      <div className="flex items-center gap-2 mb-1.5">
+      <div className="flex flex-wrap items-center gap-2 mb-1.5">
         <span className="text-xs text-warden-text-dim">Send prompt to agent:</span>
         <select
           value={effectiveAgentId}
@@ -125,7 +125,7 @@ export function PromptPanel({ agents, selectedAgentId }: PromptPanelProps) {
       )}
       <div className="flex flex-col gap-1">
         <span className="text-[10px] text-warden-text-dim/50">Sends prompt to the AI agent via OpenClaw Gateway — the agent interprets and acts</span>
-        <div className="flex gap-2">
+        <div className="flex flex-col sm:flex-row gap-2">
           <textarea
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
@@ -137,7 +137,7 @@ export function PromptPanel({ agents, selectedAgentId }: PromptPanelProps) {
           <button
             onClick={handleSend}
             disabled={isSending || !prompt.trim() || !effectiveAgentId}
-            className="px-3 py-1.5 text-sm bg-warden-accent text-white rounded hover:bg-warden-accent-dim transition-colors disabled:opacity-40 disabled:cursor-not-allowed self-end"
+            className="px-3 py-1.5 text-sm bg-warden-accent text-white rounded hover:bg-warden-accent-dim transition-colors disabled:opacity-40 disabled:cursor-not-allowed sm:self-end w-full sm:w-auto"
           >
             {isSending ? 'Sending...' : 'Send'}
           </button>

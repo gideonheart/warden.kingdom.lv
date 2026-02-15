@@ -43,7 +43,7 @@ export function InstanceTabBar({ instances, selectedSessionName, onSelectSession
   }
 
   return (
-    <div className="flex items-center gap-1 px-2 py-1.5 bg-warden-panel border-b border-warden-border overflow-x-auto">
+    <div className="flex items-center gap-1 px-2 py-1.5 bg-warden-panel border-b border-warden-border overflow-x-auto touch-scroll">
       {instances.map((instance) => {
         const isSelected = instance.tmuxSessionName === selectedSessionName;
         const statusColor = STATUS_COLORS[instance.status] ?? 'bg-warden-idle';
@@ -52,7 +52,7 @@ export function InstanceTabBar({ instances, selectedSessionName, onSelectSession
         return (
           <div
             key={instance.tmuxSessionName}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm whitespace-nowrap transition-colors ${
+            className={`flex items-center gap-2 px-3 py-1.5 min-h-[44px] rounded-md text-sm whitespace-nowrap transition-colors ${
               isSelected
                 ? 'bg-warden-accent/20 text-warden-accent border border-warden-accent/30'
                 : 'text-warden-text-dim hover:bg-warden-border/50 hover:text-warden-text border border-transparent'

@@ -5,6 +5,7 @@ interface AgentSidebarProps {
   topicMappings: TopicMapping[];
   selectedAgentId: string | null;
   onSelectAgent: (agentId: string) => void;
+  onClose?: () => void;
 }
 
 function formatBytes(bytes: number | null | undefined): string {
@@ -18,14 +19,23 @@ function formatBytes(bytes: number | null | undefined): string {
   return `${size.toFixed(1)} ${units[unitIndex]}`;
 }
 
-export function AgentSidebar({ agents, topicMappings, selectedAgentId, onSelectAgent }: AgentSidebarProps) {
+export function AgentSidebar({ agents, topicMappings, selectedAgentId, onSelectAgent, onClose }: AgentSidebarProps) {
   const selectedAgent = agents.find((a) => a.id === selectedAgentId);
   const agentTopics = topicMappings.filter((t) => t.agentId === selectedAgentId);
 
   return (
-    <div className="w-72 bg-warden-panel border-l border-warden-border flex flex-col overflow-y-auto">
-      <div className="px-3 py-2 border-b border-warden-border">
+    <div className="w-full lg:w-72 h-full bg-warden-panel border-l border-warden-border flex flex-col overflow-y-auto">
+      <div className="flex items-center justify-between px-3 py-2 border-b border-warden-border">
         <h2 className="text-sm font-semibold text-warden-text">Agents</h2>
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="lg:hidden px-2 py-1 text-xs text-warden-text-dim hover:text-warden-text transition-colors"
+            aria-label="Close sidebar"
+          >
+            Close
+          </button>
+        )}
       </div>
 
       <div className="flex flex-col gap-1 p-2">
