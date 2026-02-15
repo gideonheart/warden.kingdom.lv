@@ -14,11 +14,21 @@ interface TerminalViewProps {
 // instead of forwarding mouse events to tmux (which has `set -g mouse on`).
 const MOUSE_TRACKING_ENABLE_PATTERN = /\x1b\[\?(1000|1002|1003|1006)h/g;
 
+const IS_TOUCH_DEVICE = typeof window !== 'undefined' &&
+  ('ontouchstart' in window || navigator.maxTouchPoints > 0);
+
+function getResponsiveFontSize(): number {
+  return window.innerWidth < 640 ? 11 : 14;
+}
+
 export function TerminalView({ tmuxSessionName, onSessionExit }: TerminalViewProps) {
   const terminalContainerRef = useRef<HTMLDivElement>(null);
   const terminalInstanceRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
   const [showCopiedToast, setShowCopiedToast] = useState(false);
+  const [selectMode, setSelectMode] = useState(false);
+  const [terminalText, setTerminalText] = useState('');
+  const [clickIndicator, setClickIndicator] = useState<{ x: number; y: number } | null>(null);
 
   const handleTerminalOutput = useCallback((data: string) => {
     const filtered = data.replace(MOUSE_TRACKING_ENABLE_PATTERN, '');
@@ -54,7 +64,7 @@ export function TerminalView({ tmuxSessionName, onSessionExit }: TerminalViewPro
         white: '#e2e8f0',
       },
       fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace",
-      fontSize: 14,
+      fontSize: getResponsiveFontSize(),
       lineHeight: 1.2,
       cursorBlink: true,
       scrollback: 5000,
@@ -98,8 +108,89 @@ export function TerminalView({ tmuxSessionName, onSessionExit }: TerminalViewPro
     terminalInstanceRef.current = terminal;
     fitAddonRef.current = fitAddon;
 
+    // Alt+click cursor positioning
+    const container = terminalContainerRef.current;
+    const handleAltClick = (event: MouseEvent) => {
+      if (!event.altKey) return;
+      event.preventDefault();
+
+      const xtermRows = container.querySelector('.xterm-rows');
+      if (!xtermRows) return;
+
+      const cellWidth = xtermRows.clientWidth / terminal.cols;
+      const cellHeight = xtermRows.clientHeight / terminal.rows;
+
+      const rect = xtermRows.getBoundingClientRect();
+      const relativeX = event.clientX - rect.left;
+      const relativeY = event.clientY - rect.top;
+
+      const col = Math.max(0, Math.min(terminal.cols - 1, Math.floor(relativeX / cellWidth)));
+      const row = Math.max(0, Math.min(terminal.rows - 1, Math.floor(relativeY / cellHeight)));
+
+      // Send SGR mouse press and release sequences
+      sendInput(`\x1b[<0;${col + 1};${row + 1}M`);
+      sendInput(`\x1b[<0;${col + 1};${row + 1}m`);
+
+      // Show click indicator
+      setClickIndicator({ x: event.clientX - rect.left + container.getBoundingClientRect().left - rect.left, y: event.clientY - rect.top });
+      setTimeout(() => setClickIndicator(null), 300);
+    };
+    container.addEventListener('click', handleAltClick);
+
+    // Mobile long-press detection for text selection overlay
+    let longPressTimer: ReturnType<typeof setTimeout> | null = null;
+    let touchMoved = false;
+
+    const handleTouchStart = () => {
+      touchMoved = false;
+      longPressTimer = setTimeout(() => {
+        if (touchMoved) return;
+
+        // Extract visible terminal text
+        const buffer = terminal.buffer.active;
+        const lines: string[] = [];
+        const viewportY = buffer.viewportY;
+        for (let i = 0; i < terminal.rows; i++) {
+          const line = buffer.getLine(viewportY + i);
+          if (line) {
+            lines.push(line.translateToString());
+          }
+        }
+        setTerminalText(lines.join('\n'));
+        setSelectMode(true);
+      }, 500);
+    };
+
+    const handleTouchMove = () => {
+      touchMoved = true;
+      if (longPressTimer) {
+        clearTimeout(longPressTimer);
+        longPressTimer = null;
+      }
+    };
+
+    const handleTouchEnd = () => {
+      if (longPressTimer) {
+        clearTimeout(longPressTimer);
+        longPressTimer = null;
+      }
+    };
+
+    if (IS_TOUCH_DEVICE) {
+      container.addEventListener('touchstart', handleTouchStart, { passive: true });
+      container.addEventListener('touchmove', handleTouchMove, { passive: true });
+      container.addEventListener('touchend', handleTouchEnd, { passive: true });
+    }
+
+    // Responsive font size on window resize / orientation change
+    let previousFontSize = getResponsiveFontSize();
     const handleWindowResize = () => {
       try {
+        const newFontSize = getResponsiveFontSize();
+        if (newFontSize !== previousFontSize) {
+          terminal.options.fontSize = newFontSize;
+          previousFontSize = newFontSize;
+        }
         fitAddon.fit();
       } catch {
         // Container may have zero dimensions during layout transitions
@@ -109,6 +200,13 @@ export function TerminalView({ tmuxSessionName, onSessionExit }: TerminalViewPro
 
     return () => {
       window.removeEventListener('resize', handleWindowResize);
+      container.removeEventListener('click', handleAltClick);
+      if (IS_TOUCH_DEVICE) {
+        container.removeEventListener('touchstart', handleTouchStart);
+        container.removeEventListener('touchmove', handleTouchMove);
+        container.removeEventListener('touchend', handleTouchEnd);
+      }
+      if (longPressTimer) clearTimeout(longPressTimer);
       terminal.dispose();
       terminalInstanceRef.current = null;
       fitAddonRef.current = null;
@@ -128,6 +226,7 @@ export function TerminalView({ tmuxSessionName, onSessionExit }: TerminalViewPro
           <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-warden-success' : isReconnecting ? 'bg-warden-warning animate-pulse' : 'bg-warden-error'}`} />
           <span className="text-xs text-warden-text-dim font-mono">{tmuxSessionName}</span>
         </div>
+        <span className="text-[10px] text-warden-text-dim/40 hidden sm:inline">Alt+click to position cursor</span>
       </div>
 
       {!isConnected && (
@@ -142,6 +241,35 @@ export function TerminalView({ tmuxSessionName, onSessionExit }: TerminalViewPro
       )}
 
       <div ref={terminalContainerRef} className="flex-1 min-h-0" />
+
+      {/* Alt+click visual indicator */}
+      {clickIndicator && (
+        <div
+          className="absolute w-3 h-3 rounded-full bg-warden-accent/60 pointer-events-none z-20 animate-ping"
+          style={{ left: clickIndicator.x - 6, top: clickIndicator.y + 28 }}
+        />
+      )}
+
+      {/* Mobile long-press text selection overlay */}
+      {selectMode && (
+        <div className="absolute inset-0 z-30 bg-warden-bg/95 overflow-auto p-3 flex flex-col">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs text-warden-text-dim">Long-press text to select and copy</span>
+            <button
+              onClick={() => setSelectMode(false)}
+              className="px-2 py-1 text-xs text-warden-text-dim hover:text-warden-text bg-warden-border/50 rounded transition-colors"
+            >
+              Close
+            </button>
+          </div>
+          <pre
+            className="flex-1 select-all text-warden-text font-mono text-xs leading-relaxed whitespace-pre overflow-auto"
+            style={{ fontFamily: "'JetBrains Mono', 'Fira Code', monospace", fontSize: '12px' }}
+          >
+            {terminalText}
+          </pre>
+        </div>
+      )}
 
       {showCopiedToast && (
         <div className="absolute bottom-4 right-4 px-3 py-1.5 bg-warden-accent text-white text-xs rounded shadow-lg z-20">
