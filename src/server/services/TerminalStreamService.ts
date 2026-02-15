@@ -10,6 +10,7 @@ interface ActiveTerminalStream {
 
 export class TerminalStreamService {
   private activeStreams: Map<string, ActiveTerminalStream> = new Map();
+  private sessionStreams: Map<string, Set<string>> = new Map();
 
   setupSocketNamespace(socketServer: SocketIOServer): void {
     const terminalNamespace = socketServer.of('/terminal');
@@ -34,6 +35,15 @@ export class TerminalStreamService {
   }
 
   attachSocketToSession(socket: Socket, sessionName: string): void {
+    // Dedup: kill any existing PTY attachments for this tmux session
+    const existingSocketIds = this.sessionStreams.get(sessionName);
+    if (existingSocketIds) {
+      for (const existingSocketId of existingSocketIds) {
+        console.log(`[TerminalStream] Killing existing PTY for session ${sessionName} (was socket ${existingSocketId})`);
+        this.detachSocket(existingSocketId);
+      }
+    }
+
     const ptyProcess = pty.spawn('tmux', ['attach-session', '-t', sessionName], {
       name: 'xterm-256color',
       cols: 120,
@@ -52,6 +62,15 @@ export class TerminalStreamService {
       }
       socket.emit('terminal:exit', { sessionName, exitCode });
       this.activeStreams.delete(socket.id);
+
+      // Clean up session index on PTY exit
+      const socketIds = this.sessionStreams.get(sessionName);
+      if (socketIds) {
+        socketIds.delete(socket.id);
+        if (socketIds.size === 0) {
+          this.sessionStreams.delete(sessionName);
+        }
+      }
     });
 
     socket.on('terminal:input', (userInput: string) => {
@@ -82,6 +101,12 @@ export class TerminalStreamService {
       sessionName,
       isAlive: true,
     });
+
+    // Track socket in session index
+    if (!this.sessionStreams.has(sessionName)) {
+      this.sessionStreams.set(sessionName, new Set());
+    }
+    this.sessionStreams.get(sessionName)!.add(socket.id);
   }
 
   detachSocket(socketId: string): void {
@@ -89,6 +114,15 @@ export class TerminalStreamService {
     if (stream) {
       stream.ptyProcess.kill();
       this.activeStreams.delete(socketId);
+
+      // Clean up session index
+      const socketIds = this.sessionStreams.get(stream.sessionName);
+      if (socketIds) {
+        socketIds.delete(socketId);
+        if (socketIds.size === 0) {
+          this.sessionStreams.delete(stream.sessionName);
+        }
+      }
     }
   }
 
@@ -102,6 +136,7 @@ export class TerminalStreamService {
       stream.ptyProcess.kill();
       this.activeStreams.delete(socketId);
     }
+    this.sessionStreams.clear();
   }
 
   private socketServer: SocketIOServer | null = null;
