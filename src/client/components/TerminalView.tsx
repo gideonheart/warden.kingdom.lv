@@ -21,6 +21,38 @@ function getResponsiveFontSize(): number {
   return window.innerWidth < 640 ? 11 : 14;
 }
 
+const MOBILE_KEYS: Array<{ label: string; seq: string; wide?: boolean }> = [
+  { label: 'Esc', seq: '\x1b' },
+  { label: 'Tab', seq: '\t' },
+  { label: 'Ctrl+C', seq: '\x03' },
+  { label: 'Ctrl+D', seq: '\x04' },
+  { label: '\u2191', seq: '\x1b[A' },          // Up arrow
+  { label: '\u2193', seq: '\x1b[B' },          // Down arrow
+  { label: '\u2190', seq: '\x1b[D' },          // Left arrow
+  { label: '\u2192', seq: '\x1b[C' },          // Right arrow
+  { label: 'PgUp', seq: '\x1b[5~' },
+  { label: 'PgDn', seq: '\x1b[6~' },
+];
+
+function MobileKeyToolbar({ sendInput }: { sendInput: (data: string) => void }) {
+  return (
+    <div className="flex items-center gap-1 px-2 py-1.5 bg-warden-panel border-t border-warden-border overflow-x-auto touch-scroll">
+      {MOBILE_KEYS.map((key) => (
+        <button
+          key={key.label}
+          onTouchStart={(e) => {
+            e.preventDefault();
+            sendInput(key.seq);
+          }}
+          className="px-2 py-1.5 min-w-[40px] min-h-[36px] text-xs font-mono text-warden-text-dim bg-warden-border/40 rounded active:bg-warden-accent/30 active:text-warden-accent whitespace-nowrap select-none"
+        >
+          {key.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export function TerminalView({ tmuxSessionName, onSessionExit }: TerminalViewProps) {
   const terminalContainerRef = useRef<HTMLDivElement>(null);
   const terminalInstanceRef = useRef<Terminal | null>(null);
@@ -175,12 +207,11 @@ export function TerminalView({ tmuxSessionName, onSessionExit }: TerminalViewPro
       longPressTimer = setTimeout(() => {
         if (isScrolling) return;
 
-        // Extract visible terminal text for copy overlay
+        // Extract full buffer history for copy overlay
         const buffer = terminal.buffer.active;
         const lines: string[] = [];
-        const viewportY = buffer.viewportY;
-        for (let i = 0; i < terminal.rows; i++) {
-          const line = buffer.getLine(viewportY + i);
+        for (let i = 0; i < buffer.length; i++) {
+          const line = buffer.getLine(i);
           if (line) {
             lines.push(line.translateToString());
           }
@@ -296,6 +327,11 @@ export function TerminalView({ tmuxSessionName, onSessionExit }: TerminalViewPro
       )}
 
       <div ref={terminalContainerRef} className="flex-1 min-h-0 min-w-0 overflow-hidden" />
+
+      {/* Mobile key toolbar */}
+      {IS_TOUCH_DEVICE && (
+        <MobileKeyToolbar sendInput={sendInput} />
+      )}
 
       {/* Alt+click visual indicator */}
       {clickIndicator && (

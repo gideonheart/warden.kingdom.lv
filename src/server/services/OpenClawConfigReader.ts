@@ -108,7 +108,7 @@ class OpenClawConfigReader {
 
         return {
           id: agent.id,
-          name: agent.name,
+          name: agent.name ?? agent.id.charAt(0).toUpperCase() + agent.id.slice(1),
           workspace,
           model,
           isDefault: agent.default ?? false,
