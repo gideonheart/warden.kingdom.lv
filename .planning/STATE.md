@@ -58,6 +58,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 | # | Description | Date | Commit |
 |---|-------------|------|--------|
 | 2 | Terminal auto-copy selection to clipboard with toast | 2026-02-12 | `3204868` |
+| 3 | Mobile responsiveness, PTY dedup, URL hash routing, Alt+click, long-press copy | 2026-02-15 | `3c5e961` |
 
 ### Pending Todos
 
@@ -70,6 +71,6 @@ None — all milestones complete
 
 ## Session Continuity
 
-Last session: 2026-02-12
-Stopped at: v1.1 milestone archived
+Last session: 2026-02-15
+Stopped at: Completed quick-3 (mobile responsiveness & UX fixes)
 Resume file: None
