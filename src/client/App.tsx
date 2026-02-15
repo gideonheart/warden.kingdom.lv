@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { InstanceTabBar } from './components/InstanceTabBar.js';
 import { TerminalView } from './components/TerminalView.js';
 import { ErrorBoundary } from './components/ErrorBoundary.js';
@@ -10,13 +10,32 @@ import { useAgentConfig } from './hooks/useAgentConfig.js';
 
 type AppView = 'terminals' | 'history';
 
+function parseHash(): { view: AppView; session: string | null } {
+  const hash = window.location.hash.replace(/^#/, '');
+  const params = new URLSearchParams(hash);
+  const viewParam = params.get('view');
+  const view: AppView = viewParam === 'history' ? 'history' : 'terminals';
+  const session = params.get('session') || null;
+  return { view, session };
+}
+
+function updateHash(view: AppView, session: string | null): void {
+  const parts: string[] = [`view=${view}`];
+  if (session) {
+    parts.push(`session=${session}`);
+  }
+  history.replaceState(null, '', `#${parts.join('&')}`);
+}
+
 export function App() {
   const { instances, isLoading, error, refetch } = useActiveInstances();
   const { agents, topicMappings } = useAgentConfig();
-  const [selectedSessionName, setSelectedSessionName] = useState<string | null>(null);
+  const [selectedSessionName, setSelectedSessionName] = useState<string | null>(
+    () => parseHash().session
+  );
   const [sidebarSelectedAgentId, setSidebarSelectedAgentId] = useState<string | null>(null);
-  const [showSidebar, setShowSidebar] = useState(true);
-  const [currentView, setCurrentView] = useState<AppView>('terminals');
+  const [showSidebar, setShowSidebar] = useState(() => window.innerWidth >= 1024);
+  const [currentView, setCurrentView] = useState<AppView>(() => parseHash().view);
 
   const activeInstances = instances.filter(
     (instance) => instance.status === 'active' || instance.status === 'idle'
@@ -31,6 +50,15 @@ export function App() {
   const handleSelectSession = useCallback((sessionName: string) => {
     setSelectedSessionName(sessionName);
     setCurrentView('terminals');
+    updateHash('terminals', sessionName);
+  }, []);
+
+  const handleViewChange = useCallback((view: AppView) => {
+    setCurrentView(view);
+    setSelectedSessionName((current) => {
+      updateHash(view, current);
+      return current;
+    });
   }, []);
 
   const handleSessionExit = useCallback(
@@ -51,16 +79,36 @@ export function App() {
     [refetch]
   );
 
+  // Listen for external hash changes (back/forward navigation)
+  useEffect(() => {
+    const handleHashChange = () => {
+      const { view, session } = parseHash();
+      setCurrentView(view);
+      if (session) {
+        setSelectedSessionName(session);
+      }
+    };
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
+
+  // Handle selected session disappearing
   if (selectedSessionName && !activeInstances.some((i) => i.tmuxSessionName === selectedSessionName)) {
     if (activeInstances.length > 0) {
-      setSelectedSessionName(activeInstances[0].tmuxSessionName);
+      const fallback = activeInstances[0].tmuxSessionName;
+      setSelectedSessionName(fallback);
+      updateHash(currentView, fallback);
     } else {
       setSelectedSessionName(null);
+      updateHash(currentView, null);
     }
   }
 
+  // Auto-select first session if none selected
   if (!selectedSessionName && activeInstances.length > 0) {
-    setSelectedSessionName(activeInstances[0].tmuxSessionName);
+    const first = activeInstances[0].tmuxSessionName;
+    setSelectedSessionName(first);
+    updateHash(currentView, first);
   }
 
   return (
@@ -81,13 +129,13 @@ export function App() {
             </span>
           )}
           <button
-            onClick={() => setCurrentView('terminals')}
+            onClick={() => handleViewChange('terminals')}
             className={`px-2 py-1 text-xs transition-colors ${currentView === 'terminals' ? 'text-warden-accent' : 'text-warden-text-dim hover:text-warden-text'}`}
           >
             Terminals
           </button>
           <button
-            onClick={() => setCurrentView('history')}
+            onClick={() => handleViewChange('history')}
             className={`px-2 py-1 text-xs transition-colors ${currentView === 'history' ? 'text-warden-accent' : 'text-warden-text-dim hover:text-warden-text'}`}
           >
             History
@@ -95,7 +143,7 @@ export function App() {
           <span className="w-px h-4 bg-warden-border" />
           <button
             onClick={() => setShowSidebar(!showSidebar)}
-            className={`px-2 py-1 text-xs transition-colors ${showSidebar ? 'text-warden-accent' : 'text-warden-text-dim hover:text-warden-text'}`}
+            className={`px-2 py-1 text-xs transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center ${showSidebar ? 'text-warden-accent' : 'text-warden-text-dim hover:text-warden-text'}`}
           >
             Agents
           </button>
