@@ -256,14 +256,20 @@ export function TerminalView({ tmuxSessionName, onSessionExit }: TerminalViewPro
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs text-warden-text-dim">Long-press text to select and copy</span>
             <button
-              onClick={() => setSelectMode(false)}
-              className="px-2 py-1 text-xs text-warden-text-dim hover:text-warden-text bg-warden-border/50 rounded transition-colors"
+              onClick={() => {
+                setSelectMode(false);
+                window.getSelection()?.removeAllRanges();
+                requestAnimationFrame(() => {
+                  terminalInstanceRef.current?.focus();
+                });
+              }}
+              className="px-2 py-1 text-xs text-warden-text-dim hover:text-warden-text bg-warden-border/50 rounded transition-colors min-h-[44px] min-w-[44px]"
             >
               Close
             </button>
           </div>
           <pre
-            className="flex-1 select-all text-warden-text font-mono text-xs leading-relaxed whitespace-pre overflow-auto"
+            className="flex-1 select-text text-warden-text font-mono text-xs leading-relaxed whitespace-pre overflow-auto"
             style={{ fontFamily: "'JetBrains Mono', 'Fira Code', monospace", fontSize: '12px' }}
           >
             {terminalText}

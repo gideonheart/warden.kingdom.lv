@@ -35,6 +35,11 @@ export function App() {
   );
   const [sidebarSelectedAgentId, setSidebarSelectedAgentId] = useState<string | null>(null);
   const [showSidebar, setShowSidebar] = useState(() => window.innerWidth >= 1024);
+
+  // Auto-select first agent in sidebar when agents load
+  if (sidebarSelectedAgentId === null && agents.length > 0) {
+    setSidebarSelectedAgentId(agents[0].id);
+  }
   const [currentView, setCurrentView] = useState<AppView>(() => parseHash().view);
 
   const activeInstances = instances.filter(
@@ -92,8 +97,8 @@ export function App() {
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
 
-  // Handle selected session disappearing
-  if (selectedSessionName && !activeInstances.some((i) => i.tmuxSessionName === selectedSessionName)) {
+  // Handle selected session disappearing (only after instances have loaded)
+  if (!isLoading && selectedSessionName && !activeInstances.some((i) => i.tmuxSessionName === selectedSessionName)) {
     if (activeInstances.length > 0) {
       const fallback = activeInstances[0].tmuxSessionName;
       setSelectedSessionName(fallback);
@@ -104,8 +109,8 @@ export function App() {
     }
   }
 
-  // Auto-select first session if none selected
-  if (!selectedSessionName && activeInstances.length > 0) {
+  // Auto-select first session if none selected (only after loading)
+  if (!isLoading && !selectedSessionName && activeInstances.length > 0) {
     const first = activeInstances[0].tmuxSessionName;
     setSelectedSessionName(first);
     updateHash(currentView, first);
