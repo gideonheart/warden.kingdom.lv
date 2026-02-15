@@ -137,10 +137,31 @@ export function TerminalView({ tmuxSessionName, onSessionExit }: TerminalViewPro
     };
     container.addEventListener('click', handleAltClick);
 
+    // Scroll forwarding: send mouse wheel escape sequences to tmux.
+    // We stripped mouse-tracking enable sequences so xterm.js doesn't
+    // intercept mouse events, but tmux still expects them. SGR format:
+    //   scroll up:   \x1b[<64;col;rowM
+    //   scroll down: \x1b[<65;col;rowM
+    const sendScrollToTmux = (linesUp: number) => {
+      const button = linesUp > 0 ? 64 : 65;
+      const count = Math.abs(linesUp);
+      const seq = `\x1b[<${button};1;1M`;
+      for (let i = 0; i < count; i++) {
+        sendInput(seq);
+      }
+    };
+
+    // Desktop: forward mouse wheel to tmux
+    const handleWheel = (event: WheelEvent) => {
+      event.preventDefault();
+      const lines = Math.sign(event.deltaY) * Math.max(1, Math.ceil(Math.abs(event.deltaY) / 40));
+      // deltaY positive = scroll down = tmux scroll down (button 65)
+      // deltaY negative = scroll up = tmux scroll up (button 64)
+      sendScrollToTmux(lines > 0 ? -Math.abs(lines) : Math.abs(lines));
+    };
+    container.addEventListener('wheel', handleWheel, { passive: false });
+
     // Mobile: touch scroll + long-press detection
-    // xterm.js's .xterm-screen canvas sits on top of .xterm-viewport (the
-    // scrollable element), so touch events never reach the scroll layer.
-    // We manually translate touch-move deltas into terminal.scrollLines().
     let longPressTimer: ReturnType<typeof setTimeout> | null = null;
     let touchStartY = 0;
     let touchAccumulator = 0;
@@ -184,15 +205,17 @@ export function TerminalView({ tmuxSessionName, onSessionExit }: TerminalViewPro
       }
 
       if (isScrolling) {
-        // Accumulate fractional lines for smooth scrolling
-        const lineHeight = terminal.element
-          ? terminal.element.querySelector('.xterm-rows')?.clientHeight ?? 1
-          : 1;
-        const cellHeight = lineHeight / terminal.rows;
+        // Prevent pull-to-refresh / page scroll
+        event.preventDefault();
+
+        // Accumulate pixels and convert to line-sized scroll events
+        const xtermRows = terminal.element?.querySelector('.xterm-rows');
+        const cellHeight = xtermRows ? xtermRows.clientHeight / terminal.rows : 16;
         touchAccumulator += deltaY;
         const linesToScroll = Math.trunc(touchAccumulator / cellHeight);
         if (linesToScroll !== 0) {
-          terminal.scrollLines(linesToScroll);
+          // deltaY positive = finger moved up = scroll up in tmux
+          sendScrollToTmux(linesToScroll);
           touchAccumulator -= linesToScroll * cellHeight;
         }
       }
@@ -209,7 +232,7 @@ export function TerminalView({ tmuxSessionName, onSessionExit }: TerminalViewPro
 
     if (IS_TOUCH_DEVICE) {
       container.addEventListener('touchstart', handleTouchStart, { passive: true });
-      container.addEventListener('touchmove', handleTouchMove, { passive: true });
+      container.addEventListener('touchmove', handleTouchMove, { passive: false });
       container.addEventListener('touchend', handleTouchEnd, { passive: true });
     }
 
@@ -232,6 +255,7 @@ export function TerminalView({ tmuxSessionName, onSessionExit }: TerminalViewPro
     return () => {
       window.removeEventListener('resize', handleWindowResize);
       container.removeEventListener('click', handleAltClick);
+      container.removeEventListener('wheel', handleWheel);
       if (IS_TOUCH_DEVICE) {
         container.removeEventListener('touchstart', handleTouchStart);
         container.removeEventListener('touchmove', handleTouchMove);
