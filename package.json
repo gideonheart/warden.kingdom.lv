@@ -8,7 +8,7 @@
     "dev:client": "vite",
     "dev:all": "concurrently \"npm run dev\" \"npm run dev:client\"",
     "build": "vite build && tsc -p tsconfig.server.json",
-    "start": "node dist/server/index.js",
+    "start": "node dist/server/server/index.js",
     "typecheck": "tsc --noEmit",
     "test:backend": "bash tests/backend-verify.sh",
     "test:e2e": "playwright test",

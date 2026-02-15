@@ -20,7 +20,7 @@ export function HistoryView() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center gap-1 px-3 py-2 border-b border-warden-border">
+      <div className="flex flex-wrap items-center gap-1 px-3 py-2 border-b border-warden-border">
         {tabs.map((tab) => (
           <button
             key={tab.id}
