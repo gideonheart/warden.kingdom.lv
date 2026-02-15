@@ -137,16 +137,24 @@ export function TerminalView({ tmuxSessionName, onSessionExit }: TerminalViewPro
     };
     container.addEventListener('click', handleAltClick);
 
-    // Mobile long-press detection for text selection overlay
+    // Mobile: touch scroll + long-press detection
+    // xterm.js's .xterm-screen canvas sits on top of .xterm-viewport (the
+    // scrollable element), so touch events never reach the scroll layer.
+    // We manually translate touch-move deltas into terminal.scrollLines().
     let longPressTimer: ReturnType<typeof setTimeout> | null = null;
-    let touchMoved = false;
+    let touchStartY = 0;
+    let touchAccumulator = 0;
+    let isScrolling = false;
 
-    const handleTouchStart = () => {
-      touchMoved = false;
+    const handleTouchStart = (event: TouchEvent) => {
+      touchStartY = event.touches[0].clientY;
+      touchAccumulator = 0;
+      isScrolling = false;
+
       longPressTimer = setTimeout(() => {
-        if (touchMoved) return;
+        if (isScrolling) return;
 
-        // Extract visible terminal text
+        // Extract visible terminal text for copy overlay
         const buffer = terminal.buffer.active;
         const lines: string[] = [];
         const viewportY = buffer.viewportY;
@@ -161,11 +169,32 @@ export function TerminalView({ tmuxSessionName, onSessionExit }: TerminalViewPro
       }, 500);
     };
 
-    const handleTouchMove = () => {
-      touchMoved = true;
-      if (longPressTimer) {
-        clearTimeout(longPressTimer);
-        longPressTimer = null;
+    const handleTouchMove = (event: TouchEvent) => {
+      const currentY = event.touches[0].clientY;
+      const deltaY = touchStartY - currentY;
+      touchStartY = currentY;
+
+      // Cancel long-press once user starts scrolling
+      if (Math.abs(deltaY) > 2 && !isScrolling) {
+        isScrolling = true;
+        if (longPressTimer) {
+          clearTimeout(longPressTimer);
+          longPressTimer = null;
+        }
+      }
+
+      if (isScrolling) {
+        // Accumulate fractional lines for smooth scrolling
+        const lineHeight = terminal.element
+          ? terminal.element.querySelector('.xterm-rows')?.clientHeight ?? 1
+          : 1;
+        const cellHeight = lineHeight / terminal.rows;
+        touchAccumulator += deltaY;
+        const linesToScroll = Math.trunc(touchAccumulator / cellHeight);
+        if (linesToScroll !== 0) {
+          terminal.scrollLines(linesToScroll);
+          touchAccumulator -= linesToScroll * cellHeight;
+        }
       }
     };
 
@@ -174,6 +203,8 @@ export function TerminalView({ tmuxSessionName, onSessionExit }: TerminalViewPro
         clearTimeout(longPressTimer);
         longPressTimer = null;
       }
+      isScrolling = false;
+      touchAccumulator = 0;
     };
 
     if (IS_TOUCH_DEVICE) {

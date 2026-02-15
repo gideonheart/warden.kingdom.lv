@@ -18,6 +18,10 @@ body {
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
 }
 
+.xterm-viewport {
+  -webkit-overflow-scrolling: touch;
+}
+
 .xterm-viewport::-webkit-scrollbar {
   width: 8px;
 }
