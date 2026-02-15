@@ -240,7 +240,7 @@ export function TerminalView({ tmuxSessionName, onSessionExit }: TerminalViewPro
         </div>
       )}
 
-      <div ref={terminalContainerRef} className="flex-1 min-h-0" />
+      <div ref={terminalContainerRef} className="flex-1 min-h-0 min-w-0 overflow-hidden" />
 
       {/* Alt+click visual indicator */}
       {clickIndicator && (
