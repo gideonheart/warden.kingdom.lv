@@ -72,35 +72,35 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| PLUG-01 | — | Pending |
-| PLUG-02 | — | Pending |
-| PLUG-03 | — | Pending |
-| PLUG-04 | — | Pending |
-| PLUG-05 | — | Pending |
-| PLUG-06 | — | Pending |
-| ACTV-01 | — | Pending |
-| ACTV-02 | — | Pending |
-| ACTV-03 | — | Pending |
-| ACTV-04 | — | Pending |
-| ACTV-05 | — | Pending |
-| ACTV-06 | — | Pending |
-| ACTV-07 | — | Pending |
-| ACTV-08 | — | Pending |
-| ACTV-09 | — | Pending |
-| ACTV-10 | — | Pending |
-| MOBI-01 | — | Pending |
-| MOBI-02 | — | Pending |
-| MOBI-03 | — | Pending |
-| MOBI-04 | — | Pending |
-| MOBI-05 | — | Pending |
-| MOBI-06 | — | Pending |
-| MOBI-07 | — | Pending |
+| PLUG-01 | Phase 9 | Pending |
+| PLUG-02 | Phase 9 | Pending |
+| PLUG-03 | Phase 9 | Pending |
+| PLUG-04 | Phase 9 | Pending |
+| PLUG-05 | Phase 9 | Pending |
+| PLUG-06 | Phase 9 | Pending |
+| MOBI-01 | Phase 10 | Pending |
+| MOBI-02 | Phase 10 | Pending |
+| MOBI-03 | Phase 10 | Pending |
+| MOBI-04 | Phase 10 | Pending |
+| MOBI-05 | Phase 10 | Pending |
+| MOBI-06 | Phase 10 | Pending |
+| MOBI-07 | Phase 10 | Pending |
+| ACTV-01 | Phase 11 | Pending |
+| ACTV-02 | Phase 11 | Pending |
+| ACTV-03 | Phase 11 | Pending |
+| ACTV-04 | Phase 11 | Pending |
+| ACTV-05 | Phase 11 | Pending |
+| ACTV-06 | Phase 11 | Pending |
+| ACTV-07 | Phase 11 | Pending |
+| ACTV-08 | Phase 11 | Pending |
+| ACTV-09 | Phase 11 | Pending |
+| ACTV-10 | Phase 11 | Pending |
 
 **Coverage:**
 - v2.0 requirements: 23 total
-- Mapped to phases: 0
-- Unmapped: 23 (pending roadmap creation)
+- Mapped to phases: 23/23 (100%)
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-02-16*
-*Last updated: 2026-02-16 after initial definition*
+*Last updated: 2026-02-16 after roadmap creation*

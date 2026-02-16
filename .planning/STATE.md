@@ -5,16 +5,17 @@
 See: .planning/PROJECT.md (updated 2026-02-16)
 
 **Core value:** Real-time visibility into all active Claude Code agent sessions from a single browser tab
-**Current focus:** v2.0 Mission Control — plugin registry, activity timeline, mobile UI
+
+**Current focus:** Phase 9 - Plugin Registry Foundation (v2.0 Mission Control)
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-02-16 — Milestone v2.0 started
+Phase: 9 of 11 (Plugin Registry Foundation)
+Plan: 0 of 0 in current phase
+Status: Ready to plan
+Last activity: 2026-02-16 — v2.0 roadmap created with 3 phases (9-11) covering 23 requirements
 
-Progress: [░░░░░░░░░░] 0% (v2.0)
+Progress: [████████░░] 73% (8/11 phases complete)
 
 ## Performance Metrics
 
@@ -53,6 +54,11 @@ Progress: [░░░░░░░░░░] 0% (v2.0)
 ### Decisions
 
 See PROJECT.md Key Decisions table for full list with outcomes.
+Recent decisions affecting v2.0:
+
+- v1.0: SRP service architecture — each service does one thing (applies to plugin system)
+- v1.0: Always-interactive terminals — informs mobile terminal strategy decision
+- v2.0: Plugin registry with build-time type-safe registration — avoid over-engineering
 
 ### Quick Tasks Completed
 
@@ -65,15 +71,29 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 
 ### Pending Todos
 
-None — all milestones complete
+None
 
 ### Blockers/Concerns
 
-- Gateway `/v1/chat/completions` endpoint may need explicit enabling in openclaw.json per agent
-- tmux.conf is system-level config (/home/forge/.tmux.conf), not tracked in repo
+**Phase 9 (Plugin Registry):**
+- Risk: Over-engineering plugin system when simple build-time registration suffices
+- Mitigation: Set complexity budget (<200 LOC), use Vite glob imports, not module federation
+
+**Phase 10 (Mobile UI):**
+- Critical decision needed: xterm.js mobile touch support is fundamentally broken (5+ year issue)
+- Options: (1) read-only mobile terminal, (2) budget 2-3 weeks debugging, (3) defer mobile terminal
+- Research flag: Needs testing on real iOS/Android devices before implementation
+
+**Phase 11 (Activity Timeline):**
+- Risk: Terminal output parsing becomes performance nightmare with exponential storage growth
+- Mitigation: Selective parsing (only known patterns), 7-day retention, aggressive indexing
+- Risk: ANSI escape sequence security vulnerabilities (10 CVEs enabling RCE, log manipulation)
+- Mitigation: Strip ANSI before storage with strip-ansi library, never render in web UI
+- Research flag: Needs analysis of real Claude Code terminal output to identify parsing patterns
 
 ## Session Continuity
 
-Last session: 2026-02-16
-Stopped at: Completed quick-5 (move PromptPanel to sidebar)
+Last session: 2026-02-16 15:00
+Stopped at: v2.0 Mission Control roadmap created with full requirement coverage validation
 Resume file: None
+Next step: `/gsd:plan-phase 9` to create execution plan for Plugin Registry Foundation
