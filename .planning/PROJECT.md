@@ -34,17 +34,22 @@ Real-time visibility into all active Claude Code agent sessions from a single br
 
 ### Active
 
-(None — define in next milestone)
+#### Current Milestone: v2.0 Mission Control
+
+**Goal:** Transform Warden from a terminal viewer into an extensible mission control platform with plugin architecture, agent activity auditing, and mobile-first design.
+
+**Target features:**
+- Tool/plugin registry — code modules with metadata + manifest, build-time type-safe registration, UI panel rendering
+- Agent activity/audit timeline — structured events (session lifecycle, operator actions) + parsed terminal output (tool calls, file edits, commands) with dedicated Activity view
+- Mobile-first UI — full experience on mobile including terminal viewing, agent list/detail with collapsible panels, bottom-sheet actions, clean typography
 
 ### Out of Scope
 
-- Mobile app — single-user internal tool, desktop browser only
 - Multi-user auth — IP-whitelisted, single operator (Gideon)
 - Agent creation/deletion — managed via openclaw.json, not the dashboard
 - Telegram bot management — handled by OpenClaw gateway
 - Terminal themes/customization — monitoring tool, single dark theme
 - Multi-pane terminal splits — tmux handles layout within sessions
-- Session recording/replay — storage cost, session history table sufficient
 - In-dashboard code editor — agents edit files, operator intervenes via prompts
 - Offline mode — real-time is core value
 
@@ -81,4 +86,4 @@ tmux configured with mouse mode and 50,000-line scrollback buffer for monitoring
 | Separate sidebar/prompt panel agent state | Clean separation of concerns, avoids state conflicts | ✓ Good — independent behavior |
 
 ---
-*Last updated: 2026-02-12 after v1.1 milestone*
+*Last updated: 2026-02-16 after v2.0 milestone start*

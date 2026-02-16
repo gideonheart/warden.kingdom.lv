@@ -2,18 +2,19 @@
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-02-12)
+See: .planning/PROJECT.md (updated 2026-02-16)
 
 **Core value:** Real-time visibility into all active Claude Code agent sessions from a single browser tab
-**Current focus:** v1.1 shipped — planning next milestone
+**Current focus:** v2.0 Mission Control — plugin registry, activity timeline, mobile UI
 
 ## Current Position
 
-Phase: All phases complete (v1.0 Phases 1-6, v1.1 Phases 7-8)
-Status: Milestone v1.1 complete
-Last activity: 2026-02-12 — v1.1 milestone archived
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-02-16 — Milestone v2.0 started
 
-Progress: [██████████] 100% (v1.1)
+Progress: [░░░░░░░░░░] 0% (v2.0)
 
 ## Performance Metrics
 
