@@ -194,39 +194,33 @@ export function App() {
       <div className="flex flex-1 min-h-0 min-w-0">
         <main className="flex-1 min-h-0 min-w-0 flex flex-col overflow-hidden">
           {currentView === 'terminals' ? (
-            <>
-              <div className="flex-1 min-h-0">
-                {isLoading ? (
-                  <div className="flex items-center justify-center h-full">
-                    <div className="flex items-center gap-3">
-                      <div className="w-5 h-5 border-2 border-warden-accent border-t-transparent rounded-full animate-spin" />
-                      <span className="text-warden-text-dim">Loading sessions...</span>
-                    </div>
+            <div className="flex-1 min-h-0">
+              {isLoading ? (
+                <div className="flex items-center justify-center h-full">
+                  <div className="flex items-center gap-3">
+                    <div className="w-5 h-5 border-2 border-warden-accent border-t-transparent rounded-full animate-spin" />
+                    <span className="text-warden-text-dim">Loading sessions...</span>
                   </div>
-                ) : selectedSessionName ? (
-                  <ErrorBoundary key={selectedSessionName}>
-                    <TerminalView
-                      tmuxSessionName={selectedSessionName}
-                      onSessionExit={handleSessionExit}
-                    />
-                  </ErrorBoundary>
-                ) : (
-                  <div className="flex items-center justify-center h-full">
-                    <div className="text-center">
-                      <div className="text-4xl mb-4 opacity-20">&#9678;</div>
-                      <p className="text-warden-text-dim text-lg">No active agent sessions</p>
-                      <p className="text-warden-text-dim/60 text-sm mt-1">
-                        tmux sessions with agent prefixes (warden-*, scout-*, builder-*) will appear here
-                      </p>
-                    </div>
+                </div>
+              ) : selectedSessionName ? (
+                <ErrorBoundary key={selectedSessionName}>
+                  <TerminalView
+                    tmuxSessionName={selectedSessionName}
+                    onSessionExit={handleSessionExit}
+                  />
+                </ErrorBoundary>
+              ) : (
+                <div className="flex items-center justify-center h-full">
+                  <div className="text-center">
+                    <div className="text-4xl mb-4 opacity-20">&#9678;</div>
+                    <p className="text-warden-text-dim text-lg">No active agent sessions</p>
+                    <p className="text-warden-text-dim/60 text-sm mt-1">
+                      tmux sessions with agent prefixes (warden-*, scout-*, builder-*) will appear here
+                    </p>
                   </div>
-                )}
-              </div>
-
-              {agents.length > 0 && (
-                <PromptPanel agents={agents} selectedAgentId={derivedAgentId} />
+                </div>
               )}
-            </>
+            </div>
           ) : (
             <HistoryView />
           )}
@@ -234,7 +228,7 @@ export function App() {
 
         {/* Desktop: inline sidebar */}
         {showSidebar && agents.length > 0 && (
-          <div className="hidden lg:block">
+          <div className="hidden lg:flex lg:flex-col">
             <AgentSidebar
               agents={agents}
               topicMappings={topicMappings}
@@ -242,6 +236,9 @@ export function App() {
               onSelectAgent={handleSidebarSelectAgent}
               onClose={() => setShowSidebar(false)}
             />
+            {currentView === 'terminals' && (
+              <PromptPanel agents={agents} selectedAgentId={derivedAgentId} />
+            )}
           </div>
         )}
 
@@ -252,7 +249,7 @@ export function App() {
               className="absolute inset-0 sidebar-backdrop"
               onClick={() => setShowSidebar(false)}
             />
-            <div className="absolute right-0 top-0 h-full w-[85vw] max-w-sm">
+            <div className="absolute right-0 top-0 h-full w-[85vw] max-w-sm flex flex-col">
               <AgentSidebar
                 agents={agents}
                 topicMappings={topicMappings}
@@ -260,6 +257,9 @@ export function App() {
                 onSelectAgent={handleSidebarSelectAgent}
                 onClose={() => setShowSidebar(false)}
               />
+              {currentView === 'terminals' && (
+                <PromptPanel agents={agents} selectedAgentId={derivedAgentId} />
+              )}
             </div>
           </div>
         )}

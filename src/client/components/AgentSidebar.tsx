@@ -24,7 +24,7 @@ export function AgentSidebar({ agents, topicMappings, selectedAgentId, onSelectA
   const agentTopics = topicMappings.filter((t) => t.agentId === selectedAgentId);
 
   return (
-    <div className="w-full lg:w-72 h-full bg-warden-panel border-l border-warden-border flex flex-col overflow-y-auto">
+    <div className="w-full lg:w-72 flex-1 min-h-0 bg-warden-panel border-l border-warden-border flex flex-col overflow-y-auto">
       <div className="flex items-center justify-between px-3 py-2 border-b border-warden-border">
         <h2 className="text-sm font-semibold text-warden-text">Agents</h2>
         {onClose && (
