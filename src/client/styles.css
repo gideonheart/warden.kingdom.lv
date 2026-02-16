@@ -52,4 +52,5 @@ body {
 .app-height {
   height: 100vh;
   height: 100dvh;
+  height: var(--visual-viewport-height, 100dvh);
 }

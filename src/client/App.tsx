@@ -36,6 +36,27 @@ export function App() {
   const [sidebarSelectedAgentId, setSidebarSelectedAgentId] = useState<string | null>(null);
   const [showSidebar, setShowSidebar] = useState(() => window.innerWidth >= 1024);
 
+  // Track visual viewport height for iOS keyboard handling
+  useEffect(() => {
+    const viewport = window.visualViewport;
+    if (!viewport) return;
+
+    const updateHeight = () => {
+      document.documentElement.style.setProperty(
+        '--visual-viewport-height',
+        `${viewport.height}px`
+      );
+    };
+
+    updateHeight();
+    viewport.addEventListener('resize', updateHeight);
+    viewport.addEventListener('scroll', updateHeight);
+    return () => {
+      viewport.removeEventListener('resize', updateHeight);
+      viewport.removeEventListener('scroll', updateHeight);
+    };
+  }, []);
+
   // Auto-select first agent in sidebar when agents load
   if (sidebarSelectedAgentId === null && agents.length > 0) {
     setSidebarSelectedAgentId(agents[0].id);
