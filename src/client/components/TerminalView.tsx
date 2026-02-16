@@ -63,7 +63,7 @@ function MobileKeyToolbar({ sendInput, selectMode, onToggleCopyMode }: MobileKey
   }, [showPasteInput]);
 
   return (
-    <div className="relative z-40 flex flex-col bg-warden-panel border-t border-warden-border">
+    <div className="sticky bottom-0 z-40 flex-shrink-0 flex flex-col bg-warden-panel border-t border-warden-border">
       {showPasteInput && (
         <div className="flex items-center gap-2 px-2 py-1.5 border-b border-warden-border">
           <textarea
@@ -108,6 +108,7 @@ function MobileKeyToolbar({ sendInput, selectMode, onToggleCopyMode }: MobileKey
         </button>
         <button
           onTouchStart={(event) => { event.preventDefault(); sendInput('\x1b'); }}
+          title="Exit scroll/copy mode"
           className="px-2 py-1.5 min-w-[40px] min-h-[36px] text-xs font-mono text-warden-text-dim bg-warden-border/40 rounded active:bg-warden-accent/30 active:text-warden-accent whitespace-nowrap select-none"
         >
           Esc
@@ -323,8 +324,10 @@ export function TerminalView({ tmuxSessionName, onSessionExit }: TerminalViewPro
         touchAccumulator += deltaY;
         const linesToScroll = Math.trunc(touchAccumulator / cellHeight);
         if (linesToScroll !== 0) {
+          // Scroll down faster (3x) to help escape long scrollback buffers
+          const adjustedLines = linesToScroll > 0 ? linesToScroll : linesToScroll * 3;
           // Natural scrolling: finger up = see newer content = scroll down in tmux
-          sendScrollToTmux(-linesToScroll);
+          sendScrollToTmux(-adjustedLines);
           touchAccumulator -= linesToScroll * cellHeight;
         }
       }
