@@ -1,306 +1,354 @@
 # Project Research Summary
 
-**Project:** Warden Dashboard
-**Domain:** Browser-based terminal dashboard / multi-agent session multiplexer
-**Researched:** 2026-02-12
-**Confidence:** MEDIUM
+**Project:** Warden Dashboard v2.0 Mission Control
+**Domain:** Terminal multiplexer dashboard with plugin registry, activity timeline, and mobile-first UI
+**Researched:** 2026-02-16
+**Confidence:** HIGH
 
 ## Executive Summary
 
-Warden Dashboard is a browser-based terminal multiplexer specifically designed for monitoring and intervening with OpenClaw autonomous agents. The product combines three established patterns: terminal multiplexing (tmux model), web-based terminal emulation (xterm.js rendering), and agent monitoring dashboards (Jenkins/Kubernetes agent grid model). Research indicates the recommended approach uses a proven stack (Express 5 + Socket.IO + React 19 + xterm.js 5 + node-pty + tmux) with a three-layer architecture: presentation layer (browser with xterm.js), application layer (Node.js with Socket.IO for real-time streaming), and process layer (node-pty bridging to persistent tmux sessions).
+Warden v2.0 extends the existing terminal streaming dashboard with three major feature domains: (1) Plugin/Tool Registry for UI extensibility, (2) Activity Timeline for structured event capture and audit logging, and (3) Mobile-First UI for responsive operation. Research reveals that the current stack (Express 5, Socket.IO 4, React 19, xterm.js 5, SQLite, Tailwind CSS 4, Vite 6) provides all necessary infrastructure with minimal new dependencies.
 
-The key differentiation is that Warden is NOT a general-purpose terminal tool competing with tmux. It's a monitoring and intervention layer for autonomous agents, prioritizing observation, non-invasiveness, and surgical intervention over power-user terminal features. The architecture must support read-only observation by default with explicit take-over mode, agent-to-Telegram topic mapping for routing clarity, and seamless reconnection without data loss.
+The recommended approach prioritizes simplicity and leverages existing patterns: use Vite's native dynamic imports with TypeScript registry pattern for plugins (no module federation), selective ANSI parsing with security-first event storage for activity timeline, and mobile-first CSS with progressive enhancement for responsive UI. This approach adds only ~68kb to the bundle (ansi_up, react-modal-sheet, framer-motion, @gravity-ui/timeline) and requires zero build system changes.
 
-Critical risks include PTY process zombie accumulation (requires explicit cleanup handlers), Socket.IO reconnection data loss (requires server-side buffering), xterm.js resize race conditions (requires debouncing and synchronization), and React 19 StrictMode double-mounting effects (requires proper cleanup functions). These pitfalls are well-documented with clear prevention strategies and must be addressed from Phase 1 to avoid expensive retrofitting.
+Key risks center on three critical areas: (1) over-engineering the plugin system when simple build-time registration suffices, (2) xterm.js mobile touch support which remains fundamentally broken in 2026 (requires read-only mobile terminal decision), and (3) terminal output parsing performance and ANSI security vulnerabilities (requires selective parsing with aggressive sanitization). All risks have documented mitigations and do not block MVP delivery.
 
 ## Key Findings
 
 ### Recommended Stack
 
-The stack leverages cutting-edge but stable versions of established technologies. Express 5.2.1 provides async/await support with integrated body-parser. React 19.2.4 offers improved concurrent rendering critical for real-time terminal updates. Socket.IO 4.8.3 handles WebSocket communication with auto-reconnection and room-based multiplexing. xterm.js 5.3.0 provides modern Unicode support and addon architecture. node-pty 1.1.0 creates real PTY processes required for streaming Claude Code output. better-sqlite3 11.10.0 offers synchronous API for simple persistence without client-server overhead. Tailwind CSS 4.1.18 provides fast builds with CSS-first configuration matching OpenClaw Gateway UI style.
+Warden v2.0 requires minimal new dependencies. The existing infrastructure handles all core functionality. Four new libraries provide specialized capabilities without architectural changes.
 
-**Core technologies:**
-- **Express 5.2.1**: HTTP server with native async/await support and integrated body-parser
-- **React 19.2.4**: UI framework with compiler optimizations and improved concurrent rendering for terminal updates
-- **Socket.IO 4.8.3**: WebSocket library with auto-reconnection, room isolation, and binary event support
-- **xterm.js 5.3.0**: Terminal renderer with modern Unicode support and addon system (FitAddon, WebLinksAddon)
-- **node-pty 1.1.0**: Pseudo-terminal interface for spawning real shell processes and streaming output
-- **better-sqlite3 11.10.0**: Synchronous SQLite driver with no external dependencies for session metadata
-- **Tailwind CSS 4.1.18**: Utility-first CSS with Oxide engine for fast builds and OpenClaw UI consistency
+**New dependencies:**
+- **ansi_up (6.0.2):** ANSI escape code parsing for terminal output — zero dependencies, isomorphic, TypeScript support, actively maintained since 2011
+- **react-modal-sheet (3.1.0):** Bottom sheet/drawer for mobile UI — built on Framer Motion, Tailwind-compatible, accessibility-focused
+- **framer-motion (11.11+):** Animation library (peer dependency of react-modal-sheet) — industry standard, React 19 compatible
+- **@gravity-ui/timeline (0.1.0):** Canvas-based virtualized timeline rendering — handles thousands of events, active development by Yandex team
 
-**Version-specific gotchas:**
-- Express 5 requires HTTP server wrapping (not direct app listen) for Socket.IO integration
-- React 19 StrictMode double-invokes effects (requires explicit cleanup functions)
-- Tailwind 4 uses CSS-first config with @theme directives (may require safelist for dynamic classes)
-- xterm.js fit() must be called AFTER DOM mount with proper debouncing for resize
-- Socket.IO client/server versions MUST match exactly (4.8.3 <-> 4.8.3)
+**No additional dependencies needed:**
+- Plugin architecture uses Vite's native `import.meta.glob()` with TypeScript registry pattern
+- Mobile terminal uses existing xterm.js with custom touch handlers
+- SQLite schema additions use existing better-sqlite3 with virtual columns and FTS5
+- Mobile UI uses existing Tailwind CSS 4 with custom utilities
+
+**Bundle size impact:** +68kb gzipped (15% increase from ~450kb to ~518kb), mitigated by code-splitting timeline and bottom sheet components.
+
+**Critical version requirements:** None identified. All dependencies compatible with existing React 19 and Vite 6 infrastructure.
 
 ### Expected Features
 
-Research identifies clear table stakes vs differentiators. Users expect live terminal streaming, session persistence across browser disconnects, multi-session tabs, read-only by default mode, connection status indicators, and terminal scrollback. These are baseline expectations from any terminal multiplexer and must work flawlessly.
+Research identified three distinct feature domains with clear table stakes, differentiators, and anti-features.
 
-**Must have (table stakes):**
-- Live terminal streaming with sub-100ms latency
-- Session persistence across browser disconnects (tmux-backed)
-- Multi-session tabs with agent metadata (name, project, status)
-- Read-only by default to prevent accidental agent interference
-- Connection status indicators (connected/reconnecting/dead)
-- Terminal scroll buffer and copy/paste support
-- Auto-reconnect on network drop
-- Terminal resizing on window resize
+**Plugin Registry — Must have (P1):**
+- Manifest schema for plugin metadata (name, version, description, capabilities)
+- Metadata display table showing plugins with status (active/inactive)
+- Manual enable/disable toggle per plugin
+- Build-time type-safe registration with TypeScript
 
-**Should have (competitive differentiators):**
-- Agent-to-Telegram topic mapping (visual grid showing routing)
-- Prompt injection via OpenClaw gateway (structured intervention)
-- Explicit take-over mode (toggle to interactive terminal)
-- Agent identity in UI (color-coded tabs, distinct visual identity)
-- Session status tracking (active/idle/stopped/error states)
-- Project path context (which git repo the agent is working in)
-- SOUL.md preview (quick reminder of agent role)
+**Plugin Registry — Should have (P2):**
+- Manifest pattern (co-locate metadata + code + UI in single file)
+- UI panel slots for injecting custom React components
 
-**Defer (v2+):**
-- Session history with search and date filters
-- Token usage dashboard per agent
-- Log viewer for OpenClaw gateway logs
-- Multi-pane terminal splits (tmux already does this)
-- Terminal themes/customization (monitoring tool, not daily driver)
-- Session recording/replay (storage cost, complexity)
+**Plugin Registry — Defer (anti-features):**
+- Auto-install from public registry (security risk, scope creep)
+- Plugin marketplace UI (requires hosting, moderation, legal complexity)
 
-**MVP recommendation:**
-Phase 1 focuses on pure observation (terminal streaming, session discovery, multi-session tabs, read-only mode) to prove the observation model works before adding intervention features. Phase 2 adds intervention capabilities (prompt input, take-over mode, topic mapping) once observation is validated. Phase 3 adds analytics and history once intervention patterns are established.
+**Activity Timeline — Must have (P1):**
+- SQLite events table with Activity Stream Protocol schema (Actor/Verb/Object/Target)
+- Chronological event list (time-sorted, newest first)
+- Event detail panel with full metadata
+- Filter by agent, date range, event type
+- Export to CSV/JSON for audit compliance
+
+**Activity Timeline — Should have (P2):**
+- Structured event parsing from terminal output (tool calls, file edits, commands)
+- Success/failure state indicators (parse exit codes, error keywords)
+- Linked events (click event → jump to terminal session at timestamp)
+
+**Activity Timeline — Defer (anti-features):**
+- Real-time WebSocket streaming of every event (overwhelming for high-volume agents)
+- AI-powered event summarization (API costs, unreliable for audit)
+- Immutable log with blockchain (massive overkill for single-user tool)
+
+**Mobile UI — Must have (P1):**
+- Full-width responsive layout (375px to 1920px)
+- Collapsible panels (accordions) for agent details, session logs, token usage
+- Bottom sheet for prompt panel (thumb-reachable on mobile)
+- Touch scrolling support for terminal
+- Safe zone at top (64px) when bottom sheet expands
+
+**Mobile UI — Should have (P2):**
+- Progressive enhancement (mobile baseline, desktop enhancements via min-width breakpoints)
+- Gesture library (swipe for tabs, pinch to zoom)
+
+**Mobile UI — Defer (anti-features):**
+- Separate native mobile app (3x development cost, App Store distribution)
+- Predictive touch input (Mosh pattern) — high complexity, conflicts with Socket.IO
+- Full mobile terminal interactivity (xterm.js touch support broken, requires weeks of debugging)
 
 ### Architecture Approach
 
-The architecture follows a three-layer pattern with WebSocket room-based multiplexing for session isolation. Each tmux session gets a unique Socket.IO room. Browser connects by session name. Multiple browsers can observe the same session without interference. The recommended pattern uses per-socket PTY (each browser gets its own `tmux attach-session` process) rather than shared PTY, as tmux handles multi-attach natively and resource overhead is negligible.
+All three features integrate cleanly into the existing architecture without major refactoring. The plugin system slots into the React component hierarchy, activity timeline extends the existing Socket.IO streaming service, and mobile UI restructures layout components using media queries.
 
-**Major components:**
-1. **Socket Router** (server) — Maps incoming WebSocket connections to correct PTY processes using Socket.IO rooms for session isolation
-2. **Session Manager** (server) — Creates/destroys/lists tmux sessions, enforces naming conventions, implements reconciliation between SQLite metadata and actual tmux sessions
-3. **Terminal Stream Service** (server) — Spawns node-pty processes, bridges I/O between pty and socket, implements read-only vs interactive mode, handles cleanup on disconnect
-4. **Instance Tracker** (server) — Persists session metadata to SQLite (agent, project, status, timestamps), reconciles with tmux state periodically, provides query API
-5. **Config Reader** (server) — Parses OpenClaw config (openclaw.json), extracts agent metadata and topic mappings, caches for 30s to avoid excessive disk reads
-6. **Terminal View** (client) — React component wrapping xterm.js with FitAddon and WebLinksAddon, uses useRef to prevent re-render issues, implements proper cleanup
-7. **Terminal Socket Hook** (client) — Manages Socket.IO connection lifecycle, handles reconnection, exposes send/receive interface to components
+**Major components for Plugin Registry:**
+1. **PluginRegistry (client singleton)** — Map-based registry with `discover()`, `load()`, `unload()` methods; type-safe component lookup
+2. **DynamicPanelRenderer (React component)** — Runtime component loader with ErrorBoundary isolation per plugin
+3. **PluginManager (server service)** — CRUD operations for plugin metadata, SQLite persistence
+4. **Panel slot architecture** — Declarative `<PluginSlot slotId="sidebar-top" />` containers in layout components
 
-**Key patterns:**
-- **Room-based multiplexing**: Each session isolated in Socket.IO room (prevents cross-session data leakage)
-- **Per-socket PTY**: Each browser connection spawns own `tmux attach-session` (simpler than shared PTY, no resize conflicts)
-- **Active tracking with reconciliation**: SQLite tracks metadata, periodic background job syncs with actual tmux sessions (handles sessions killed outside app)
-- **Read-only by default, explicit take-over**: Safe observation model with clear UX boundary for intervention
+**Major components for Activity Timeline:**
+1. **TerminalOutputParser (server service)** — ANSI escape sequence parser using ansi_up, detects commands/errors via regex patterns
+2. **ActivityEnricher (server service)** — Event extraction pipeline, transforms raw terminal chunks into structured events
+3. **AuditLogger (server service)** — Event persistence with sequence numbers, retention policy enforcement, batch writes
+4. **ActivityTimeline (React component)** — Virtualized event list with filters, pagination, detail panel
 
-**Project structure:**
-```
-src/
-├── server/
-│   ├── services/          # TmuxSessionManager, TerminalStreamService, InstanceTracker, OpenClawConfigReader
-│   ├── socket/            # terminalHandler.ts (Socket.IO /terminal namespace)
-│   ├── routes/            # REST endpoints for instance management, agent metadata
-│   └── database/          # schema.sql, DatabaseConnection.ts
-└── client/
-    ├── components/        # TerminalView, InstanceTabBar, AgentDetailsSidebar, PromptInputPanel
-    └── hooks/             # useTerminalSocket, useActiveInstances, useAgentConfig
+**Major components for Mobile UI:**
+1. **ResponsiveLayout (React component)** — Conditional layout based on viewport (MobileHeader + BottomNav vs TabletDesktopHeader)
+2. **useMediaQuery hook** — Viewport detection with `window.matchMedia` and event listeners
+3. **MobileHeader, BottomNav, SessionDrawer, AgentDrawer** — Mobile-specific UI components
+4. **Touch-friendly utilities** — Tailwind CSS custom utilities for safe areas, touch targets (44x44px min), momentum scrolling
+
+**Integration points:**
+- Plugin slots added to App.tsx, AgentSidebar.tsx (sidebar-top, sidebar-bottom, bottom-panel, terminal-overlay)
+- TerminalStreamService emits parsed events to new `/activity` Socket.IO namespace
+- App.tsx conditional rendering based on `useIsMobile()`, `useIsDesktop()` hooks
+- SQLite migrations add `plugins` and `activity_events` tables with indexes and FTS5 virtual table
+
+**Database schema additions:**
+```sql
+-- Plugin registry table
+CREATE TABLE plugins (id TEXT PRIMARY KEY, name TEXT, version TEXT,
+  enabled INTEGER DEFAULT 1, manifest_json TEXT, installed_at DATETIME);
+
+-- Activity events table with virtual columns for JSON indexing
+CREATE TABLE activity_events (id INTEGER PRIMARY KEY, instance_id INTEGER,
+  timestamp DATETIME, event_type TEXT, severity TEXT, raw_text TEXT,
+  structured_data TEXT,
+  agent_id TEXT GENERATED ALWAYS AS (json_extract(structured_data, '$.agentId')) VIRTUAL,
+  severity TEXT GENERATED ALWAYS AS (json_extract(structured_data, '$.severity')) VIRTUAL);
+
+-- Full-text search for activity
+CREATE VIRTUAL TABLE activity_events_fts USING fts5(summary, terminal_output,
+  content='activity_events', tokenize='porter unicode61');
 ```
 
 ### Critical Pitfalls
 
-Research identified 10 critical pitfalls, all well-documented with clear prevention strategies. The top 5 that must be addressed in Phase 1:
+Research identified 8 critical pitfalls with verified sources (2025-2026). Top 5 most impactful:
 
-1. **PTY Process Zombie Apocalypse** — node-pty processes not cleaned up on disconnect, accumulate until server unresponsive. **Prevention**: Two-stage cleanup (Socket.IO disconnect + heartbeat timeout), track all PTY processes in Map, implement graceful shutdown handlers (SIGTERM/SIGINT), use `pty.kill()` followed by `pty.kill('SIGKILL')` if needed.
+1. **Over-Engineering Plugin System for Single-User Tool** — Building full plugin SDK with sandboxing, versioning, dependency management when need is "add 2-3 internal code modules." Balloons codebase from 2,644 LOC to 10,000+ LOC with zero user value. **Mitigation:** Start with simplest approach (TypeScript modules with metadata, build-time registration), set complexity budget (<200 LOC), defer sandboxing until concrete demand.
 
-2. **Socket.IO Reconnection Data Loss** — Terminal output generated during network disconnection is lost. **Prevention**: Implement circular buffer per PTY session (last 10K lines or 1MB), send buffer contents on reconnection before resuming live stream, use tmux scrollback as persistence layer.
+2. **xterm.js Mobile Touch Experience is Fundamentally Broken** — 5+ year old issue still active in 2025: no native touch event handling, copy/paste broken on iOS (Issue #3727), erratic typing on Android (Issue #3600), Smart Keyboard arrows don't work (Issue #1101). **Mitigation:** Decide early if mobile terminal is core requirement; if nice-to-have, make read-only with "Use desktop" message; if core, budget 2-3 weeks mobile-specific work and expect ongoing issues.
 
-3. **xterm.js Fit Addon Resize Race Condition** — Terminal dimensions incorrect, causing text wrapping issues and broken ncurses UIs (vim, htop). **Prevention**: Debounce resize events (300-500ms), wait for DOM layout stabilization before calling fit(), verify dimensions are sane before calling pty.resize(), handle initial mount carefully.
+3. **Terminal Output Parsing Becomes Performance Nightmare** — Claude Code generates thousands of lines per minute; ANSI parsing is CPU-intensive; capturing everything causes exponential storage growth; queries over millions of rows timeout. **Mitigation:** Parse selectively (only known patterns like tool calls), set 7-day retention limit, index aggressively (timestamp, event_type), offload parsing to background worker, monitor database size (<100MB), run daily cleanup.
 
-4. **Express 5 Async Error Handling Gaps** — Async errors in route handlers not caught, causing process crash or hanging requests. **Prevention**: Use async middleware wrapper, always call next(err) in try/catch blocks, implement global error handler with 4 parameters, configure process-level unhandledRejection handler.
+4. **ANSI Escape Sequences Create Security and Storage Vulnerabilities** — Research uncovered 10 CVEs enabling RCE, log manipulation, DoS. 2025 attacks target AI/LLM tools. ANSI codes can obfuscate malicious payloads, make logs appear empty when viewed, print billions of characters. **Mitigation:** Strip ANSI before storing (replace `\x1b` with placeholder), use battle-tested strip-ansi library, validate storage size (reject >10KB), never render ANSI in web UI.
 
-5. **SQLite WAL Mode Corruption on Dirty Shutdown** — Database corrupted after unclean shutdown (kill -9, power loss). **Prevention**: Enable WAL mode explicitly, implement graceful shutdown handler that checkpoints WAL and closes DB properly, set appropriate checkpoint interval.
+5. **Desktop-First Mobile Implementation Breaks Desktop UX** — Giant touch-friendly buttons waste space on desktop, navigation requires extra clicks, information density drops, keyboard shortcuts removed. Regression caused by treating responsive design as "afterthought." **Mitigation:** Use mobile-first CSS with min-width media queries, design viewport-specific component variants (not just resize), test desktop AND mobile throughout, use content-based breakpoints.
 
-**Phase 2 pitfalls:**
-- React 19 useEffect double-execution in StrictMode (requires cleanup functions)
-- tmux session name collisions with concurrent agents (requires UUID-based naming)
-
-**Phase 3 pitfalls:**
-- Tailwind CSS 4 JIT purge removing terminal classes (requires safelist)
-
-**Security pitfalls (address throughout):**
-- Inadequate input sanitization leading to command injection (validate all pty.write() calls)
-- No authentication on Socket.IO (implement at minimum localhost-only binding)
-- Memory leaks from unremoved event listeners (track and clean up all listeners)
+**Other critical pitfalls:**
+- Socket.IO Connection State Recovery fails for activity timeline on network switching (WiFi → 4G) — always implement REST backfill for `socket.recovered === false`
+- Node.js memory leaks in terminal streaming from PTY event listeners not removed on disconnect — track and remove ALL listeners, use WeakMap for metadata
+- SQLite WAL checkpoint starvation from long-running activity timeline queries — ensure "reader gaps," use short-lived transactions (<1s), paginate queries
 
 ## Implications for Roadmap
 
-Based on architecture dependencies, feature priorities, and pitfall timing, recommend a three-phase structure focused on incremental validation:
+Based on research findings, recommended phase structure prioritizes low-risk foundation, addresses mobile strategy before implementation, and defers complex parsing until infrastructure is stable.
 
-### Phase 1: Core Infrastructure (Foundation)
-**Rationale:** No UI dependencies. Backend can be tested independently via curl + wscat. Must establish foundation with proper error handling, cleanup, and persistence before building on top. All critical pitfalls with "Phase 1" designation must be addressed here to avoid expensive retrofitting.
+### Suggested Phase Structure
 
-**Delivers:** Working backend with terminal streaming, session management, and database persistence. Validates core technical feasibility before investing in frontend.
+#### Phase 1: Plugin Registry Foundation (Week 1-2)
+**Rationale:** Lowest-risk feature with clear scope. Establishes extensibility pattern for future enhancements. Must be built correctly from day one — over-engineering here dooms entire milestone.
+
+**Delivers:**
+- Simple build-time plugin registration system (<200 LOC)
+- Type-safe plugin manifest schema with TypeScript validation
+- Plugin metadata display UI (table with enable/disable toggles)
+- 1-2 proof-of-concept built-in plugins (e.g., "System Stats" panel)
 
 **Addresses features:**
-- Live terminal streaming (table stake)
-- Session persistence across disconnects (table stake)
-- Connection status indicators (table stake)
+- Plugin Registry — Manifest Schema (P1)
+- Plugin Registry — Metadata Display (P1)
+- Plugin Registry — Manual Enable/Disable (P1)
+- Plugin Registry — Type-Safe Registration (P2)
 
 **Avoids pitfalls:**
-- PTY zombie processes (cleanup handlers)
-- Express 5 async error gaps (global error handling)
-- SQLite WAL corruption (graceful shutdown)
-- Memory leaks (event listener tracking)
-- Command injection (input validation)
+- Over-engineering (use Vite glob imports, not module federation)
+- Missing error boundaries (wrap each plugin in ErrorBoundary)
+- Type safety loss (build-time registration with TypeScript manifest)
 
-**Components:**
-- DatabaseConnection + schema
-- TmuxSessionManager
-- TerminalStreamService
-- Socket.IO handler
-- InstanceTracker
-- REST routes for /api/instances
+**Research flags:** None — plugin registry has well-documented patterns, standard implementation. Skip `/gsd:research-phase`.
 
-**Validation:** `curl localhost:3001/api/instances` returns empty array. `wscat -c ws://localhost:3001/terminal?sessionName=test` connects. Manually create tmux session via SSH, see it tracked in database.
+---
 
-### Phase 2: Terminal Integration (UI + Real-time Streaming)
-**Rationale:** Backend API exists, can build UI against real data. This phase connects xterm.js to Socket.IO and validates the full observation loop. Must address React/xterm.js integration pitfalls and resize handling.
+#### Phase 2: Mobile-First UI Restructure (Week 2-3)
+**Rationale:** UI foundation needed before Activity view implementation. **Critical decision point:** Must resolve xterm.js mobile touch strategy before proceeding (read-only vs interactive). Desktop regression testing required after every change.
 
-**Delivers:** Working dashboard that streams live terminal output. Users can observe multiple agents simultaneously with proper tab switching.
+**Delivers:**
+- Responsive layout hierarchy (MobileHeader, BottomNav, drawers)
+- Mobile-first CSS with progressive enhancement (min-width breakpoints)
+- Touch-friendly components (44px min targets, safe areas, momentum scroll)
+- Playwright tests at mobile (375px), tablet (768px), desktop (1440px) viewports
 
 **Addresses features:**
-- Multi-session tabs (table stake)
-- Read-only by default (table stake)
-- Terminal scroll and copy/paste (table stake)
-- Terminal resizing (table stake)
-- Agent identity in UI (differentiator)
-- Project path context (differentiator)
+- Mobile UI — Full-Width Responsive Layout (P1)
+- Mobile UI — Collapsible Panels (P1)
+- Mobile UI — Bottom Sheet (P1)
+- Mobile UI — Touch Scrolling (P1)
+- Mobile UI — Progressive Enhancement (P2)
 
 **Avoids pitfalls:**
-- Socket.IO reconnection data loss (buffering)
-- xterm.js resize race conditions (debouncing)
-- React 19 useEffect double-execution (cleanup functions)
-- tmux session name collisions (UUID naming)
+- xterm.js mobile touch broken (make terminal read-only on mobile OR budget 2-3 weeks debugging)
+- Desktop UX regression (mobile-first CSS, test desktop continuously)
+- Mobile keyboard covering input (use visual viewport API, already in App.tsx)
 
-**Components:**
-- React app scaffold + Vite config
-- TerminalView component (xterm.js wrapper)
-- useTerminalSocket hook
-- InstanceTabBar
-- useActiveInstances hook
+**Research flags:** **Needs research** — xterm.js mobile touch support requires evaluation of alternatives or acceptance of read-only constraint. Consider `/gsd:research-phase` focused on mobile terminal interaction patterns.
 
-**Validation:** Dashboard shows empty state. Manually create tmux session, refresh page, see tab appear. Click tab, see live terminal output. Disconnect network, reconnect, see no data loss. Resize window, verify vim/htop render correctly.
+**Critical pre-phase decision:** Test xterm.js touch on real iOS/Android devices. If unusable, commit to read-only mobile terminal before starting phase. Document limitation in UX.
 
-### Phase 3: Agent Integration (Config + Gateway)
-**Rationale:** Requires backend + frontend working. Adds business logic layer connecting to OpenClaw config and gateway API. Enables intervention capabilities beyond pure observation.
+---
 
-**Delivers:** Full intervention capabilities via prompt injection and take-over mode. Visual mapping of agent routing. Agent details for informed intervention decisions.
+#### Phase 3: Activity Timeline & Audit Log (Week 3-5)
+**Rationale:** Most complex feature, depends on parser library integration, benefits from plugin system (custom event renderers as plugins). Security and performance must be designed from day one — retrofitting ANSI stripping and retention policies is difficult.
+
+**Delivers:**
+- Selective ANSI parsing with security-first sanitization
+- SQLite activity_events table with virtual columns and FTS5
+- Real-time event capture via Socket.IO with REST backfill
+- Timeline UI with filters, pagination, virtualized rendering
+- Retention policy (7-day default, daily cleanup cron)
 
 **Addresses features:**
-- Prompt injection via gateway (differentiator)
-- Explicit take-over mode (differentiator)
-- Agent-to-Telegram topic mapping (differentiator)
-- SOUL.md preview (differentiator)
-- Session status tracking (differentiator)
+- Activity Timeline — SQLite Events Table (P1)
+- Activity Timeline — Chronological Event List (P1)
+- Activity Timeline — Event Detail Panel (P1)
+- Activity Timeline — Filter by Agent (P1)
+- Activity Timeline — Date Range Filter (P1)
+- Activity Timeline — Export to CSV/JSON (P1)
+- Activity Timeline — Structured Event Parsing (P2)
+- Activity Timeline — Success/Failure Indicators (P2)
 
 **Avoids pitfalls:**
-- Tailwind CSS 4 purge issues (safelist)
+- ANSI security vulnerabilities (strip before storage with strip-ansi library)
+- Parsing performance nightmare (selective parsing, pattern allowlist, background worker)
+- WAL checkpoint starvation (paginate queries, <1s transactions, daily checkpoint)
+- Socket.IO event loss (implement REST backfill for `socket.recovered === false`)
+- Memory leaks (remove PTY listeners on disconnect, WeakMap for metadata)
 
-**Components:**
-- OpenClawConfigReader service
-- GatewayApiClient service
-- /api/agents REST route
-- AgentDetailsSidebar
-- PromptInputPanel
-- TelegramTopicMap
+**Research flags:** **Needs research** — ANSI parsing patterns for Claude Code tool calls require investigation. Terminal output varies by agent type. Consider `/gsd:research-phase` focused on extracting structured events from real terminal logs.
 
-**Validation:** Sidebar shows agent SOUL.md. PromptInputPanel sends message (verify in OpenClaw logs). Topic map shows correct agent → topic mappings. Take-over mode allows typing into terminal.
+**Critical pre-phase requirements:**
+- Establish pattern allowlist for parsing (tool calls, file edits, errors)
+- Design retention policy and storage budget (100MB target)
+- Implement monitoring for database size and WAL growth
 
-### Phase 4: History & Polish (v2+ Features)
-**Rationale:** Nice-to-have features. Core functionality works. Historical analysis and analytics only valuable once product is used daily.
-
-**Delivers:** Session history search, token usage dashboard, log viewer, UI polish, Playwright tests.
-
-**Addresses features:**
-- Session history (deferred)
-- Token usage dashboard (deferred)
-- Log viewer (deferred)
+---
 
 ### Phase Ordering Rationale
 
-- **Foundation first**: DatabaseConnection → InstanceTracker → REST routes establishes persistence layer all other components depend on
-- **Backend before frontend**: Server components can be tested independently with curl/wscat, proving technical feasibility before UI investment
-- **Observation before intervention**: Phase 1-2 prove the observation model works (live streaming, multi-session tabs) before adding intervention complexity (prompts, take-over)
-- **Standard before custom**: Terminal streaming (standard xterm.js + Socket.IO pattern) before OpenClaw integration (custom business logic)
-- **Critical path**: DatabaseConnection → InstanceTracker → REST routes → useActiveInstances → InstanceTabBar → TerminalView → useTerminalSocket → Socket.IO handler → TerminalStreamService
+**Why this sequence:**
+1. **Plugin Foundation first** — Establishes pattern for extensibility, lowest risk, required for activity timeline plugins (custom event parsers/renderers)
+2. **Mobile UI second** — Provides layout foundation for Activity view, forces xterm.js mobile decision before implementation, allows desktop regression testing throughout
+3. **Activity Timeline last** — Most complex, highest risk, benefits from plugin system, requires mobile layout for optimal UX
+
+**Why this grouping:**
+- Plugin system is standalone, no dependencies on other features
+- Mobile UI restructure affects all views (terminals, history, activity), best done before adding new view
+- Activity timeline integrates with both plugins (event renderers) and mobile UI (bottom sheet filters)
+
+**How this avoids pitfalls:**
+- Plugin complexity assessed early (Phase 1), prevents over-engineering cascade
+- Mobile strategy decided before implementation (Phase 2), prevents late discovery of xterm.js limitations
+- Activity timeline security and performance designed from start (Phase 3), prevents retrofit of ANSI stripping and retention
 
 ### Research Flags
 
+**Phases needing deeper research during planning:**
+
+- **Phase 2 (Mobile UI):** xterm.js mobile touch support evaluation — test on real devices, investigate alternatives (read-only, custom handlers, alternative terminal libraries), document decision rationale
+- **Phase 3 (Activity Timeline):** Terminal output parsing patterns for Claude Code agents — analyze real terminal logs, identify tool call signatures, design pattern allowlist, validate parsing accuracy
+
 **Phases with standard patterns (skip research-phase):**
-- **Phase 1 (Core Infrastructure):** Well-documented Express + Socket.IO + SQLite patterns. Established xterm.js/node-pty integration examples (Wetty, ttyd, Gotty). No research needed.
-- **Phase 2 (Terminal Integration):** Standard React + xterm.js + Socket.IO client patterns. Abundant examples in open source. Skip research.
 
-**Phases likely needing deeper research:**
-- **Phase 3 (Agent Integration):** Requires understanding OpenClaw gateway API and config structure. Research `/gsd:research-phase 3` to investigate:
-  - OpenClaw config format (openclaw.json structure, agent definitions)
-  - Gateway API endpoints (how to send messages to specific agents/topics)
-  - Token usage visibility (does gateway expose per-agent metrics?)
-  - Log format and access patterns
-
-**Research gaps to address in Phase 3:**
-- OpenClaw gateway prompt injection API (does it exist? what's the endpoint?)
-- Token usage visibility (API vs log parsing?)
-- Session lifecycle events (webhook support or polling only?)
+- **Phase 1 (Plugin Registry):** Well-documented TypeScript registry pattern, Vite glob imports proven in production, React dynamic components established pattern
+- **Phase 2 (Mobile UI - layout):** Mobile-first CSS is established practice, Tailwind responsive utilities well-documented, media query hooks standard React pattern
+- **Phase 3 (Activity Timeline - storage):** SQLite virtual columns and FTS5 well-documented, Activity Stream Protocol established standard, audit logging patterns mature
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | MEDIUM | All versions verified via npm (2026-02-12), but Express 5/React 19/Tailwind 4 are relatively new. Breaking changes based on training data (January 2025 cutoff). High confidence in core choices, medium confidence in version-specific gotchas. |
-| Features | MEDIUM | Feature landscape based on training data understanding of terminal multiplexers (tmux, screen), web terminals (Wetty, ttyd), and agent dashboards (Jenkins, K8s). Could not verify 2026 state via WebSearch. Patterns are established and slow-changing. |
-| Architecture | MEDIUM | Architecture patterns based on established browser terminal systems (Wetty, ttyd, Gotty) and WebSocket multiplexing. Socket.IO room-based isolation and node-pty/tmux integration are proven patterns. Unable to verify current best practices via live sources. |
-| Pitfalls | MEDIUM | Pitfalls drawn from training data knowledge of common issues with xterm.js, Socket.IO, node-pty, React hooks, and SQLite. Specific Express 5/React 19/Tailwind 4 edge cases need real-world validation. Prevention strategies are sound but may need adjustment during implementation. |
+| Stack | HIGH | All dependencies actively maintained (2024-2025 releases), TypeScript support confirmed, React 19 compatibility verified, bundle size acceptable |
+| Features | HIGH | Feature landscape validated against competitors (VS Code, GitHub, Material Design 3), MVP definition clear, anti-features documented with rationale |
+| Architecture | HIGH | Integration points identified, component boundaries clear, database schema validated, existing infrastructure sufficient |
+| Pitfalls | HIGH | All 8 critical pitfalls verified with 2025-2026 sources, mitigations documented, phase-specific warnings mapped |
 
-**Overall confidence:** MEDIUM
+**Overall confidence:** HIGH
+
+Research is comprehensive and current (2025-2026 sources). All major decisions have documented rationale. Risks are identified with mitigation strategies.
 
 ### Gaps to Address
 
-Research areas with lower confidence that require validation during implementation:
+**Medium-confidence areas requiring validation during implementation:**
 
-- **Express 5 async error handling edge cases**: Training data covers general approach, but specific v5 behavior needs testing. **Mitigation**: Write error handling tests early in Phase 1.
+1. **@gravity-ui/timeline stability:** Library is newer (2024), backed by Yandex Gravity UI team but less mature than react-window. Monitor stability during Phase 3. **Fallback:** Custom virtualized list with IntersectionObserver if timeline library proves unstable.
 
-- **Tailwind 4 @theme syntax with OpenClaw Gateway UI**: Must verify Tailwind 4 CSS-first config matches OpenClaw UI style requirements. **Mitigation**: Check OpenClaw Gateway UI code during Phase 3 for theme structure.
+2. **Activity event volume estimation:** Unknown how many events per hour agents generate. Affects polling interval (10s vs manual refresh) and storage growth rate. **Validation:** Monitor event volume in Phase 3 development, adjust retention policy and polling if needed.
 
-- **Socket.IO reconnection behavior with Claude Code streams**: Specific behavior with long-running Claude Code output needs testing. **Mitigation**: Simulate network interruptions during Phase 2 testing.
+3. **Terminal output parsing accuracy:** Can we reliably parse ANSI output for tool calls, file edits, commands? Or do we need structured logging from agents? **Validation:** Analyze real terminal logs in Phase 3 research, test regex patterns, evaluate if structured logging needed.
 
-- **node-pty memory usage under long-running sessions**: Unknown memory footprint after 24+ hours of continuous streaming. **Mitigation**: Load test with long-running sessions during Phase 2.
+4. **Mobile terminal UX acceptance:** Will operators accept read-only mobile terminal or demand full interactivity? **Validation:** User testing with read-only mobile terminal in Phase 2, document limitations clearly.
 
-- **OpenClaw gateway API capabilities**: Unclear if gateway exposes prompt injection endpoint or token usage metrics. **Mitigation**: Research OpenClaw codebase during Phase 3 planning (use `/gsd:research-phase 3`).
-
-- **React 19 concurrent rendering impact on terminal writes**: May need `flushSync` if order matters. **Mitigation**: Test with rapid terminal output during Phase 2.
-
-- **xterm.js performance with 24+ hour sessions**: Unknown scroll buffer memory impact. **Mitigation**: Cap scroll buffer at 10K lines, rely on tmux scrollback for history.
+**Handling during planning:**
+- Test @gravity-ui/timeline with sample 1000+ event dataset in Phase 3 kickoff
+- Implement monitoring for event volume, database size, query performance from Phase 3 start
+- Allocate time in Phase 3 for pattern refinement based on real logs
+- Build read-only mobile terminal first (Phase 2), add interactivity only if user feedback demands it
 
 ## Sources
 
 ### Primary (HIGH confidence)
-- **npm registry** (verified 2026-02-12): Version numbers, peer dependencies, engines for express@5.2.1, react@19.2.4, socket.io@4.8.3, xterm@5.3.0, node-pty@1.1.0, better-sqlite3@11.10.0, tailwindcss@4.1.18
-- **package.json** (project): Confirmed pre-decided stack choices align with latest stable versions
+
+**Stack Research:**
+- [ansi_up GitHub](https://github.com/drudru/ansi_up) — ANSI parsing library, 6.0.2 verified
+- [react-modal-sheet GitHub](https://github.com/Temzasse/react-modal-sheet) — Mobile bottom sheet component
+- [Gravity UI Timeline](https://gravity-ui.com/libraries/timeline) — Virtualized timeline library
+- [Vite Features - Dynamic Imports](https://vite.dev/guide/features) — import.meta.glob documentation
+- [SQLite FTS5 Extension](https://sqlite.org/fts5.html) — Full-text search official docs
+- [SQLite JSON Virtual Columns - DB Pro Blog](https://www.dbpro.app/blog/sqlite-json-virtual-columns-indexing) — Indexing patterns
+
+**Features Research:**
+- [Visual Studio Code Extension API](https://code.visualstudio.com/api/references/extension-manifest) — Plugin manifest patterns
+- [GitHub Activity Feed](https://docs.github.com/en/rest/activity) — Activity Stream Protocol
+- [Material Design 3 - Bottom Sheets](https://m3.material.io/components/bottom-sheets/guidelines) — Mobile UI patterns
+- [xterm.js Issue #5377](https://github.com/xtermjs/xterm.js/issues/5377) — Touch support limitations (July 2025)
+
+**Architecture Research:**
+- [Registry Pattern - GeeksforGeeks](https://www.geeksforgeeks.org/system-design/registry-pattern) — Plugin registry architecture
+- [Microservices Audit Logging Pattern](https://microservices.io/patterns/observability/audit-logging.html) — Event logging patterns
+- [React Media Query Hook](https://react.wiki/hooks/custom-use-media-query/) — Responsive design hooks
+- [Framer Breakpoints Guide 2026](https://www.framer.com/blog/responsive-breakpoints/) — Mobile-first breakpoints
+
+**Pitfalls Research:**
+- [Don't Trust This Title: ANSI Escape Security](https://www.cyberark.com/resources/threat-research-blog/dont-trust-this-title-abusing-terminal-emulators-with-ansi-escape-characters) — ANSI vulnerabilities
+- [ANSI Terminal Security 2023 - 10 CVEs](https://dgl.cx/2023/09/ansi-terminal-security) — RCE vulnerabilities
+- [Deceiving Users with ANSI in MCP](https://blog.trailofbits.com/2025/04/29/deceiving-users-with-ansi-terminal-codes-in-mcp/) — 2025 AI tool attacks
+- [Socket.IO Connection State Recovery](https://socket.io/docs/v4/connection-state-recovery) — Official documentation
+- [SQLite WAL Mode](https://sqlite.org/wal.html) — Checkpoint starvation
+- [Why Responsive Design Still Fails In 2025](https://blog.imagine.bo/responsive-design-still-fails/) — Mobile-first pitfalls
+- [Node.js Memory Leak Patches](https://securityonline.info/node-js-patches-memory-leak-and-permission-bypasses/) — CVE-2025-55131, CVE-2025-59464
 
 ### Secondary (MEDIUM confidence)
-- **Training data** (January 2025 cutoff): Breaking changes for Express 5, React 19, Tailwind 4, xterm.js 5, Socket.IO 4
-- **Training data**: Browser terminal architecture patterns (Wetty, ttyd, Gotty, tmate)
-- **Training data**: Agent monitoring dashboard patterns (Jenkins, Kubernetes Dashboard, PM2)
-- **Training data**: Terminal multiplexing patterns (tmux, screen, byobu)
-- **Training data**: Common pitfalls with xterm.js, Socket.IO, node-pty, React hooks, SQLite
 
-### Tertiary (LOW confidence, needs validation)
-- **Inferred**: OpenClaw gateway API capabilities (prompt injection, token metrics)
-- **Inferred**: Express 5 specific async error handling edge cases
-- **Inferred**: React 19 concurrent rendering impact on terminal writes
+- [Slash Engineering: Scaling TypeScript with Registries](https://puzzles.slash.com/blog/scaling-1m-lines-of-typescript-registries) — Type-safe registry patterns
+- [Comparing React Timeline Libraries - LogRocket](https://blog.logrocket.com/comparing-best-react-timeline-libraries/) — Timeline component evaluation
+- [DhiWise: React Mobile Responsiveness](https://www.dhiwise.com/post/the-ultimate-guide-to-achieving-react-mobile-responsiveness/) — Responsive patterns
 
-### Recommended Validation
-- Test Express 5 async error handling in development during Phase 1
-- Verify Tailwind 4 @theme syntax against OpenClaw Gateway UI during Phase 3
-- Check Socket.IO reconnection behavior with real Claude Code streams during Phase 2
-- Validate node-pty memory usage under long-running sessions during Phase 2
-- Research OpenClaw codebase for gateway API capabilities during Phase 3 planning
+### Tertiary (needs validation)
+
+- [Tambo 1.0: React Component Rendering Agents](https://aitoolly.com/ai-news/article/2026-02-11-tambo-10-open-source-toolkit-for-agents-rendering-react-components-launched) — Dynamic component rendering (new, unproven)
 
 ---
-*Research completed: 2026-02-12*
+
+*Research completed: 2026-02-16*
 *Ready for roadmap: yes*

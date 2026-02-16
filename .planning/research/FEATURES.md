@@ -1,150 +1,190 @@
-# Feature Landscape
+# Feature Landscape: Mission Control v2.0
 
-**Domain:** Browser-based terminal dashboard / multi-agent session multiplexer
-**Researched:** 2026-02-12
-**Confidence:** MEDIUM
+**Domain:** Terminal multiplexer dashboard for OpenClaw agent sessions — v2.0 milestone (plugin registry, activity timeline, mobile UI)
+**Researched:** 2026-02-16
+**Confidence:** HIGH
 
 ## Executive Summary
 
-Browser-based terminal dashboards combine two established patterns: **terminal multiplexing** (tmux/screen model) and **web-based terminal emulation** (xterm.js rendering). Multi-agent monitoring adds a third layer: **process orchestration visibility** (Jenkins/Kubernetes agent dashboard model).
+This research covers three distinct feature domains for Warden Dashboard v2.0, building on top of the existing v1.x foundation (live terminal streaming, session tabs, prompt panel, agent sidebar, session history, token usage, log viewer):
 
-The domain has clear table stakes — users expect instant terminal visibility, session persistence, and read-only observation. Differentiators come from intelligent agent routing, cross-tool integration (Telegram topic mapping), and intervention capabilities (prompt injection vs direct terminal takeover).
+1. **Plugin/Tool Registry** — Type-safe registration, metadata-driven discovery, UI rendering
+2. **Agent Activity/Audit Timeline** — Structured event capture, terminal output parsing, audit trail
+3. **Mobile-First UI** — Responsive terminal emulator, touch gestures, bottom-sheet actions, collapsible panels
 
-**Key insight:** This is NOT a general-purpose terminal tool competing with tmux. It's a **monitoring and intervention layer** for an autonomous agent system. Features should prioritize visibility, non-invasiveness, and surgical intervention over power-user terminal features.
+Each domain has clear table stakes (expected behavior), differentiators (competitive advantages), and anti-features (commonly requested but problematic).
 
----
-
-## Table Stakes
-
-Features users expect. Missing = product feels incomplete or broken.
-
-| Feature | Why Expected | Complexity | Notes |
-|---------|--------------|------------|-------|
-| **Live terminal streaming** | Core value prop — see what agents are doing right now | MEDIUM | xterm.js + Socket.IO + node-pty. Standard pattern. Latency under 100ms critical. |
-| **Session persistence across disconnects** | Browser refresh shouldn't kill agent work | LOW | tmux handles this. Just need to re-attach on reconnect. |
-| **Multi-session tabs/view** | Users monitor multiple agents — need quick switching | LOW | Horizontal tab bar. Standard UI pattern. |
-| **Read-only by default** | Prevent accidental interference with autonomous agents | LOW | Socket doesn't listen for input until explicitly enabled. |
-| **Connection status indicators** | Users need to know if stream is live or stale | LOW | Dot indicators: green = connected, amber = reconnecting, red = dead. |
-| **Terminal scroll and search** | Users review past output to understand agent state | LOW | xterm.js has built-in scroll buffer. Search requires addon. |
-| **Auto-reconnect on network drop** | Unstable connections shouldn't require manual refresh | LOW | Socket.IO handles this with exponential backoff. |
-| **Session metadata display** | Which agent? Which project? When started? | LOW | Show in tab label and sidebar. Read from SQLite or tmux session name. |
-| **Terminal resizing** | Users resize browser window — terminal must adapt | LOW | FitAddon for xterm.js. Send resize events to pty. |
-| **Copy/paste support** | Users extract output for debugging | LOW | Browser native. xterm.js handles selection. |
+**Key insight:** These features are NOT independent. Plugin registry enables activity timeline extensions (custom event parsers as plugins). Mobile UI must work with both terminals AND activity feeds. Design for composition, not isolation.
 
 ---
 
-## Differentiators
+## Feature Landscape
 
-Features that set Warden apart. Not expected, but highly valued for this use case.
+### Table Stakes (Users Expect These)
 
-| Feature | Value Proposition | Complexity | Notes |
-|---------|-------------------|------------|-------|
-| **Agent-to-Telegram topic mapping** | Shows which Telegram conversation controls which agent | MEDIUM | Unique to OpenClaw architecture. Visual grid prevents routing confusion. |
-| **Prompt injection via gateway** | Send message through OpenClaw routing instead of raw terminal | MEDIUM | Preserves agent context + memory. Safer than direct terminal input. |
-| **Explicit take-over mode** | Clear boundary between observation and intervention | LOW | Toggle per session. Visual indicator (banner, cursor blink). Prevents accidents. |
-| **Agent identity in UI** | Color-coded tabs, avatars, distinct visual identity per agent | LOW | Helps users mentally map "this terminal = Warden = coding tasks". |
-| **Session status tracking** | Active vs idle vs stopped vs error states | MEDIUM | Requires heuristics (last output timestamp, process exit codes) + SQLite persistence. |
-| **Project path context** | Show which git repo the agent is working in | LOW | Parse from systemPrompt or read from session metadata. Critical for multi-project agents. |
-| **SOUL.md preview** | Quick reminder of agent's role without leaving dashboard | LOW | Read from agentDir, render in sidebar. Helps operator decide when to intervene. |
-| **Session discovery** | Auto-detect tmux sessions even if not tracked in DB | MEDIUM | Parse `tmux list-sessions`, match naming conventions. Resilient to DB loss. |
-| **Workspace isolation indicators** | Show which agentDir, which workspace path | LOW | Prevents cross-agent confusion. Shows when agents share vs isolate state. |
+Features users assume exist. Missing these = product feels incomplete or broken.
 
----
+| Feature | Why Expected | Complexity | Dependencies |
+|---------|--------------|------------|--------------|
+| **Plugin Registry — Metadata Display** | Users need to see what plugins are loaded, their version, status | LOW | Manifest schema |
+| **Plugin Registry — Manual Enable/Disable** | Core registry UX — users must control which plugins are active | LOW | Metadata display |
+| **Activity Timeline — Chronological Event List** | Audit logs/activity feeds are always time-ordered | LOW | SQLite events table |
+| **Activity Timeline — Event Detail Panel** | Users need to see full context of an event when selected | LOW | Event list |
+| **Activity Timeline — Filter by Agent** | Multi-agent system — users need to scope timeline to one agent | LOW | Existing agent filter logic |
+| **Activity Timeline — Date Range Filter** | Standard audit log feature — users want to scope by time | MEDIUM | Existing history date filter |
+| **Activity Timeline — Export to CSV/JSON** | Audit compliance — users can export activity logs for analysis | LOW | Event list |
+| **Mobile UI — Full-Width Responsive Layout** | Mobile-first = 100% width on phone, adaptive on tablet | LOW | Tailwind responsive utilities |
+| **Mobile UI — Touch Scrolling** | Mobile terminals must support native touch scroll | MEDIUM | xterm.js custom touch handler |
+| **Mobile UI — Collapsible Panels (Accordion)** | Mobile screen space is scarce — panels must collapse | MEDIUM | Agent details, session logs, token usage |
+| **Mobile UI — Bottom Navigation or Bottom Sheet** | Mobile convention for actions/CTAs at thumb-reachable zone | MEDIUM | Prompt panel redesign |
+| **Mobile UI — Safe Zone at Top (64px)** | When bottom sheet expands, maintain 64px top safe zone for context | LOW | Bottom sheet layout |
 
-## Anti-Features
+### Differentiators (Competitive Advantage)
 
-Features to explicitly NOT build (commonly requested, often problematic).
+Features that set the product apart. Not required, but valuable and potentially unique to Warden.
 
-| Anti-Feature | Why Requested | Why Problematic | Alternative |
-|--------------|---------------|-----------------|-------------|
-| **Multi-pane terminal splits** | tmux has splits, why not the dashboard? | Adds complexity for zero value — tmux already does this inside sessions. | Let tmux handle layout. Dashboard shows whole session. |
-| **Terminal themes/customization** | Users want to personalize appearance | Scope creep. This is a monitoring tool, not a daily-driver terminal. | Single dark theme matching OpenClaw UI. No user theming. |
-| **Vim keybindings in dashboard** | Power users expect vim navigation | Dashboard is for observation, not editing. Agents do the editing. | Provide take-over for rare cases. No keybinding layer. |
-| **Collaborative multi-user editing** | What if multiple operators watch same session? | Single-user tool. No auth system. Adding multi-user = 10x complexity. | IP whitelist ensures single operator. No multi-user features. |
-| **Session recording/replay** | "Record sessions for later playback" | Storage cost, playback complexity, privacy concerns. Agent logs exist. | Use session history table with timestamps + final output. No video recording. |
-| **In-dashboard code editor** | "Edit files without switching to terminal" | Defeats the purpose. Agents edit files. Operator intervenes via prompts. | Prompt input panel. If manual editing needed, use local editor. |
-| **Real-time collaboration (CRDTs)** | "Multiple people control one agent" | Chaos. Agents are autonomous. Single operator model. | One operator, prompt queue if needed. No CRDT complexity. |
-| **Terminal multiplexing inside dashboard** | "Create new tmux windows from UI" | Dashboard observes, doesn't orchestrate tmux internals. | Let agents manage their own tmux layout. Read-only observation. |
+| Feature | Value Proposition | Complexity | Dependencies |
+|---------|-------------------|------------|--------------|
+| **Plugin Registry — Type-Safe Registration (Build-Time)** | Compile-time guarantees prevent broken plugins at runtime | MEDIUM | Manifest schema, TypeScript |
+| **Plugin Registry — Manifest Pattern** | Co-locate plugin metadata + code + UI config in single manifest | MEDIUM | Type-safe registration |
+| **Plugin Registry — UI Panel Slots** | Plugins can inject custom UI panels (not just backend tools) | HIGH | Manifest pattern, React lazy loading |
+| **Activity Timeline — Structured Event Parsing from Terminal Output** | Parse ANSI terminal output into structured events (tool calls, file edits, commands) | HIGH | Event list, regex/ANSI parser |
+| **Activity Timeline — Activity Stream Protocol (Actor/Verb/Object/Target)** | Structured events follow standard: "Agent → Executed → Command → in Session X" | MEDIUM | Event schema |
+| **Activity Timeline — Linked Events (Context)** | Click a terminal output event → jump to terminal session at that timestamp | MEDIUM | session_logs table, terminal scroll API |
+| **Activity Timeline — Success/Failure State Indicators** | Events show whether action succeeded or failed (exit code, error messages) | LOW | Event parsing, metadata |
+| **Mobile UI — Predictive Touch Input (Mosh Pattern)** | Display keystrokes instantly without waiting for server roundtrip | HIGH | Custom xterm.js addon, optimistic rendering |
+| **Mobile UI — Progressive Enhancement (Desktop → Mobile)** | Start with mobile base styles, add desktop features via min-width breakpoints | LOW | Mobile-first CSS |
+| **Mobile UI — Gesture Library (Swipe, Pinch)** | Native-feeling gestures for tab switching, terminal zoom | MEDIUM | Hammer.js, xterm.js integration |
+| **Mobile UI — Offline-First with Service Worker** | Cache UI shell and recent sessions for offline terminal viewing | HIGH | Service worker, IndexedDB |
+
+### Anti-Features (Commonly Requested, Often Problematic)
+
+Features that seem good but create problems. Document to prevent scope creep.
+
+| Feature | Why Requested | Why Problematic | Alternative |
+|---------|---------------|-----------------|-------------|
+| **Plugin Registry — Auto-Install from Public Registry** | Convenience (npm-like plugin install) | Security risk (arbitrary code execution), complexity (sandboxing, versioning, updates) | Manual install from known sources only, documented install process |
+| **Plugin Registry — Plugin Marketplace UI** | Discoverability | Scope creep for v2.0, requires hosting, moderation, legal (ToS, liability) | Documentation page with recommended plugins, GitHub topic tags |
+| **Activity Timeline — Real-Time WebSocket Streaming of Every Event** | "Live updates feel modern" | Overwhelming for high-volume agents, performance bottleneck, UI churn | Polling every 10s (matches instance tracker), manual refresh button |
+| **Activity Timeline — AI-Powered Event Summarization** | "Summarize last hour of activity" | API costs, latency, unreliable for audit purposes | Structured filters (event type, agent, date) + export for external analysis |
+| **Activity Timeline — Immutable Event Log with Blockchain** | "Tamper-proof audit trail" | Massive overkill for single-user tool, complexity, storage bloat | SQLite with append-only writes, export to read-only CSV for archival |
+| **Mobile UI — Gesture Overload (10+ Custom Gestures)** | "Power user shortcuts" | Discoverability problem, steep learning curve, conflicts with OS gestures | Stick to standard gestures (scroll, tap, swipe for tabs), explicit buttons for actions |
+| **Mobile UI — Separate Mobile App (Native iOS/Android)** | "Better performance than web" | Development/maintenance cost 3x (iOS + Android + Web), distribution hassle (App Store) | Progressive Web App (PWA) with native-like UX, add to home screen |
+| **Mobile UI — Mobile-Specific Feature Parity Reduction** | "Mobile users don't need full features" | Users resent being treated as second-class citizens | Full feature parity on mobile, just different UI patterns (bottom sheets vs sidebars) |
 
 ---
 
 ## Feature Dependencies
 
 ```
-Terminal Streaming
-    └──requires──> Session Discovery
-                       └──requires──> tmux Session Naming Convention
+Plugin Registry — Metadata Display
+    └──requires──> Plugin Registry — Manifest Schema
 
-Prompt Injection
-    └──requires──> OpenClaw Gateway API
-    └──requires──> Agent-to-Topic Mapping
+Plugin Registry — UI Panel Slots
+    └──requires──> Plugin Registry — Manifest Schema
+    └──requires──> Plugin Registry — Type-Safe Registration
 
-Take-Over Mode
-    └──requires──> Terminal Streaming
-    └──enhances──> Prompt Injection (alternative intervention path)
+Plugin Registry — Type-Safe Registration
+    └──requires──> Plugin Registry — Manifest Schema
 
-Agent Details Sidebar
-    └──requires──> OpenClaw Config Reader
-    └──enhances──> Agent-to-Topic Mapping (shows systemPrompt context)
+Activity Timeline — Chronological Event List
+    └──requires──> SQLite events table (new)
 
-Session Status Tracking
-    └──requires──> SQLite Database
-    └──enhances──> Session Discovery (adds state to discovered sessions)
+Activity Timeline — Structured Event Parsing
+    └──requires──> Activity Timeline — Event Detail Panel
+    └──enhances──> Activity Timeline — Linked Events (Context)
 
-Session History
-    └──requires──> Session Status Tracking
-    └──requires──> SQLite Database
+Activity Timeline — Linked Events (Context)
+    └──requires──> session_logs table (existing)
+    └──requires──> Activity Timeline — Event Detail Panel
 
-Token Usage Dashboard
-    └──requires──> OpenClaw Gateway API (if available)
-    └──conflicts──> Direct Implementation (OpenClaw may not expose this)
+Activity Timeline — Success/Failure State Indicators
+    └──requires──> Activity Timeline — Structured Event Parsing
+
+Mobile UI — Bottom Sheet
+    └──requires──> Mobile UI — Collapsible Panels (accordion)
+    └──enhances──> Prompt Panel (existing)
+
+Mobile UI — Touch Scrolling
+    └──requires──> xterm.js addon or custom handler
+    └──conflicts──> xterm.js default mouse handling
+
+Mobile UI — Predictive Touch Input (Mosh Pattern)
+    └──requires──> Mobile UI — Touch Scrolling
+    └──conflicts──> Socket.IO buffering (requires custom buffering)
+
+Mobile UI — Gesture Library
+    └──requires──> Mobile UI — Touch Scrolling
+    └──conflicts──> xterm.js default touch handling
+
+Mobile UI — Progressive Enhancement
+    └──requires──> Mobile UI — Full-Width Responsive Layout
 ```
 
 ### Dependency Notes
 
-- **Terminal Streaming requires Session Discovery:** Can't stream what you can't find. Discovery identifies tmux sessions before streaming.
-- **Prompt Injection requires Gateway API:** Direct terminal input bypasses agent context. Gateway routing preserves memory and intent.
-- **Take-Over enhances Prompt Injection:** Two intervention modes — structured (prompt via gateway) vs emergency (direct terminal control).
-- **Token Usage conflicts with Direct Implementation:** OpenClaw gateway may not expose token counts. Feature may require log parsing or API extension.
+- **Plugin Registry — Type-Safe Registration requires Manifest Schema**: Manifest is the source of truth for plugin metadata; registration enforces the schema at build time (TypeScript `interface` + Zod/Ajv validation).
+- **Activity Timeline — Structured Event Parsing enhances Linked Events**: Parsing terminal output into structured events enables "click event → jump to terminal at timestamp" UX. Without parsing, timeline is just a dumb log.
+- **Mobile UI — Touch Scrolling conflicts with xterm.js default mouse handling**: xterm.js has limited touch support as of 2026 ([Issue #5377](https://github.com/xtermjs/xterm.js/issues/5377)); custom touch handler may be needed. Investigate xterm.js addon ecosystem first.
+- **Mobile UI — Predictive Touch Input conflicts with Socket.IO buffering**: Mosh-style instant echo requires custom buffering logic to avoid double-rendering when server echo arrives. High complexity, defer to v3+.
+- **Mobile UI — Bottom Sheet enhances existing Prompt Panel**: Move PromptPanel into bottom sheet on mobile for thumb-reachable prompt injection. Desktop keeps sidebar. Same component, different layout.
 
 ---
 
-## MVP Recommendation
+## MVP Definition
 
-### Launch With (v1 — P0 Features)
+### Launch With (v2.0)
 
-Minimum viable product — prove the observation layer works.
+Minimum viable feature set for v2.0 milestone. Validates core concepts.
 
-- [x] **Terminal Streaming** — Live xterm.js view of each tmux session
-- [x] **Session Discovery** — Auto-detect running sessions by naming convention
-- [x] **Multi-Session Tabs** — Horizontal tab bar with agent name, project, status dot
-- [x] **Read-Only by Default** — No input until explicitly enabled
-- [x] **Connection Status** — Visual indicators for socket health
-- [x] **Session Metadata** — Agent ID, project path, start time
+#### Plugin Registry (P1)
+- [ ] **Manifest Schema** — JSON schema for plugin metadata (name, version, description, enabled, dependencies)
+- [ ] **Metadata Display** — Table of plugins with name, version, status (active/inactive), description
+- [ ] **Manual Enable/Disable** — Toggle button per plugin, persists to `~/.openclaw/warden-plugins.json`
 
-**Rationale:** Prove you can watch agents work. No intervention features yet — pure observation. If this doesn't provide value, intervention features won't save it.
+#### Activity Timeline (P1)
+- [ ] **SQLite Events Table** — Schema: `{ id, agent_id, event_type, actor, verb, object, target, metadata, timestamp, success }`
+- [ ] **Chronological Event List** — Time-sorted list of agent activity events (newest first)
+- [ ] **Event Detail Panel** — Click event → see full metadata (actor, verb, object, target, timestamp, success/failure)
+- [ ] **Filter by Agent** — Dropdown to scope timeline to single agent (reuse existing filter component)
+- [ ] **Date Range Filter** — Start/end date picker for time-scoped queries (reuse existing history filter)
+- [ ] **Export to CSV/JSON** — Download button for audit compliance
 
-### Add After Validation (v1.x — P1 Features)
+#### Mobile UI (P1)
+- [ ] **Full-Width Responsive Layout** — App renders correctly on 375px (iPhone SE) to 1920px (desktop)
+- [ ] **Collapsible Panels (Accordion)** — Agent details, session logs, token usage collapse on mobile (<768px)
+- [ ] **Bottom Navigation/Bottom Sheet** — Prompt panel moves to bottom sheet on mobile, sidebar on desktop
+- [ ] **Touch Scrolling** — Terminal supports native touch scroll (custom handler if xterm.js addon unavailable)
+- [ ] **Safe Zone at Top (64px)** — Bottom sheet full-height maintains 64px top margin for context
 
-Once core observation is validated and used daily.
+### Add After Validation (v2.x)
 
-- [ ] **Prompt Input Panel** — Send messages through OpenClaw gateway
-- [ ] **Take-Over Mode** — Toggle to interactive terminal input
-- [ ] **Agent-to-Telegram Topic Map** — Visual grid showing routing configuration
-- [ ] **Agent Details Sidebar** — SOUL.md, workspace, model, bindings
-- [ ] **Session Status Tracking** — Active/idle/stopped/error states in SQLite
+Features to add once core is working and usage patterns emerge.
 
-**Trigger for adding:** Using the dashboard daily for at least a week. Clear need to intervene (not just observe).
+#### Plugin Registry (P2)
+- [ ] **Type-Safe Registration (Build-Time)** — Enforce manifest schema at compile time with TypeScript + Zod
+- [ ] **Manifest Pattern** — Co-locate plugin metadata + code + UI config in `src/plugins/{pluginName}/manifest.ts`
 
-### Future Consideration (v2+ — P2 Features)
+#### Activity Timeline (P2)
+- [ ] **Structured Event Parsing** — Parse terminal output for tool calls (`Edited file X`), file edits, commands (`$ git commit`)
+- [ ] **Activity Stream Protocol** — Standardize event schema (Actor/Verb/Object/Target): `"Warden → Edited → server.ts → in warden-dashboard-abc123"`
+- [ ] **Success/Failure State Indicators** — Green dot for success, red for failure, amber for partial (parse exit codes, error keywords)
+- [ ] **Linked Events (Context)** — Click event → jump to terminal session at timestamp (requires session_logs offset mapping)
 
-Defer until product-market fit with operator workflow.
+#### Mobile UI (P2)
+- [ ] **Progressive Enhancement** — Mobile-first CSS with desktop enhancements via `@media (min-width: 768px)`
+- [ ] **Gesture Library** — Swipe left/right for tab switching, pinch to zoom terminal font size
 
-- [ ] **Session History** — Searchable archive with date/agent filters
-- [ ] **Token Usage Dashboard** — Per-agent daily aggregation
-- [ ] **Log Viewer** — Tail OpenClaw gateway logs filtered by agent
+### Future Consideration (v3+)
 
-**Why defer:** These are "nice to have" analytics. Focus on real-time monitoring first. Historical analysis comes later.
+Features to defer until product-market fit is established and v2.0 is stable.
+
+#### Plugin Registry (P3)
+- [ ] **UI Panel Slots** — Plugins inject custom React components into dashboard (e.g., custom metrics panel)
+
+#### Mobile UI (P3)
+- [ ] **Predictive Touch Input (Mosh Pattern)** — Instant keystroke echo without server roundtrip
+- [ ] **Offline-First with Service Worker** — Cache UI shell and sessions for offline viewing
 
 ---
 
@@ -152,208 +192,173 @@ Defer until product-market fit with operator workflow.
 
 | Feature | User Value | Implementation Cost | Priority |
 |---------|------------|---------------------|----------|
-| Terminal Streaming | HIGH | MEDIUM | P0 |
-| Session Discovery | HIGH | MEDIUM | P0 |
-| Multi-Session Tabs | HIGH | LOW | P0 |
-| Read-Only Default | HIGH | LOW | P0 |
-| Connection Status | MEDIUM | LOW | P0 |
-| Session Metadata | MEDIUM | LOW | P0 |
-| Prompt Input Panel | HIGH | MEDIUM | P1 |
-| Take-Over Mode | MEDIUM | LOW | P1 |
-| Agent-Telegram Map | HIGH | MEDIUM | P1 |
-| Agent Details Sidebar | MEDIUM | LOW | P1 |
-| Session Status Tracking | MEDIUM | MEDIUM | P1 |
-| SOUL.md Preview | LOW | LOW | P1 |
-| Session History | LOW | MEDIUM | P2 |
-| Token Usage Dashboard | LOW | HIGH | P2 |
-| Log Viewer | LOW | MEDIUM | P2 |
+| **Plugin Registry — Manifest Schema** | MEDIUM | MEDIUM | P1 |
+| Plugin Registry — Metadata Display | HIGH | LOW | P1 |
+| Plugin Registry — Manual Enable/Disable | HIGH | LOW | P1 |
+| Plugin Registry — Type-Safe Registration | MEDIUM | MEDIUM | P2 |
+| Plugin Registry — Manifest Pattern | MEDIUM | MEDIUM | P2 |
+| Plugin Registry — UI Panel Slots | LOW | HIGH | P3 |
+| **Activity Timeline — SQLite Events Table** | HIGH | MEDIUM | P1 |
+| Activity Timeline — Chronological Event List | HIGH | LOW | P1 |
+| Activity Timeline — Event Detail Panel | HIGH | LOW | P1 |
+| Activity Timeline — Filter by Agent | HIGH | LOW | P1 |
+| Activity Timeline — Date Range Filter | MEDIUM | MEDIUM | P1 |
+| Activity Timeline — Export to CSV/JSON | MEDIUM | LOW | P1 |
+| Activity Timeline — Structured Event Parsing | HIGH | HIGH | P2 |
+| Activity Timeline — Activity Stream Protocol | MEDIUM | MEDIUM | P2 |
+| Activity Timeline — Success/Failure State Indicators | MEDIUM | LOW | P2 |
+| Activity Timeline — Linked Events (Context) | MEDIUM | MEDIUM | P2 |
+| **Mobile UI — Full-Width Responsive Layout** | HIGH | LOW | P1 |
+| Mobile UI — Collapsible Panels | HIGH | MEDIUM | P1 |
+| Mobile UI — Bottom Sheet | HIGH | MEDIUM | P1 |
+| Mobile UI — Touch Scrolling | HIGH | MEDIUM | P1 |
+| Mobile UI — Safe Zone at Top | LOW | LOW | P1 |
+| Mobile UI — Progressive Enhancement | MEDIUM | LOW | P2 |
+| Mobile UI — Gesture Library | MEDIUM | MEDIUM | P2 |
+| Mobile UI — Predictive Touch Input | LOW | HIGH | P3 |
+| Mobile UI — Offline-First | LOW | HIGH | P3 |
 
 **Priority key:**
-- **P0:** Must have for launch — core value prop
-- **P1:** Should have — clear value, add once P0 is stable
-- **P2:** Nice to have — analytics and polish, defer until proven need
+- **P1**: Must have for v2.0 launch (table stakes or high-value/low-cost differentiators)
+- **P2**: Should have for v2.x after validation (medium-value differentiators, enhance P1 features)
+- **P3**: Nice to have for v3+ (low-value or high-cost, defer until product-market fit)
 
 ---
 
-## Competitive Feature Analysis
+## Competitor / Reference Analysis
 
-### Comparable Tools
-
-| Category | Tool | Primary Use Case | Relevant Features |
-|----------|------|------------------|-------------------|
-| **Web Terminals** | Wetty | SSH-over-HTTP | Terminal streaming, auto-reconnect, URL-based session routing |
-| **Web Terminals** | ttyd | Share terminal over web | xterm.js, WebSocket streaming, read-only mode |
-| **Web Terminals** | GateOne | Enterprise web terminal | Multi-session tabs, session persistence, terminal recording |
-| **Tmux Tools** | tmate | Tmux session sharing | Instant session URLs, read-only viewers, multi-viewer support |
-| **Agent Dashboards** | Jenkins | CI/CD agent monitoring | Agent status grid, job-to-agent mapping, executor health |
-| **Agent Dashboards** | Kubernetes Dashboard | Container orchestration UI | Pod logs streaming, resource metrics, deployment status |
-| **Process Monitors** | PM2 Web UI | Node.js process manager | Process list, log streaming, restart controls |
-
-### Feature Comparison
-
-| Feature | Wetty | ttyd | GateOne | tmate | Jenkins | K8s Dash | Warden (Planned) |
-|---------|-------|------|---------|-------|---------|----------|------------------|
-| **Terminal Streaming** | Yes | Yes | Yes | Yes | No | Yes (logs) | Yes |
-| **Multi-Session Tabs** | No | No | Yes | No | Yes (agents) | Yes (pods) | Yes |
-| **Read-Only Mode** | No | Yes | Yes | Yes | Yes | Yes | Yes |
-| **Session Persistence** | No | No | Yes | Yes | N/A | N/A | Yes (tmux) |
-| **Auto-Reconnect** | No | Yes | Yes | Yes | Yes | Yes | Yes |
-| **Agent Metadata View** | N/A | N/A | N/A | N/A | Yes | Yes | Yes |
-| **Prompt Injection** | N/A | N/A | N/A | N/A | Yes (build params) | Yes (kubectl exec) | Yes |
-| **Take-Over Mode** | Yes (default) | No | Yes | Yes | No | Yes (kubectl exec) | Yes |
-| **Topic/Routing Map** | N/A | N/A | N/A | N/A | No | No | Yes (unique) |
-| **Session History** | No | No | Yes | No | Yes | Yes | Planned (P2) |
-| **Status Tracking** | No | No | Yes | No | Yes | Yes | Yes |
-
-### Our Approach vs Competitors
-
-| Feature Category | Standard Approach | Warden's Differentiation |
-|------------------|-------------------|--------------------------|
-| **Terminal Access** | Direct SSH or pty spawn | Observe tmux sessions created by OpenClaw |
-| **Multi-Session** | One tab per connection | One tab per autonomous agent (persistent identity) |
-| **Intervention** | Always interactive OR always read-only | Graduated: observe → prompt via gateway → terminal takeover |
-| **Routing** | URL-based session IDs | Agent-to-Telegram-topic mapping (matches OpenClaw bindings) |
-| **Metadata** | Generic process info | Agent role (SOUL.md), workspace isolation, model config |
-| **Session Persistence** | Often ephemeral (dies on disconnect) | tmux-backed (survives browser close, server reboot) |
+| Feature | VS Code Extensions | GitHub Activity Feed | Mosh (Mobile Shell) | Material Design 3 | Our Approach |
+|---------|-------------------|---------------------|---------------------|-------------------|--------------|
+| **Plugin Discovery** | Marketplace UI with search, ratings, install counts | N/A | N/A | N/A | Manual install only (v2.0), avoid marketplace scope creep |
+| **Plugin Metadata** | `package.json` manifest with `publisher`, `version`, `engines`, `activationEvents` | N/A | N/A | N/A | JSON schema manifest with name, version, description, enabled state, dependencies |
+| **Plugin Registration** | Extension API with `activate()` function, contribution points | N/A | N/A | N/A | Type-safe registration via manifest + PluginManager class |
+| **Activity Timeline** | N/A | Actor/Verb/Object format ("user pushed to repo") | N/A | N/A | Activity Stream Protocol (Actor/Verb/Object/Target) |
+| **Event Filtering** | N/A | Filter by actor, repo, event type, date | N/A | N/A | Filter by agent, date range, event type (parsed from terminal output) |
+| **Event Detail** | N/A | Click event → expand inline with metadata + diff | N/A | N/A | Right-rail panel with full event metadata + link to terminal session |
+| **Mobile Terminal** | N/A | N/A | Predictive input (instant echo), adaptive to bad connections | N/A | Touch scrolling (custom handler for xterm.js), bottom sheet for actions |
+| **Mobile Navigation** | N/A | N/A | N/A | Bottom nav bar, bottom sheets for modals | Bottom sheet for prompt panel, collapsible accordions for agent details |
+| **Collapsible Panels** | N/A | N/A | N/A | Accordion component (Material 3) | Accordion for agent details, session logs, token usage on mobile |
+| **Offline Support** | N/A | N/A | Mosh maintains connection state across network changes | N/A | Defer to v3+ (service worker + IndexedDB cache) |
 
 ---
 
 ## Domain-Specific Patterns
 
-### Browser-Based Terminals (Wetty, ttyd, GateOne)
+### Plugin Registries (VS Code, Chrome Extensions, Open VSX)
 
 **What they do well:**
-- xterm.js rendering (fast, well-supported)
-- WebSocket streaming (low latency)
-- Auto-reconnect on network drop
+- **Manifest-driven registration**: `package.json` or `manifest.json` as source of truth for metadata
+- **Versioning**: SemVer, compatibility declarations (`"engines": { "vscode": "^1.80.0" }`)
+- **Activation events**: Load plugins lazily when needed (`"activationEvents": ["onCommand:myPlugin.run"]`)
 
 **Common gaps:**
-- Poor multi-session UX (separate windows, no unified view)
-- No semantic session identity (just "session-1234")
-- No intervention modes (interactive OR read-only, not both)
+- **No build-time type safety**: Manifest schema validated at runtime, not compile time
+- **Complex marketplace**: VS Code Marketplace is proprietary, requires Microsoft account, moderation
 
-**Lesson for Warden:** Use their technical stack (xterm.js + Socket.IO) but add semantic layer (agent identity, role-based tabs, graduated intervention).
+**Lesson for Warden:** Use manifest pattern, enforce with TypeScript + Zod at build time. Skip marketplace (single-user tool, manual install). Support lazy loading via React.lazy for UI plugins.
 
-### Tmux Sharing Tools (tmate)
+### Activity Timelines (GitHub, SugarCRM, Microsoft Purview)
 
 **What they do well:**
-- Instant URL-based session sharing
-- Multiple viewers on one session
-- Read-only viewer mode
+- **Activity Stream Protocol**: Standardized event format (Actor/Verb/Object/Target)
+- **Event detail panels**: Click event → see full context in right rail or modal
+- **Filter by multiple dimensions**: Actor, date range, event type, object type
+- **Immutability**: Audit logs are append-only, cannot be altered after creation
+- **Export to CSV/JSON**: Compliance requirement for audit trails
 
 **Common gaps:**
-- No session discovery (must copy URL manually)
-- No persistent identity (sessions are anonymous)
-- No metadata layer (what is this session doing?)
+- **No linkage to source context**: GitHub shows diff, but can't jump to file at that commit in IDE
+- **No structured parsing of unstructured data**: Logs are structured (API calls) OR unstructured (terminal output), not both
 
-**Lesson for Warden:** Auto-discovery via naming conventions. Persistent agent identity. Rich metadata (project, role, status).
+**Lesson for Warden:** Parse terminal ANSI output into structured events (regex for known patterns: `Edited file X`, `Running command Y`, `Error: Z`). Link events to terminal session at timestamp (requires session_logs offset mapping). Export to CSV/JSON for audit compliance.
 
-### Agent Monitoring Dashboards (Jenkins, Kubernetes)
+### Mobile-First Dashboards (Material Design 3, Toptal Best Practices)
 
 **What they do well:**
-- Agent/executor health grid
-- Job-to-agent routing visibility
-- Status indicators (idle/busy/offline)
-- Log streaming per agent
+- **Bottom navigation**: Primary actions at thumb-reachable zone (bottom 64px)
+- **Bottom sheets**: Modals slide up from bottom, partial (peek) or full-screen
+- **Collapsible accordions**: Save vertical space, progressive disclosure
+- **Card-based layouts**: Each metric/widget in a self-contained card
+- **Touch target sizing**: Minimum 44x44px (iOS) or 48x48px (Android)
 
 **Common gaps:**
-- No interactive access to agent terminals
-- High abstraction (can't see raw process output easily)
-- Complex setup (enterprise-grade)
+- **Terminal emulators on mobile**: Limited touch support in xterm.js, predictive keyboards break input
+- **Offline-first**: Most dashboards require constant network connection
 
-**Lesson for Warden:** Combine visibility grid with raw terminal access. Keep setup simple (single-user, SQLite, no auth complexity).
+**Lesson for Warden:** Bottom sheet for prompt panel (thumb-reachable). Collapsible accordions for agent details, session logs, token usage. Custom touch handler for xterm.js scrolling. Defer offline-first to v3+ (complex, low value for initial release).
 
 ---
 
-## Research Gaps
+## Research Gaps & Validation Needed
 
-**LOW confidence areas (require verification):**
+**MEDIUM confidence areas (require verification during implementation):**
 
-1. **Token usage visibility:** Does OpenClaw gateway expose per-agent token counts via API? Or must we parse logs?
-   - **Impact:** P2 feature (Token Usage Dashboard) feasibility
-   - **Mitigation:** Defer to P2, validate API during implementation
+1. **xterm.js touch support in 2026:** Has xterm.js added first-class touch support since Issue #5377? Check npm for xterm-addon-touch or similar.
+   - **Impact:** Mobile UI — Touch Scrolling complexity (LOW if addon exists, MEDIUM if custom handler)
+   - **Mitigation:** Start with xterm.js default touch handling, add custom handler only if needed
 
-2. **Gateway prompt injection API:** Does OpenClaw expose an HTTP endpoint to send messages to specific agents/topics?
-   - **Impact:** P1 feature (Prompt Input Panel) feasibility
-   - **Mitigation:** Check OpenClaw docs/code during P1 planning. Fallback: direct terminal input only.
+2. **Activity event volume:** How many events per hour do agents generate? Will 10s polling overwhelm the UI?
+   - **Impact:** Activity Timeline — Real-time streaming vs polling decision
+   - **Mitigation:** Start with manual refresh button, add 10s polling if event volume is manageable (<100/hour)
 
-3. **Session lifecycle events:** Can we detect when agents spawn new tmux sessions without polling?
-   - **Impact:** Session discovery freshness
-   - **Mitigation:** Start with polling (5s interval). Add webhook if OpenClaw supports it.
+3. **Terminal output parsing accuracy:** Can we reliably parse ANSI output for tool calls, file edits, commands? Or do we need structured logging from agents?
+   - **Impact:** Activity Timeline — Structured Event Parsing feasibility (HIGH if reliable, defer if unreliable)
+   - **Mitigation:** Start with simple regex patterns (e.g., `Edited file (.+)`), expand as patterns emerge. Fallback: require agents to log structured JSON events to separate file.
 
-4. **xterm.js performance with long-running sessions:** What's the memory footprint after 24+ hours of streaming?
-   - **Impact:** Scroll buffer management
-   - **Mitigation:** Cap scroll buffer at 10K lines. Add "clear buffer" button.
+4. **Plugin use cases:** What plugins will operators actually want? Custom metrics? Event parsers? UI panels?
+   - **Impact:** Plugin Registry — UI Panel Slots priority (P3 if no demand, P2 if clear use cases)
+   - **Mitigation:** Ship P1 (metadata display, enable/disable) first, gather feedback before building UI slots
 
 ---
 
 ## Feature Research Sources
 
-**Browser terminals:**
-- My training data includes Wetty, ttyd, and GateOne architecture patterns (xterm.js + WebSocket standard)
-- tmate design (read-only viewer mode, URL-based session sharing)
+### Plugin Registry Research
 
-**Multi-agent monitoring:**
-- Jenkins agent dashboard UX (executor grid, job mapping)
-- Kubernetes Dashboard patterns (pod logs, status indicators)
+- [Registry Pattern - GeeksforGeeks](https://www.geeksforgeeks.org/system-design/registry-pattern/)
+- [Optimizing Software Architecture with Plugins | ArjanCodes](https://arjancodes.com/blog/best-practices-for-decoupling-software-using-plugins/)
+- [How to Build Plugin Systems in Python | OneUptime](https://oneuptime.com/blog/post/2026-01-30-python-plugin-systems/view)
+- [Publishing Extensions | Visual Studio Code Extension API](https://code.visualstudio.com/api/working-with-extensions/publishing-extension)
+- [Extension Marketplace | VS Code](https://code.visualstudio.com/docs/configure/extensions/extension-marketplace)
+- [Open VSX Registry](https://open-vsx.org/)
+- [Building A Type-safe Plugin System In Typescript](https://peerdh.com/blogs/programming-insights/building-a-type-safe-plugin-system-in-typescript)
+- [Type-Safe User Interfaces & the Manifest Pattern | Andrew Hathaway](https://andrewhathaway.net/blog/manifest-pattern/)
+- [Extension Manifest | Visual Studio Code Extension API](https://code.visualstudio.com/api/references/extension-manifest)
+- [manifest.json - Mozilla | MDN](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/manifest.json)
 
-**Terminal multiplexing:**
-- tmux session management patterns (naming conventions, session discovery)
-- screen/byobu UX patterns (status bars, session switching)
+### Activity Timeline Research
 
-**Confidence level:** MEDIUM
-- **Why not HIGH:** Could not verify current 2026 state of tools via WebSearch (permission denied)
-- **Why not LOW:** Strong familiarity with domain from training data. Patterns are well-established and slow-changing.
-- **Verification needed:** Confirm xterm.js current version features, Socket.IO 4.x capabilities, node-pty compatibility with tmux 3.4+
+- [Activity Logs | Business Central Design Patterns](https://alguidelines.dev/docs/navpatterns/patterns/activity-log/)
+- [Audit log activities | Microsoft Learn](https://learn.microsoft.com/en-us/purview/audit-log-activities)
+- [Audit Logging: What It Is & How It Works | Datadog](https://www.datadoghq.com/knowledge-center/audit-logging/)
+- [Historical Summary vs. Activity Stream vs. Audit Log vs. Timeline | Sugar Support](https://support.sugarcrm.com/knowledge_base/user_interface/historical_summary_vs._activity_stream_vs._change_log/)
+- [Audit Logs Overview | Adobe Experience Platform](https://experienceleague.adobe.com/en/docs/experience-platform/landing/governance-privacy-security/audit-logs/overview)
+- [Pattern: Audit logging | Microservices.io](https://microservices.io/patterns/observability/audit-logging.html)
+- [Getting Started with Activity stream | HackerNoon](https://medium.com/hackernoon/getting-started-with-activity-stream-d7d5a528394c)
+- [Logs vs Structured Events - charity.wtf](https://charity.wtf/2019/02/05/logs-vs-structured-events/)
+- [Input Event Processing | Fish Shell](https://deepwiki.com/fish-shell/fish-shell/3.1-initialization-and-configuration)
 
----
+### Mobile-First UI Research
 
-## Recommendations for Roadmap
-
-### Phase 1: Prove the Observation Model
-Focus on table stakes. Goal: Can we watch agents work and understand what's happening?
-
-**Include:**
-- Terminal streaming
-- Session discovery
-- Multi-session tabs
-- Read-only default
-- Connection status
-
-**Exclude:**
-- Intervention features (prompts, takeover)
-- Analytics (history, tokens)
-- Polish (themes, customization)
-
-**Success criteria:** Dashboard used daily for at least a week. Operator finds value in passive observation.
-
-### Phase 2: Add Intervention
-Once observation is proven valuable, add ability to influence agents.
-
-**Include:**
-- Prompt input panel (via OpenClaw gateway)
-- Take-over mode (direct terminal input)
-- Agent-to-Telegram topic map (prevents routing errors)
-- Agent details sidebar (informs intervention decisions)
-
-**Exclude:**
-- Historical features (session archive, token usage)
-- Advanced analytics
-
-**Success criteria:** Operator intervenes at least once per day. Intervention is surgical, not constant.
-
-### Phase 3: Analytics and History
-Once intervention patterns are established, add historical view.
-
-**Include:**
-- Session history with search
-- Token usage dashboard
-- Log viewer
-
-**Success criteria:** Operator reviews history weekly to identify patterns or debug issues.
+- [Dashboard Design UX Patterns Best Practices](https://www.pencilandpaper.io/articles/ux-pattern-analysis-data-dashboards)
+- [Dashboard Design: best practices and examples | Justinmind](https://www.justinmind.com/ui-design/dashboard-design-best-practices-ux)
+- [Mobile First Design: Principles, Process, and Examples](https://digitalpresent.io/mobile-first-design/)
+- [Intuitive Mobile Dashboard UI: 4 Best Practices | Toptal](https://www.toptal.com/designers/dashboard-design/mobile-dashboard-ui)
+- [PatternFly Dashboard Guidelines](https://www.patternfly.org/patterns/dashboard/design-guidelines/)
+- [Bottom Sheet UI Design: Best practices | Mobbin](https://mobbin.com/glossary/bottom-sheet)
+- [Bottom Sheets: Definition and UX Guidelines - Nielsen Norman Group](https://www.nngroup.com/articles/bottom-sheet/)
+- [Bottom sheets - Material Design 3](https://m3.material.io/components/bottom-sheets/guidelines)
+- [How to design bottom sheets for optimized user experience | LogRocket](https://blog.logrocket.com/ux-design/bottom-sheets-optimized-ux/)
+- [Accordion UI Design: Best practices | Mobbin](https://mobbin.com/glossary/accordion)
+- [Accordions on Mobile - Nielsen Norman Group](https://www.nngroup.com/articles/mobile-accordions/)
+- [Accordion UI Examples: Best Practices | Eleken](https://www.eleken.co/blog-posts/accordion-ui)
+- [Limited touch support on mobile devices | xterm.js Issue #5377](https://github.com/xtermjs/xterm.js/issues/5377)
+- [Support mobile platforms | xterm.js Issue #1101](https://github.com/xtermjs/xterm.js/issues/1101)
+- [Mosh: the mobile shell](https://mosh.org/)
+- [Learning From Terminals to Design the Future of User Interfaces](https://brandur.org/interfaces)
 
 ---
 
-*Feature research for: Warden Dashboard — browser-based terminal multiplexer for OpenClaw multi-agent system*
-*Researched: 2026-02-12*
-*Confidence: MEDIUM (training data based, no live ecosystem verification)*
+*Feature research for: Warden Dashboard v2.0 Mission Control (plugin registry, activity timeline, mobile UI)*
+*Researched: 2026-02-16*
+*Confidence: HIGH (verified via official docs, GitHub issues, and multiple authoritative sources)*

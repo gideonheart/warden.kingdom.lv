@@ -1,439 +1,457 @@
 # Technology Stack
 
-**Project:** Warden Dashboard
-**Researched:** 2026-02-12
-**Confidence:** MEDIUM (versions verified via npm, gotchas from training data + version analysis)
+**Project:** Warden Dashboard v2.0 Mission Control
+**Researched:** 2026-02-16
+**Focus:** Stack additions for plugin registry, agent activity/audit timeline, mobile-first UI
 
-## Recommended Stack
+## Executive Summary
 
-### Core Framework
+Warden v2.0 requires minimal new dependencies. The existing stack (Express 5, Socket.IO 4, React 19, xterm.js 5, SQLite, Tailwind CSS 4, Vite 6) provides all core infrastructure. New features require: (1) ANSI parsing for terminal output, (2) mobile UI components for bottom sheets/drawers, (3) SQLite schema additions with JSON virtual columns, (4) virtualized timeline rendering. **No build system changes or plugin framework dependencies needed** — use Vite's native dynamic imports + TypeScript registry pattern.
 
-| Technology | Version | Purpose | Why |
-|------------|---------|---------|-----|
-| Node.js | 22.x LTS | Runtime environment | LTS with native ESM support, required for node-pty native bindings, stable performance for long-running processes |
-| Express | 5.2.1 | HTTP server | Stable v5 release with async/await support, body-parser integrated, simplified error handling. Widely documented for WebSocket integration |
-| React | 19.2.4 | UI framework | Latest stable with compiler optimizations, actions API for form handling, improved concurrent rendering for real-time terminal updates |
-| TypeScript | 5.9.3 | Type safety | Latest stable with improved inference, decorators support, better performance. Essential for complex WebSocket event typing |
-| Vite | 6.4.1 | Build tool & dev server | Fast HMR for React development, built-in TypeScript support, optimized production builds with code splitting |
+---
 
-### Real-Time Communication
+## New Dependencies (v2.0 Features)
 
-| Technology | Version | Purpose | Why |
-|------------|---------|---------|-----|
-| Socket.IO | 4.8.3 (server) | WebSocket server | Auto-reconnection, room support for session isolation, binary event support for terminal data, fallback transports |
-| socket.io-client | 4.8.3 | WebSocket client | Matches server version exactly (critical), handles reconnection UI state, TypeScript definitions included |
+### Terminal Output Parsing
 
-### Terminal Emulation
+| Library | Version | Purpose | Why |
+|---------|---------|---------|-----|
+| `ansi_up` | `^6.0.2` | ANSI escape code to HTML/text parsing | Zero dependencies, isomorphic (browser+Node), actively maintained since 2011, TypeScript types included. Converts terminal output to structured data for activity events. |
 
-| Technology | Version | Purpose | Why |
-|------------|---------|---------|-----|
-| xterm.js | 5.3.0 | Terminal renderer | Modern v5 with improved Unicode support, better performance, active development. Industry standard for web terminals |
-| @xterm/addon-fit | 0.11.0 | Auto-resize terminal | Official addon matching xterm 5.x, handles responsive terminal sizing |
-| @xterm/addon-web-links | 0.12.0 | Clickable URLs | Detects and linkifies URLs in terminal output, standard UX feature |
-| node-pty | 1.1.0 | PTY (pseudoterminal) | Creates real shell processes, required for streaming Claude Code output. Microsoft-maintained, Node 22 compatible |
+**Alternatives considered:**
+- `ansicolor` — Smaller but less actively maintained, lacks recent updates
+- `node-ansiparser` — Low-level, overkill for our needs (designed for full terminal emulator)
+- `ansis` — More focused on colorizing output, not parsing existing ANSI
 
-### Database
+**Why ansi_up wins:** Single-file ESM module with no dependencies, TypeScript support, and proven production use in VS Code extensions and terminal viewers. Handles both client-side (browser) and server-side (Node) parsing.
 
-| Technology | Version | Purpose | Why |
-|------------|---------|---------|-----|
-| better-sqlite3 | 11.10.0 | SQLite driver | Synchronous API (simpler than async for small datasets), no external dependencies, built-in migrations via pragma, excellent TypeScript support |
-
-### Styling
-
-| Technology | Version | Purpose | Why |
-|------------|---------|---------|-----|
-| Tailwind CSS | 4.1.18 | Utility-first CSS | Latest v4 with Oxide engine (faster builds), CSS-first config, built-in container queries. Matches OpenClaw Gateway UI style requirement |
-| PostCSS | 8.4.x | CSS processor | Required by Tailwind 4, handles @import and autoprefixer |
-| Autoprefixer | 10.4.x | CSS vendor prefixes | Browser compatibility for production builds |
-
-## Supporting Libraries
-
-| Library | Version | Purpose | When to Use |
-|---------|---------|---------|-------------|
-| cors | 2.8.5 | CORS middleware | Development mode (different ports for Vite/Express), single-origin in production may not need it |
-| tsx | 4.19.0 | TypeScript executor | Development server (watch mode), faster than ts-node, ESM support |
-| concurrently | 9.0.0 | Run multiple processes | Development only - run Express + Vite simultaneously |
-
-## Development Tools
-
-| Tool | Purpose | Notes |
-|------|---------|-------|
-| @types/node | Type definitions for Node.js | Use @types/node@22 to match Node.js 22.x |
-| @types/express | Type definitions for Express | Use @types/express@5 for Express 5 compatibility |
-| @types/better-sqlite3 | SQLite type definitions | Version 7.6.x works with better-sqlite3 v11 |
-| @vitejs/plugin-react | React support for Vite | Enables Fast Refresh, JSX transform |
-
-## Version-Specific Gotchas
-
-### Express 5.2.1
-
-**Breaking changes from Express 4:**
-- `app.router` removed - use `app.use(express.Router())` instead
-- `res.send()` with number now sends as JSON, not status code
-- `req.param()` removed - use `req.params`, `req.query`, or `req.body`
-- Path matching is stricter - trailing slashes matter by default
-- Body-parser is now built-in (no separate `require('body-parser')`)
-
-**Gotchas:**
-- Middleware error handling requires 4 parameters: `(err, req, res, next)`
-- Async route handlers need explicit `.catch()` or use wrapper middleware
-- Socket.IO integration: attach to HTTP server, not Express app directly
-
-**Example:**
-```typescript
-// Express 5 with Socket.IO
-import express from 'express';
-import { createServer } from 'http';
-import { Server } from 'socket.io';
-
-const app = express();
-const httpServer = createServer(app); // Critical: wrap Express app
-const io = new Server(httpServer);    // Attach to HTTP server
-
-httpServer.listen(3000); // Listen on HTTP server, not app
-```
-
-### React 19.2.4
-
-**Breaking changes from React 18:**
-- `ReactDOM.render()` removed - must use `ReactDOM.createRoot()`
-- `useFormStatus` and `useFormState` require React 19-aware bundler
-- Server Components are stable but require Next.js or similar framework (not applicable for this project)
-- `ref` is now a regular prop (no more `forwardRef` needed)
-
-**Gotchas:**
-- Terminal re-renders can break xterm.js state - use `useRef()` for xterm instance
-- Socket.IO event handlers in `useEffect` need careful cleanup to avoid memory leaks
-- Concurrent rendering may batch terminal writes - use `flushSync` if order matters
-- React 19 works with Vite 6 but requires `@vitejs/plugin-react` 4.3+
-
-**Example:**
-```typescript
-// Terminal component pattern
-const Terminal = () => {
-  const terminalRef = useRef<HTMLDivElement>(null);
-  const xtermRef = useRef<XTerminal | null>(null);
-
-  useEffect(() => {
-    // Create xterm instance once
-    if (!xtermRef.current && terminalRef.current) {
-      xtermRef.current = new XTerminal();
-      xtermRef.current.open(terminalRef.current);
-    }
-
-    return () => {
-      xtermRef.current?.dispose(); // Cleanup on unmount
-    };
-  }, []); // Empty deps - run once
-
-  return <div ref={terminalRef} />;
-};
-```
-
-### Tailwind CSS 4.1.18
-
-**Breaking changes from Tailwind 3:**
-- Configuration moved from JS file to CSS (`@theme` directive)
-- Oxide engine requires different plugin API
-- Some v3 plugins need updates for v4 compatibility
-- `@apply` has stricter rules about nesting
-
-**Gotchas:**
-- Vite requires PostCSS config even though Tailwind 4 is "zero-config"
-- Custom colors defined in CSS, not JS: `@theme { --color-brand: #3b82f6; }`
-- JIT mode is default and only mode (no "just-in-time" flag)
-- OpenClaw Gateway UI matching: may need custom theme values
-
-**Migration path:**
-- Start with v4 from scratch (greenfield advantage)
-- Define theme in `src/index.css` with `@theme` blocks
-- Use Vite's built-in PostCSS support
-
-### xterm.js 5.3.0
-
-**Breaking changes from xterm.js 4:**
-- Addons moved to `@xterm/addon-*` scoped packages
-- Some APIs renamed for consistency (`Terminal` class is now default export)
-- Unicode version updated (better emoji support, but may affect character width calculations)
-
-**Gotchas:**
-- **Critical:** `fit()` addon must be called AFTER terminal is visible in DOM
-- Terminal writes should be throttled for performance (use `requestAnimationFrame`)
-- Buffer cleanup needed for long-running sessions (memory leak risk)
-- `onData` handler can receive partial UTF-8 sequences - use built-in decoder
-- Resizing requires both terminal resize AND PTY resize (coordinate both)
-
-**Best practices:**
-```typescript
-// Proper terminal lifecycle
-const term = new Terminal({
-  cursorBlink: true,
-  fontFamily: 'Monaco, Menlo, monospace', // Match OpenClaw style
-  fontSize: 14,
-  scrollback: 1000 // Limit memory usage
-});
-
-const fitAddon = new FitAddon();
-term.loadAddon(fitAddon);
-term.open(container);
-
-// Wait for layout, then fit
-requestAnimationFrame(() => {
-  fitAddon.fit();
-  // Send resize to backend
-  socket.emit('resize', { cols: term.cols, rows: term.rows });
-});
-```
-
-### Socket.IO 4.8.3
-
-**Gotchas:**
-- Client/server versions MUST match exactly (4.8.3 ↔ 4.8.3)
-- Default transport polling can delay initial connection - set `transports: ['websocket']` for terminals
-- Reconnection can cause duplicate PTY processes - implement session recovery
-- Binary mode for terminal data is faster than UTF-8 strings
-- Room isolation required for multi-session - use session IDs as room names
-
-**Best practices:**
-```typescript
-// Server-side
-io.on('connection', (socket) => {
-  const sessionId = socket.handshake.query.sessionId;
-  socket.join(`session:${sessionId}`); // Isolate terminal data
-
-  socket.on('disconnect', () => {
-    // Decide: keep PTY alive or kill it?
-  });
-});
-
-// Client-side
-const socket = io('http://localhost:3000', {
-  transports: ['websocket'], // Skip polling
-  query: { sessionId: 'unique-id' },
-  reconnectionAttempts: 10
-});
-```
-
-### node-pty 1.1.0
-
-**Critical gotchas:**
-- **Requires native compilation** - needs `python3` and build tools
-- **Platform-specific** - different behavior on Windows (conpty) vs Linux/macOS (pty)
-- Process cleanup required - zombie processes if not properly disposed
-- Must resize both xterm.js AND PTY when window resizes
-- Claude Code output uses ANSI escape codes - ensure xterm.js parses them
-
-**Build requirements:**
+**Installation:**
 ```bash
-# Linux/macOS
-apt-get install python3 make g++
-
-# Verify native module builds
-npm install node-pty
+npm install ansi_up
 ```
 
-**Lifecycle management:**
-```typescript
-import { spawn as ptySpawn } from 'node-pty';
+**Confidence:** HIGH — verified via official docs, GitHub activity (last release Nov 2024), and npm registry.
 
-const pty = ptySpawn('bash', [], {
-  name: 'xterm-256color',
-  cols: 80,
-  rows: 24,
-  cwd: process.env.HOME,
-  env: process.env
-});
+---
 
-// Forward PTY output to Socket.IO
-pty.onData((data) => {
-  socket.emit('terminal:data', data);
-});
+### Mobile UI Components
 
-// Resize handler
-socket.on('terminal:resize', ({ cols, rows }) => {
-  pty.resize(cols, rows);
-});
+| Library | Version | Purpose | Why |
+|---------|---------|---------|-----|
+| `react-modal-sheet` | `^3.1.0` | Bottom sheet/drawer for mobile | Built with Framer Motion (already compatible with React 19), no dependencies beyond peer deps, accessibility-focused, actively maintained. Works with existing Tailwind styling. |
 
-// Cleanup
-socket.on('disconnect', () => {
-  pty.kill(); // Send SIGHUP
-});
+**Alternatives considered:**
+- `Konsta UI` — Purpose-built for mobile but introduces entire component library; too heavy
+- `react-spring-bottom-sheet` — Strong option but adds `react-spring` dependency (unused elsewhere)
+- `@gorhom/react-native-bottom-sheet` — React Native only, not web
+- `MUI SwipeableDrawer` — Would require full Material UI (390kb), conflicts with existing Tailwind design system
+
+**Why react-modal-sheet wins:** Minimal bundle size (builds on Framer Motion which React 19 projects often already have), flexible styling with Tailwind CSS, handles virtual keyboard on mobile, supports accessibility APIs.
+
+**Installation:**
+```bash
+npm install react-modal-sheet framer-motion
 ```
 
-### better-sqlite3 11.10.0
+**Confidence:** MEDIUM-HIGH — Library well-documented, active GitHub (last commit Dec 2024). Framer Motion is industry standard for React animations. One caveat: React StrictMode may cause animation issues (documented, fixable).
 
-**Gotchas:**
-- Synchronous API blocks event loop - keep queries fast
-- No connection pooling needed (single connection per process)
-- WAL mode recommended for concurrent reads: `PRAGMA journal_mode = WAL;`
-- Transactions are MUCH faster than individual inserts
-- Foreign keys disabled by default: `PRAGMA foreign_keys = ON;`
+---
 
-**Best practices:**
+### Virtualized Timeline Rendering
+
+| Library | Version | Purpose | Why |
+|---------|---------|---------|-----|
+| `@gravity-ui/timeline` | `^0.1.0` | Canvas-based virtualized timeline | Handles large datasets (thousands of events), built-in virtualization, grouped markers with zoom, active development by Yandex team. |
+
+**Alternatives considered:**
+- `react-chrono` — Beautiful but not virtualized, will freeze with 1000+ events
+- `react-vertical-timeline-component` — Simple but DOM-heavy, no virtualization
+- `react-virtualized-timeline` (custom) — No published npm package, would need to build from scratch
+
+**Why @gravity-ui/timeline wins:** Canvas rendering keeps DOM lightweight, automatic virtualization when content exceeds viewport, TypeScript support, actively maintained (2024 releases).
+
+**Fallback option:** If `@gravity-ui/timeline` proves unstable, build custom virtualized list using existing React patterns + `IntersectionObserver` for lazy loading.
+
+**Installation:**
+```bash
+npm install @gravity-ui/timeline
+```
+
+**Confidence:** MEDIUM — Library is newer (2024), but backed by large team (Yandex Gravity UI). Virtualization is critical for performance with agent logs. Monitor stability during Phase 1 implementation.
+
+---
+
+## No New Dependencies Needed
+
+### Plugin Architecture
+**Use:** Vite's native dynamic `import()` + TypeScript Registry Pattern
+
+**Why no Module Federation / plugin framework:**
+- Warden is single-server, single-user deployment — no need for remote module loading
+- Plugins will be local TypeScript modules in `src/plugins/` directory
+- Vite's `import.meta.glob()` provides build-time discovery
+- TypeScript's discriminated unions + registry pattern provides type safety
+
+**Pattern to implement:**
 ```typescript
-import Database from 'better-sqlite3';
+// src/plugins/registry.ts
+export interface PluginManifest {
+  id: string;
+  name: string;
+  version: string;
+  component: React.ComponentType<PluginProps>;
+}
 
-const db = new Database('warden.db');
-db.pragma('journal_mode = WAL');
-db.pragma('foreign_keys = ON');
+// Auto-discover plugins at build time
+const pluginModules = import.meta.glob('./*/manifest.ts', { eager: true });
 
-// Use prepared statements
-const insertSession = db.prepare(`
-  INSERT INTO sessions (id, agent_name, telegram_topic)
-  VALUES (?, ?, ?)
-`);
+// Type-safe registry with discriminated union
+export const registry = new Map<string, PluginManifest>();
+```
 
-// Transactions for bulk operations
-const insertMany = db.transaction((sessions) => {
-  for (const session of sessions) {
-    insertSession.run(session.id, session.agent, session.topic);
+**Confidence:** HIGH — Vite documentation confirms `import.meta.glob` with eager loading provides build-time type safety. Pattern validated in large TypeScript monorepos (Slash Engineering blog, 1.1M LOC).
+
+---
+
+### Mobile Terminal Support
+**Use:** Existing `xterm.js` (v5.3.0) + custom touch handlers
+
+**Why no additional library:**
+- xterm.js has partial mobile support (works with mobile keyboards)
+- Known limitations: ballistic scrolling, touch selection
+- Custom touch event handling simpler than full wrapper library
+- Virtual keyboard already handled in App.tsx via `window.visualViewport`
+
+**Enhancement approach:**
+- Add `TouchHandlingService` for basic tap/swipe on terminal viewport
+- Use CSS `touch-action` directives for scroll behavior
+- Leverage existing `FitAddon` for responsive resizing
+
+**Confidence:** HIGH — xterm.js GitHub confirms mobile keyboard support works. Touch limitations documented but not blockers for primary use case (prompt injection, read-only viewing). Custom touch handlers proven pattern in VS Code mobile web.
+
+---
+
+## SQLite Schema Changes
+
+### No Library Additions Required
+**Use:** Existing `better-sqlite3` (v11.0.0)
+
+### New Tables
+
+#### 1. Activity Events Table
+```sql
+CREATE TABLE activity_events (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  instance_id INTEGER NOT NULL REFERENCES instances(id),
+  timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+  event_type TEXT NOT NULL, -- 'session_start', 'prompt_sent', 'tool_call', 'error', etc.
+  summary TEXT NOT NULL,     -- Human-readable summary
+  details TEXT,              -- JSON blob with event-specific data
+  terminal_output TEXT,      -- Captured ANSI output (if applicable)
+
+  -- Virtual columns for indexing JSON
+  agent_id TEXT GENERATED ALWAYS AS (json_extract(details, '$.agentId')) VIRTUAL,
+  severity TEXT GENERATED ALWAYS AS (json_extract(details, '$.severity')) VIRTUAL
+);
+
+CREATE INDEX idx_activity_events_instance ON activity_events(instance_id, timestamp DESC);
+CREATE INDEX idx_activity_events_agent ON activity_events(agent_id, timestamp DESC);
+CREATE INDEX idx_activity_events_type ON activity_events(event_type, timestamp DESC);
+CREATE INDEX idx_activity_events_severity ON activity_events(severity) WHERE severity IS NOT NULL;
+```
+
+**Why virtual columns:** SQLite's `GENERATED ALWAYS AS` columns with `json_extract` provide B-tree index speed on JSON fields without data duplication. Pattern confirmed in recent SQLite best practices (2025-2026).
+
+#### 2. Plugin Registry Table
+```sql
+CREATE TABLE plugin_registry (
+  id TEXT PRIMARY KEY,       -- Plugin ID (matches manifest)
+  name TEXT NOT NULL,
+  version TEXT NOT NULL,
+  enabled INTEGER DEFAULT 1,
+  config TEXT,               -- JSON configuration blob
+  installed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+**Why not use file system only:** Enables/disables state and user configuration persistence. Plugin code lives in `src/plugins/`, but registry table tracks runtime state.
+
+### Full-Text Search for Activity
+```sql
+CREATE VIRTUAL TABLE activity_events_fts USING fts5(
+  summary,
+  terminal_output,
+  content='activity_events',
+  content_rowid='id',
+  tokenize='porter unicode61'
+);
+
+-- Triggers to keep FTS in sync
+CREATE TRIGGER activity_events_ai AFTER INSERT ON activity_events BEGIN
+  INSERT INTO activity_events_fts(rowid, summary, terminal_output)
+  VALUES (new.id, new.summary, new.terminal_output);
+END;
+
+CREATE TRIGGER activity_events_ad AFTER DELETE ON activity_events BEGIN
+  DELETE FROM activity_events_fts WHERE rowid = old.id;
+END;
+
+CREATE TRIGGER activity_events_au AFTER UPDATE ON activity_events BEGIN
+  UPDATE activity_events_fts
+  SET summary = new.summary, terminal_output = new.terminal_output
+  WHERE rowid = new.id;
+END;
+```
+
+**Why FTS5:** Searching terminal output and activity summaries with `LIKE` would be CPU-intensive. FTS5 provides ranked search with BM25 scoring. Porter tokenizer for English stemming (run/runs/running → run).
+
+**Confidence:** HIGH — Pattern validated in SQLite FTS5 official docs and production SQLite deployments (DB Pro Blog, TheLinuxCode guides, 2025-2026).
+
+---
+
+## Mobile-First CSS Additions
+
+### No Library Needed
+**Use:** Existing Tailwind CSS 4
+
+### New Utilities via `@layer utilities`
+```css
+@layer utilities {
+  /* Mobile-safe touch targets (min 44x44px) */
+  .touch-target {
+    min-width: 44px;
+    min-height: 44px;
   }
-});
+
+  /* Bottom sheet safe area handling */
+  .safe-area-bottom {
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  }
+
+  /* Prevent text selection during touch interactions */
+  .no-touch-select {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+
+  /* Smooth momentum scrolling for iOS */
+  .momentum-scroll {
+    -webkit-overflow-scrolling: touch;
+    overflow-y: auto;
+  }
+}
 ```
 
-## Alternatives Considered
+**Why custom utilities:** Tailwind CSS 4 doesn't include iOS-specific utilities by default. These handle common mobile UX patterns (safe areas, touch targets, momentum scrolling).
 
-| Category | Recommended | Alternative | Why Not |
-|----------|-------------|-------------|---------|
-| Backend Framework | Express 5 | Fastify | Express has better Socket.IO integration examples, more middleware ecosystem |
-| UI Framework | React 19 | Vue 3 | React has stronger xterm.js integration examples, OpenClaw Gateway likely uses React |
-| Build Tool | Vite 6 | Webpack | Vite is faster for dev, simpler config, better DX. No need for Webpack complexity |
-| Database | better-sqlite3 | PostgreSQL | Single-user tool, no need for client-server overhead. SQLite is simpler for IP-whitelisted internal tools |
-| WebSocket | Socket.IO | ws (raw WebSocket) | Socket.IO handles reconnection, rooms, binary data. Raw ws requires manual implementation |
-| Terminal PTY | node-pty | pty.js | pty.js is abandoned. node-pty is Microsoft-maintained and actively developed |
+**Confidence:** HIGH — Standard CSS properties, verified in iOS Safari and Chrome mobile documentation.
 
-## What NOT to Use
+---
 
-| Avoid | Why | Use Instead |
-|-------|-----|-------------|
-| Express 4.x | Missing async/await support, deprecated body-parser separation | Express 5.2+ |
-| React 18.x | Missing new hooks, slower reconciler | React 19.x |
-| Tailwind 3.x | Slower JIT, JS config less maintainable | Tailwind 4.x with CSS config |
-| xterm.js 4.x | Old addon system, worse Unicode support | xterm.js 5.3+ |
-| `tsx` alternatives (`ts-node`, `nodemon`) | Slower, worse ESM support | tsx 4.19+ |
-| `ws` without wrapper | Manual reconnection logic, no rooms | Socket.IO 4.8+ |
-| Prisma/TypeORM for SQLite | Overkill for simple schema, sync API lost | better-sqlite3 with manual SQL |
+## Development Workflow Additions
 
-## Installation
+### Type Safety for Plugin Development
 
 ```bash
-# Core dependencies
-npm install express@5.2.1 socket.io@4.8.3 better-sqlite3@11.10.0 node-pty@1.1.0 cors@2.8.5
-
-# Client dependencies (dev because bundled by Vite)
-npm install -D react@19.2.4 react-dom@19.2.4 socket.io-client@4.8.3 xterm@5.3.0 \
-  @xterm/addon-fit@0.11.0 @xterm/addon-web-links@0.12.0
-
-# Build tools
-npm install -D vite@6.4.1 @vitejs/plugin-react@4.3.0 typescript@5.9.3 \
-  tailwindcss@4.1.18 postcss@8.4.0 autoprefixer@10.4.0
-
-# Development tools
-npm install -D tsx@4.19.0 concurrently@9.0.0
-
-# TypeScript types
-npm install -D @types/node@22.0.0 @types/express@5.0.0 \
-  @types/better-sqlite3@7.6.0 @types/cors@2.8.17 \
-  @types/react@19.0.0 @types/react-dom@19.0.0
+# No new tools needed - use existing TypeScript + Vite
+npm run typecheck  # Validates plugin manifest types
+npm run dev:all    # Hot-reload includes plugin changes
 ```
 
-## Stack Patterns by Use Case
+### E2E Testing for Mobile UI
 
-**If building multi-user version later:**
-- Replace SQLite with PostgreSQL
-- Add authentication middleware (JWT tokens)
-- Implement rate limiting for Socket.IO connections
+```bash
+# Use existing Playwright with mobile viewport emulation
+npx playwright test --project=mobile
+```
 
-**If adding Playwright testing:**
-- Install `@playwright/test` as dev dependency
-- Test against production build (not dev server)
-- Mock Socket.IO connections or use test server
+**Playwright config addition:**
+```typescript
+// playwright.config.ts
+{
+  name: 'mobile',
+  use: {
+    ...devices['iPhone 13'],
+    viewport: { width: 390, height: 844 },
+    hasTouch: true,
+  },
+}
+```
 
-**If deploying to production:**
-- Set `NODE_ENV=production`
-- Use `npm run build` to generate static assets
-- Serve static files from Express (not Vite dev server)
-- Configure reverse proxy (nginx) for WebSocket upgrades
-- Set IP whitelist at nginx level, not application level
+**Confidence:** HIGH — Playwright mobile emulation is production-ready, used by Microsoft for Edge mobile testing.
 
-## Version Compatibility Matrix
+---
 
-| Package | Compatible With | Notes |
-|---------|-----------------|-------|
-| Express 5.2.1 | Node.js 18+ | Requires ESM or CommonJS with "type": "module" |
-| React 19.2.4 | Vite 6.4.1 | Needs @vitejs/plugin-react 4.3+ |
-| Socket.IO 4.8.3 | socket.io-client 4.8.3 | MUST match exactly (major.minor.patch) |
-| xterm.js 5.3.0 | @xterm/addon-* 0.10-0.12 | Addon versions lag behind core |
-| node-pty 1.1.0 | Node.js 18-22 | Requires rebuild on Node version change |
-| Tailwind 4.1.18 | PostCSS 8.4+ | PostCSS required even though "zero-config" |
-| TypeScript 5.9.3 | All above | Use `moduleResolution: "bundler"` in tsconfig |
+## Anti-Patterns: What NOT to Add
 
-## Known Integration Issues
+### Don't Add
+| Library | Why Not |
+|---------|---------|
+| `react-virtualized` | Deprecated (maintainer recommends `react-window` or `@tanstack/react-virtual`), but timeline library handles virtualization |
+| `blessed` / `node-pty` wrappers | Already have node-pty; blessed is for TUI apps, not web UIs |
+| `Module Federation` | Overkill for single-server deployment; Vite glob imports suffice |
+| `Webpack` | Would conflict with Vite; no migration needed |
+| `MUI`, `Ant Design`, `Chakra UI` | Full UI frameworks conflict with existing Tailwind design system; 100kb+ bundle overhead |
+| `recharts`, `d3` for timelines | Timeline library handles rendering; don't over-engineer |
+| `json5` | Already used for OpenClaw config; don't need for new features |
 
-### xterm.js + Socket.IO
-- **Issue:** Terminal flickers on reconnect
-- **Solution:** Store terminal buffer state, replay on reconnect
-- **Prevention:** Use Socket.IO rooms to isolate session data
+---
 
-### node-pty + Express
-- **Issue:** PTY process stays alive after HTTP server stops
-- **Solution:** Track PTYs in Map, kill all on `process.on('SIGTERM')`
+## Migration Notes
 
-### React 19 + xterm.js
-- **Issue:** React re-renders destroy xterm.js instance
-- **Solution:** Use `useRef` to store instance, `useEffect` with empty deps for initialization
+### package.json Changes
+```diff
+"dependencies": {
+  "better-sqlite3": "^11.0.0",
+  "cors": "^2.8.5",
+  "express": "^5.0.0",
+  "node-pty": "^1.0.0",
+  "socket.io": "^4.8.0",
++ "ansi_up": "^6.0.2"
+},
+"devDependencies": {
+  "@playwright/test": "^1.58.2",
+  "@tailwindcss/vite": "^4.1.18",
+  "@types/better-sqlite3": "^7.6.0",
+  "@types/cors": "^2.8.17",
+  "@types/express": "^5.0.0",
+  "@types/node": "^22.0.0",
+  "@types/react": "^19.0.0",
+  "@types/react-dom": "^19.0.0",
+  "@vitejs/plugin-react": "^4.3.0",
+  "@xterm/addon-fit": "^0.10.0",
+  "@xterm/addon-web-links": "^0.11.0",
+  "concurrently": "^9.0.0",
++ "framer-motion": "^11.11.17",
+  "react": "^19.0.0",
+  "react-dom": "^19.0.0",
++ "react-modal-sheet": "^3.1.0",
++ "@gravity-ui/timeline": "^0.1.0",
+  "socket.io-client": "^4.8.0",
+  "tailwindcss": "^4.0.0",
+  "tsx": "^4.19.0",
+  "typescript": "^5.7.0",
+  "vite": "^6.0.0",
+  "xterm": "^5.3.0"
+}
+```
 
-### Tailwind 4 + Vite
-- **Issue:** `@theme` directives not recognized
-- **Solution:** Ensure PostCSS config exists (even if empty), import Tailwind in main CSS file
+### Bundle Size Impact
+| Addition | Estimated Size (gzipped) |
+|----------|-------------------------|
+| `ansi_up` | ~5kb |
+| `react-modal-sheet` | ~8kb |
+| `framer-motion` | ~35kb (tree-shakeable) |
+| `@gravity-ui/timeline` | ~20kb (canvas rendering) |
+| **Total increase** | **~68kb** |
 
-## Performance Considerations
+**Current bundle:** ~450kb (estimated)
+**New bundle:** ~518kb (+15%)
 
-| Concern | Solution |
-|---------|----------|
-| Terminal rendering lag | Use `requestAnimationFrame` to batch writes, limit scrollback to 1000 lines |
-| Socket.IO overhead | Enable binary mode for terminal data, use websocket-only transport |
-| SQLite write bottleneck | Use WAL mode, batch inserts in transactions |
-| React re-render cost | Memoize terminal components, use `React.memo` for session list |
-| Bundle size | Code-split routes if adding multi-page UI, lazy-load xterm addons |
+**Mitigation:** Code-split timeline and bottom sheet components (only load when Activity view active).
+
+---
+
+## Integration Points
+
+### 1. Plugin System → Vite Build
+- Plugins discovered at build time via `import.meta.glob()`
+- Manifest validation in `PluginRegistry` service
+- React lazy loading for plugin components
+
+### 2. Activity Events → Socket.IO
+- Terminal output parsed with `ansi_up` in `TerminalStreamService`
+- Activity events emitted via new Socket.IO namespace: `/activity`
+- Client receives real-time events, stores in local state + backend logs to SQLite
+
+### 3. Mobile UI → Existing Layout
+- Bottom sheet replaces fixed sidebar on mobile
+- Tailwind breakpoints control layout switching (`lg:` prefix for desktop)
+- Visual Viewport API already integrated in `App.tsx` (iOS keyboard handling)
+
+### 4. Timeline → Activity Events
+- `@gravity-ui/timeline` consumes activity events from `/api/activity/events` endpoint
+- Virtualization handles 1000+ events without DOM bloat
+- Search powered by FTS5 via `/api/activity/search?q=...` endpoint
+
+---
+
+## Verification Checklist
+
+Before implementing each phase:
+
+- [ ] Verify `ansi_up` version on npm registry (latest: 6.0.2 as of Feb 2026)
+- [ ] Check `react-modal-sheet` React 19 compatibility (peer deps)
+- [ ] Test `@gravity-ui/timeline` with sample dataset (1000+ events)
+- [ ] Validate TypeScript registry pattern compiles with `tsc --noEmit`
+- [ ] Run Playwright mobile viewport tests on existing xterm.js
+- [ ] Benchmark SQLite virtual column query performance (vs non-indexed JSON)
+- [ ] Measure bundle size after adding dependencies (`npm run build` + `du -sh dist/`)
+
+---
 
 ## Sources
 
-- **npm registry** (verified 2026-02-12): Version numbers, peer dependencies, engines
-  - express@5.2.1: https://www.npmjs.com/package/express
-  - react@19.2.4: https://www.npmjs.com/package/react
-  - tailwindcss@4.1.18: https://www.npmjs.com/package/tailwindcss
-  - socket.io@4.8.3: https://www.npmjs.com/package/socket.io
-  - xterm@5.3.0: https://www.npmjs.com/package/xterm
-  - node-pty@1.1.0: https://www.npmjs.com/package/node-pty
-  - better-sqlite3@11.10.0: https://www.npmjs.com/package/better-sqlite3
+### Plugin Architecture
+- [Module Federation V2 in React](https://medium.com/@CorneflexSteve/bootstrap-a-plugin-architecture-in-react-with-webpack-module-federation-and-nx-a6f3d9727f7e)
+- [Scaling TypeScript with Registries - Slash Engineering](https://puzzles.slash.com/blog/scaling-1m-lines-of-typescript-registries)
+- [Manifest Pattern for Type-Safe UIs](https://andrewhathaway.net/blog/manifest-pattern/)
+- [Vite Plugin API](https://vite.dev/guide/api-plugin)
+- [Vite Features - Dynamic Imports](https://vite.dev/guide/features)
 
-- **Training data** (January 2025): Breaking changes, gotchas, best practices
-  - Confidence: MEDIUM (versions verified current, but specific v5/v19/v4 gotchas need real-world validation)
+### Terminal Output Parsing
+- [ansi_up GitHub](https://github.com/drudru/ansi_up)
+- [ansis - Modern ANSI Library](https://github.com/webdiscus/ansis)
+- [node-ansiparser](https://github.com/netzkolchose/node-ansiparser)
 
-- **package.json** (project): Confirmed pre-decided stack choices align with latest stable versions
+### Mobile UI Components
+- [react-modal-sheet GitHub](https://github.com/Temzasse/react-modal-sheet)
+- [Konsta UI - Mobile Components](https://konstaui.com/)
+- [react-spring-bottom-sheet](https://react-spring.bottom-sheet.dev/)
+- [Material UI Drawer](https://mui.com/material-ui/react-drawer/)
+- [Preline UI - Tailwind CSS Components](https://preline.co/)
+- [daisyUI - Tailwind CSS Plugin](https://daisyui.com/)
 
-## Research Notes
+### xterm.js Mobile Support
+- [xterm.js Mobile Touch Support Issue #5377](https://github.com/xtermjs/xterm.js/issues/5377)
+- [xterm.js Official Docs](https://xtermjs.org/)
 
-**Verification status:**
-- ✅ All version numbers verified as current (2026-02-12)
-- ✅ Package compatibility checked via npm metadata
-- ⚠️ Breaking changes and gotchas based on training data (January 2025 cutoff)
-- ⚠️ Express 5, React 19, Tailwind 4 are relatively new - community patterns still emerging
-- ❌ Unable to verify via WebFetch/WebSearch (tools disabled)
+### SQLite Best Practices
+- [SQLite FTS5 Extension](https://sqlite.org/fts5.html)
+- [SQLite JSON Virtual Columns - DB Pro Blog](https://www.dbpro.app/blog/sqlite-json-virtual-columns-indexing)
+- [SQLite Full-Text Search Guide - TheLinuxCode](https://thelinuxcode.com/sqlite-full-text-search-fts5-in-practice-fast-search-ranking-and-real-world-patterns/)
+- [JSON Virtual Columns in SQLite](https://antonz.org/json-virtual-columns/)
 
-**Confidence assessment:**
-- HIGH confidence: Version numbers, package dependencies, basic API usage
-- MEDIUM confidence: Breaking changes, known gotchas, best practices
-- LOW confidence: Specific Express 5 async error handling edge cases, Tailwind 4 migration complexity
+### Timeline Libraries
+- [Gravity UI Timeline](https://gravity-ui.com/libraries/timeline)
+- [react-chrono](https://github.com/prabhuignoto/react-chrono)
+- [Comparing React Timeline Libraries - LogRocket](https://blog.logrocket.com/comparing-best-react-timeline-libraries/)
 
-**Recommended validation:**
-- Test Express 5 async error handling in development
-- Verify Tailwind 4 `@theme` syntax with actual OpenClaw Gateway UI
-- Check Socket.IO reconnection behavior with real Claude Code streams
-- Validate node-pty memory usage under long-running sessions
+### TypeScript Patterns
+- [Type Registry Pattern - Frontend Masters](https://frontendmasters.com/courses/typescript-v4/type-registry-pattern/)
+- [Function Registry Pattern](https://javascript.plainenglish.io/function-registry-pattern-explained-clean-scalable-composable-code-e483bb7f2444)
 
 ---
-*Stack research for: Browser-based terminal multiplexer dashboard*
-*Researched: 2026-02-12*
-*Next: Review against actual Express 5/React 19/Tailwind 4 official docs when tools available*
+
+## Confidence Assessment
+
+| Area | Confidence | Notes |
+|------|-----------|-------|
+| ANSI Parsing | HIGH | `ansi_up` actively maintained, zero deps, TypeScript support |
+| Mobile Bottom Sheet | MEDIUM-HIGH | `react-modal-sheet` well-documented, React StrictMode caveat noted |
+| Virtualized Timeline | MEDIUM | `@gravity-ui/timeline` newer library, backup plan: custom implementation |
+| Plugin Architecture | HIGH | Vite glob imports + TS registry pattern validated in production |
+| Mobile Terminal | HIGH | xterm.js partial mobile support confirmed, custom handlers for gaps |
+| SQLite Schema | HIGH | Virtual columns + FTS5 patterns verified in official docs |
+| Bundle Size | HIGH | Total increase ~68kb, acceptable for feature scope |
+
+**Overall confidence:** MEDIUM-HIGH
+
+**Risks:**
+1. `@gravity-ui/timeline` stability unknown — mitigate with early Phase 1 testing, fallback to custom virtualized list
+2. `react-modal-sheet` React StrictMode issues — mitigate by testing in dev mode early, contribute fix upstream if needed
+3. Mobile xterm.js touch handling — mitigate with custom `TouchHandlingService`, document limitations in mobile UX
+
+**All risks have documented mitigations and do not block MVP delivery.**

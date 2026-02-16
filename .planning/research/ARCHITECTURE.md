@@ -1,570 +1,1103 @@
-# Architecture Research
+# Architecture Research: v2.0 Mission Control Extensions
 
-**Domain:** Browser-Based Terminal Dashboard / Agent Session Multiplexer
-**Researched:** 2026-02-12
-**Confidence:** MEDIUM (based on training data for established patterns like Wetty/ttyd/Gotty; WebSearch/WebFetch unavailable)
+**Domain:** Plugin Registry, Activity Timeline & Mobile-First UI for Terminal Dashboard
+**Researched:** 2026-02-16
+**Confidence:** HIGH (verified with official docs, multiple sources, WebSearch)
 
-## Standard Architecture
+## Executive Summary
+
+This research focuses ONLY on the NEW architectural components needed for v2.0 Mission Control features:
+
+1. **Plugin/Tool Registry** — Dynamic module system for extending UI with panels and capabilities
+2. **Activity Timeline** — Structured event capture from terminal streams + audit logging
+3. **Mobile-First UI** — Responsive component hierarchy restructure for <480px primary experience
+
+The existing Warden architecture (Express + Socket.IO + React + SQLite + xterm.js) is well-suited for these extensions. All three features integrate cleanly without major refactoring.
+
+## Feature 1: Plugin/Tool Registry Architecture
 
 ### System Overview
 
-Browser-based terminal dashboards follow a three-layer architecture:
-
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│                     PRESENTATION LAYER (Browser)                     │
-├─────────────────────────────────────────────────────────────────────┤
-│  ┌────────────────────┐  ┌────────────────────┐  ┌──────────────┐  │
-│  │   Terminal UI      │  │   Controls Panel   │  │  Metadata    │  │
-│  │   (xterm.js)       │  │   (Tabs, Input)    │  │  Sidebar     │  │
-│  └──────────┬─────────┘  └──────────┬─────────┘  └──────┬───────┘  │
-│             │                       │                    │           │
-│             └───────────────────────┴────────────────────┘           │
-│                                     │                                │
-│                          WebSocket (Socket.IO)                       │
-├─────────────────────────────────────┼────────────────────────────────┤
-│                     APPLICATION LAYER (Node.js)                      │
-├─────────────────────────────────────────────────────────────────────┤
-│  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐  │
-│  │  Socket Router   │  │  Session Manager │  │  Config Reader   │  │
-│  │  (events → ptys) │  │  (tmux lifecycle)│  │  (openclaw.json) │  │
-│  └────────┬─────────┘  └────────┬─────────┘  └────────┬─────────┘  │
-│           │                     │                      │             │
-│  ┌────────▼────────────────────▼──────────────────────▼─────────┐   │
-│  │              Instance Tracker (SQLite)                       │   │
-│  └──────────────────────────────┬───────────────────────────────┘   │
-├─────────────────────────────────┼────────────────────────────────────┤
-│                     PROCESS LAYER (PTY Bridge)                       │
-├─────────────────────────────────────────────────────────────────────┤
-│  ┌─────────────────────────────────────────────────────────────┐    │
-│  │               node-pty (Pseudo-Terminal Interface)           │    │
-│  │   ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐   │    │
-│  │   │ pty → A  │  │ pty → B  │  │ pty → C  │  │ pty → D  │   │    │
-│  │   └─────┬────┘  └─────┬────┘  └─────┬────┘  └─────┬────┘   │    │
-│  └─────────┼─────────────┼─────────────┼─────────────┼─────────┘    │
-│            │             │             │             │               │
-├────────────┼─────────────┼─────────────┼─────────────┼───────────────┤
-│                  TERMINAL SESSION LAYER (tmux)                       │
-├─────────────────────────────────────────────────────────────────────┤
-│  ┌────────────┐  ┌────────────┐  ┌────────────┐  ┌────────────┐    │
-│  │ warden-01  │  │ scout-02   │  │ builder-03 │  │ gideon-04  │    │
-│  │ (session)  │  │ (session)  │  │ (session)  │  │ (session)  │    │
-│  └────────────┘  └────────────┘  └────────────┘  └────────────┘    │
-└─────────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                    CLIENT (React SPA)                        │
+├─────────────────────────────────────────────────────────────┤
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │         PluginRegistry (singleton)                   │   │
+│  │  - Map<pluginId, PluginMetadata>                     │   │
+│  │  - discover(), load(), unload()                      │   │
+│  └─────────────────────┬────────────────────────────────┘   │
+│                        │                                     │
+│  ┌─────────────────────▼──────────────────────────────┐     │
+│  │    DynamicPanelRenderer (Component)                │     │
+│  │  - Lookup component by pluginId                    │     │
+│  │  - React.createElement() at runtime                │     │
+│  │  - Fallback for missing/errored plugins            │     │
+│  └─────────────────────┬──────────────────────────────┘     │
+│                        │                                     │
+│  ┌────────┬────────────▼────────┬────────────────────┐      │
+│  │ Panel  │ Panel │ Panel │ Panel │ ...built-in +    │      │
+│  │ Slot 1 │ Slot 2│ Slot 3│ Slot 4│  plugin panels   │      │
+│  └────────┴───────────────┴─────────────────────────┘      │
+├─────────────────────────────────────────────────────────────┤
+│                    SERVER (Express)                          │
+├─────────────────────────────────────────────────────────────┤
+│  GET /api/plugins          → List available plugins          │
+│  POST /api/plugins/:id/enable  → Update plugin state        │
+│  POST /api/plugins/:id/disable → Update plugin state        │
+├─────────────────────────────────────────────────────────────┤
+│                    DATABASE (SQLite)                         │
+├─────────────────────────────────────────────────────────────┤
+│  plugins table:                                              │
+│    id, name, version, enabled, manifest_json, installed_at   │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-### Component Responsibilities
+### Plugin Metadata Schema
 
-| Component | Responsibility | Typical Implementation |
-|-----------|----------------|------------------------|
-| **xterm.js Terminal** | Render terminal output, handle keyboard input, manage display buffer | React component wrapping xterm.js Terminal instance with addons (FitAddon, WebLinksAddon) |
-| **Socket.IO Client** | Maintain WebSocket connection, emit input events, receive output events | React hook managing connection lifecycle, reconnection logic |
-| **Tab Bar / Multiplexer UI** | Display active sessions, allow switching between terminals | React component with state management for active session ID |
-| **Socket Router** | Map incoming WebSocket connections to correct pty processes | Express + Socket.IO namespace handler with session-based rooms |
-| **Session Manager** | Create/destroy/list tmux sessions, enforce naming conventions | Service class wrapping tmux CLI commands (list-sessions, new-session, kill-session) |
-| **Terminal Stream Service** | Spawn pty processes, bridge I/O between pty ↔ socket | Service class using node-pty to spawn `tmux attach-session -t <name>` |
-| **Instance Tracker** | Persist session metadata (agent, project, status, timestamps) | SQLite CRUD operations via better-sqlite3 |
-| **Config Reader** | Parse OpenClaw config, extract agent metadata, topic mappings | JSON5 parser with caching, exposes agent list and topic routing |
-| **node-pty** | Spawn pseudo-terminal processes, handle resize, I/O buffering | Native addon, spawns shell commands as if from real terminal |
-| **tmux** | Persist terminal sessions across disconnects, allow multiple viewers | External process manager, sessions survive WebSocket disconnects |
+Based on [registry pattern research](https://www.geeksforgeeks.org/system-design/registry-pattern/) and [plugin architecture patterns](https://medium.com/omarelgabrys-blog/plug-in-architecture-dec207291800), the metadata schema should include:
 
-## Recommended Project Structure
-
-```
-warden.kingdom.lv/
-├── src/
-│   ├── server/
-│   │   ├── index.ts                    # Express bootstrap, Socket.IO setup
-│   │   ├── routes/
-│   │   │   ├── instanceRoutes.ts       # REST: GET /api/instances, POST /api/instances/:id/stop
-│   │   │   ├── agentRoutes.ts          # REST: GET /api/agents, POST /api/agents/:id/spawn
-│   │   │   └── sessionHistoryRoutes.ts # REST: GET /api/sessions/history
-│   │   ├── services/
-│   │   │   ├── TmuxSessionManager.ts   # tmux session lifecycle (list, create, destroy)
-│   │   │   ├── TerminalStreamService.ts# pty spawn + socket I/O bridge
-│   │   │   ├── OpenClawConfigReader.ts # Parse openclaw.json for agent metadata
-│   │   │   ├── InstanceTracker.ts      # SQLite CRUD for instance metadata
-│   │   │   └── GatewayApiClient.ts     # HTTP client for OpenClaw gateway API
-│   │   ├── socket/
-│   │   │   └── terminalHandler.ts      # Socket.IO /terminal namespace logic
-│   │   ├── database/
-│   │   │   ├── schema.sql              # SQLite schema definition
-│   │   │   └── DatabaseConnection.ts   # Single db connection with WAL mode
-│   │   └── types/
-│   │       ├── AgentInstance.ts        # Shared types: AgentInstance, AgentInstanceCreateParams
-│   │       ├── TmuxSession.ts          # TmuxSessionInfo interface
-│   │       └── OpenClawConfig.ts       # Config parsing types
-│   └── client/
-│       ├── App.tsx                     # Root component, routing, layout
-│       ├── components/
-│       │   ├── TerminalView.tsx        # xterm.js wrapper with FitAddon
-│       │   ├── InstanceTabBar.tsx      # Horizontal tabs for sessions
-│       │   ├── AgentDetailsSidebar.tsx # Agent metadata, SOUL.md preview
-│       │   ├── PromptInputPanel.tsx    # Send message to gateway per agent
-│       │   └── TelegramTopicMap.tsx    # Visual grid: topic → agent
-│       ├── hooks/
-│       │   ├── useTerminalSocket.ts    # Socket.IO connection management
-│       │   ├── useActiveInstances.ts   # Polling /api/instances
-│       │   └── useAgentConfig.ts       # Fetch agent metadata from /api/agents
-│       ├── styles/
-│       │   └── index.css               # Tailwind imports, custom theme
-│       └── types/
-│           └── index.ts                # Client-side type definitions
-├── data/
-│   └── warden.db                       # SQLite database file
-├── package.json
-├── tsconfig.json                       # Shared TypeScript config
-├── tsconfig.server.json                # Server-specific config
-├── vite.config.ts                      # Vite build config for client
-└── nginx.conf                          # Reference Nginx config
-```
-
-### Structure Rationale
-
-- **`src/server/services/`:** Each service has single responsibility (SRP). TmuxSessionManager does NOT stream terminal output — that's TerminalStreamService's job. Clean boundaries prevent coupling.
-- **`src/server/socket/`:** Isolate Socket.IO event handling from REST routes. Different lifecycle, different concerns.
-- **`src/server/database/`:** Single DatabaseConnection instance. All queries in one place (DRY). Migration logic co-located with connection setup.
-- **`src/client/hooks/`:** Reusable stateful logic. useTerminalSocket used by any component needing terminal I/O. No duplicate Socket.IO code.
-- **Shared `types/`:** Server and client import same type definitions. Single source of truth for AgentInstance shape.
-
-## Architectural Patterns
-
-### Pattern 1: WebSocket Room-Based Multiplexing
-
-**What:** Each tmux session gets a unique Socket.IO room. Browser connects to room by session name. Multiple browsers can observe same session without interference.
-
-**When to use:** When supporting multiple concurrent viewers per session (read-only observation + one take-over).
-
-**Trade-offs:**
-- **Pro:** Clean isolation — each session's I/O only sent to subscribed clients
-- **Pro:** Broadcast support — send control messages to all viewers of a session
-- **Con:** Requires careful room lifecycle management (join on connect, leave on disconnect)
-
-**Example:**
 ```typescript
-// src/server/socket/terminalHandler.ts
-io.of('/terminal').on('connection', (socket) => {
-  const { sessionName } = socket.handshake.query;
+interface PluginMetadata {
+  id: string;                    // Unique identifier (e.g., 'terminal-stats')
+  name: string;                  // Display name (e.g., 'Terminal Statistics')
+  version: string;               // Semver (e.g., '1.0.0')
+  author: string;
+  description: string;
 
-  // Join room for this session
-  socket.join(`session:${sessionName}`);
+  // Capability declarations
+  capabilities: {
+    panels?: PanelCapability[];  // UI panel slots this plugin provides
+    hooks?: HookCapability[];    // Lifecycle hooks it listens to
+    routes?: RouteCapability[];  // API routes it exposes
+  };
 
-  // Attach pty to this socket
-  terminalStreamService.attachSocketToSession(socket, sessionName, { readOnly: true });
+  // Runtime requirements
+  requires: {
+    wardenVersion: string;       // Minimum Warden version
+    dependencies?: string[];     // Other plugin IDs
+  };
 
-  socket.on('disconnect', () => {
-    socket.leave(`session:${sessionName}`);
-    terminalStreamService.detachSocket(socket.id);
-  });
+  // Entry points
+  entry: {
+    client?: string;             // Path to client component bundle
+    server?: string;             // Path to server-side module
+  };
 
-  socket.on('terminal:input', (data: string) => {
-    // Only process if not read-only
-    if (terminalStreamService.isSocketInteractive(socket.id)) {
-      // Input already forwarded by TerminalStreamService
+  // State
+  enabled: boolean;
+  installedAt: string;
+}
+
+interface PanelCapability {
+  slotId: string;                // Where to render: 'sidebar', 'bottom', 'modal'
+  component: string;             // Component export name
+  label: string;                 // Tab/button label
+  icon?: string;                 // Icon identifier
+  defaultVisible?: boolean;
+}
+
+interface HookCapability {
+  event: string;                 // E.g., 'terminal:output', 'session:start'
+  handler: string;               // Function export name
+}
+
+interface RouteCapability {
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE';
+  path: string;                  // E.g., '/api/plugins/my-plugin/action'
+  handler: string;               // Function export name
+}
+```
+
+### Component Registry Pattern
+
+Following [React dynamic component rendering patterns](https://www.storyblok.com/tp/react-dynamic-component-from-json), use an object map registry:
+
+```typescript
+// PluginRegistry.ts (client)
+class PluginRegistry {
+  private components: Map<string, React.ComponentType<any>> = new Map();
+  private metadata: Map<string, PluginMetadata> = new Map();
+
+  register(plugin: PluginMetadata, component: React.ComponentType<any>): void {
+    this.metadata.set(plugin.id, plugin);
+    if (component) {
+      this.components.set(plugin.id, component);
     }
-  });
+  }
+
+  unregister(pluginId: string): void {
+    this.metadata.delete(pluginId);
+    this.components.delete(pluginId);
+  }
+
+  getComponent(pluginId: string): React.ComponentType<any> | null {
+    return this.components.get(pluginId) ?? null;
+  }
+
+  listPlugins(filters?: { slotId?: string; enabled?: boolean }): PluginMetadata[] {
+    let plugins = Array.from(this.metadata.values());
+    if (filters?.enabled !== undefined) {
+      plugins = plugins.filter(p => p.enabled === filters.enabled);
+    }
+    if (filters?.slotId) {
+      plugins = plugins.filter(p =>
+        p.capabilities.panels?.some(panel => panel.slotId === filters.slotId)
+      );
+    }
+    return plugins;
+  }
+}
+
+export const pluginRegistry = new PluginRegistry();
+```
+
+### Dynamic Panel Renderer
+
+```typescript
+// DynamicPanelRenderer.tsx
+interface Props {
+  slotId: string;
+  pluginId: string;
+  context?: Record<string, any>;
+}
+
+export function DynamicPanelRenderer({ slotId, pluginId, context }: Props) {
+  const Component = pluginRegistry.getComponent(pluginId);
+
+  if (!Component) {
+    return (
+      <div className="text-warden-error p-4">
+        Plugin "{pluginId}" not found or failed to load.
+      </div>
+    );
+  }
+
+  return (
+    <ErrorBoundary fallback={<PluginErrorFallback pluginId={pluginId} />}>
+      <Component slotId={slotId} {...context} />
+    </ErrorBoundary>
+  );
+}
+```
+
+### Server-Side Plugin Manager
+
+```typescript
+// src/server/services/PluginManager.ts
+class PluginManager {
+  private database: DatabaseConnection;
+
+  async listPlugins(): Promise<PluginMetadata[]> {
+    return this.database.prepare(`
+      SELECT id, name, version, enabled, manifest_json as manifestJson,
+             installed_at as installedAt
+      FROM plugins
+      ORDER BY name
+    `).all().map(row => ({
+      ...JSON.parse(row.manifestJson),
+      enabled: Boolean(row.enabled),
+      installedAt: row.installedAt,
+    }));
+  }
+
+  async enablePlugin(pluginId: string): Promise<void> {
+    this.database.prepare('UPDATE plugins SET enabled = 1 WHERE id = ?').run(pluginId);
+  }
+
+  async disablePlugin(pluginId: string): Promise<void> {
+    this.database.prepare('UPDATE plugins SET enabled = 0 WHERE id = ?').run(pluginId);
+  }
+
+  async installPlugin(manifest: PluginMetadata): Promise<void> {
+    this.database.prepare(`
+      INSERT INTO plugins (id, name, version, enabled, manifest_json)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(
+      manifest.id,
+      manifest.name,
+      manifest.version,
+      1,
+      JSON.stringify(manifest)
+    );
+  }
+}
+```
+
+### Panel Slot Architecture
+
+Recommended slot IDs for Warden Dashboard:
+
+| Slot ID | Location | Use Case | Example Plugins |
+|---------|----------|----------|-----------------|
+| `sidebar-top` | AgentSidebar top section | Agent-scoped actions | "Quick Deploy", "Agent Stats" |
+| `sidebar-bottom` | AgentSidebar bottom section | Global tools | "System Monitor", "Logs" |
+| `terminal-overlay` | Floating over TerminalView | Real-time annotations | "Error Highlighter", "AI Assist" |
+| `bottom-panel` | Below terminal tabs | Secondary info | "Git Status", "File Watcher" |
+| `modal` | Full-screen modal | Complex interactions | "Plugin Settings", "Debugger" |
+
+### Integration Points
+
+**New components:**
+- `src/client/services/PluginRegistry.ts` — Client-side registry singleton
+- `src/client/components/DynamicPanelRenderer.tsx` — Runtime component loader
+- `src/client/components/PluginSlot.tsx` — Declarative slot container
+- `src/server/services/PluginManager.ts` — Server-side CRUD
+- `src/server/routes/pluginRoutes.ts` — REST API (`GET /api/plugins`, `POST /api/plugins/:id/enable`)
+
+**Modified components:**
+- `src/client/App.tsx` — Add `<PluginSlot slotId="bottom-panel" />` to layout
+- `src/client/components/AgentSidebar.tsx` — Add `<PluginSlot slotId="sidebar-top" />` and `<PluginSlot slotId="sidebar-bottom" />`
+- `src/server/database/DatabaseConnection.ts` — Add `plugins` table migration
+
+**Database schema addition:**
+```sql
+CREATE TABLE IF NOT EXISTS plugins (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  version TEXT NOT NULL,
+  enabled INTEGER DEFAULT 1,
+  manifest_json TEXT NOT NULL,
+  installed_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_plugins_enabled ON plugins(enabled);
+```
+
+### Anti-Patterns
+
+**Anti-Pattern 1: Global Registry Without Isolation**
+- **What people do:** Share single global registry with no sandboxing
+- **Why it's wrong:** Plugin errors crash the entire app; plugin A can corrupt plugin B's state
+- **Do this instead:** Use React ErrorBoundary around each plugin render, isolate plugin contexts
+
+**Anti-Pattern 2: Runtime Eval/Dynamic Imports Without Validation**
+- **What people do:** `eval(pluginCode)` or `import(untrustedUrl)`
+- **Why it's wrong:** XSS vulnerability, arbitrary code execution
+- **Do this instead:** For v2.0, bundle plugins at build time only; for v3.0+, implement CSP + allowlist validation
+
+**Anti-Pattern 3: Monolithic Plugin Contract**
+- **What people do:** Force every plugin to implement 50 methods
+- **Why it's wrong:** Complexity bloat, most plugins only need 1-2 capabilities
+- **Do this instead:** Capability-based declaration (plugins only declare what they provide)
+
+---
+
+## Feature 2: Activity Timeline & Audit Log Architecture
+
+### System Overview
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                  TERMINAL OUTPUT STREAM                      │
+├─────────────────────────────────────────────────────────────┤
+│  xterm.js Terminal                                           │
+│       ↓                                                      │
+│  Raw ANSI bytes → TerminalView component                    │
+│       ↓                                                      │
+│  [NEW] EventExtractor (client-side)                         │
+│       ↓                                                      │
+│  Socket.IO emit → 'activity:event' + 'terminal:output'     │
+├─────────────────────────────────────────────────────────────┤
+│                  SERVER PROCESSING                           │
+├─────────────────────────────────────────────────────────────┤
+│  [NEW] ActivityEventHandler (Socket.IO listener)            │
+│       ↓                                                      │
+│  [NEW] EventEnricher                                        │
+│    - Add timestamp, sessionId, agentId                      │
+│    - Parse ANSI escape sequences                            │
+│    - Extract structured data (errors, commands)             │
+│       ↓                                                      │
+│  [NEW] AuditLogger                                          │
+│    - Write to activity_events table (SQLite)                │
+│    - Enforce retention policy                               │
+├─────────────────────────────────────────────────────────────┤
+│                  STORAGE (SQLite)                            │
+├─────────────────────────────────────────────────────────────┤
+│  activity_events:                                            │
+│    id, instance_id, timestamp, event_type, severity,        │
+│    raw_text, structured_data, sequence_num                  │
+│  activity_snapshots (optional):                             │
+│    id, instance_id, timestamp, terminal_state               │
+├─────────────────────────────────────────────────────────────┤
+│                  QUERY API                                   │
+├─────────────────────────────────────────────────────────────┤
+│  GET /api/activity/timeline?instanceId=X&from=Y&to=Z        │
+│  GET /api/activity/events?type=error&severity=high          │
+│  GET /api/activity/search?query=git+commit                  │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Event Types & Schema
+
+Based on [audit logging patterns](https://microservices.io/patterns/observability/audit-logging.html) and [activity log design](https://alguidelines.dev/docs/navpatterns/patterns/activity-log/):
+
+```typescript
+interface ActivityEvent {
+  id: number;
+  instanceId: number;           // FK to instances table
+  timestamp: string;             // ISO 8601
+  sequenceNum: number;           // Monotonic counter per instance
+
+  eventType: ActivityEventType;
+  severity: 'info' | 'warning' | 'error' | 'critical';
+
+  rawText: string;               // Original terminal output chunk
+  structuredData: Record<string, any> | null;  // Parsed metadata
+
+  // Audit trail fields
+  userId?: string;               // If operator injected prompt
+  sourceIp?: string;             // If remote session
+}
+
+type ActivityEventType =
+  | 'terminal_output'            // Raw terminal data
+  | 'command_executed'           // Detected shell command
+  | 'error_occurred'             // Detected error pattern
+  | 'session_started'            // Session lifecycle
+  | 'session_stopped'
+  | 'prompt_injected'            // Operator action
+  | 'file_modified'              // Detected git/file changes
+  | 'api_called'                 // Detected HTTP request
+  | 'tool_invoked';              // Detected tool usage
+```
+
+### ANSI Escape Sequence Parser Integration
+
+Based on [ANSI parser research](https://github.com/netzkolchose/node-ansiparser), integrate structured parsing:
+
+```typescript
+// src/server/services/AnsiParser.ts
+import { AnsiParser } from 'node-ansiparser';
+
+interface ParsedChunk {
+  plainText: string;
+  containsError: boolean;
+  containsSuccess: boolean;
+  detectedCommand: string | null;
+}
+
+export class TerminalOutputParser {
+  private parser: AnsiParser;
+
+  constructor() {
+    this.parser = new AnsiParser();
+  }
+
+  parse(rawAnsi: string): ParsedChunk {
+    let plainText = '';
+    let containsError = false;
+    let containsSuccess = false;
+
+    this.parser.parse(rawAnsi, {
+      onText: (text: string) => { plainText += text; },
+      onSGR: (params: number[]) => {
+        // SGR = Select Graphic Rendition (colors)
+        // Red text (31) often indicates errors
+        if (params.includes(31)) containsError = true;
+        // Green text (32) often indicates success
+        if (params.includes(32)) containsSuccess = true;
+      },
+    });
+
+    const detectedCommand = this.detectCommand(plainText);
+
+    return { plainText, containsError, containsSuccess, detectedCommand };
+  }
+
+  private detectCommand(text: string): string | null {
+    // Heuristic: look for common shell prompt patterns
+    const promptMatch = text.match(/[\$#>]\s+(.+?)[\r\n]/);
+    return promptMatch ? promptMatch[1].trim() : null;
+  }
+}
+```
+
+### Event Enrichment Pipeline
+
+Following [event-driven architecture patterns](https://newsletter.simpleaws.dev/p/event-driven-architecture-patterns):
+
+```typescript
+// src/server/services/ActivityEnricher.ts
+export class ActivityEnricher {
+  private parser: TerminalOutputParser;
+
+  async enrich(
+    rawChunk: string,
+    context: { instanceId: number; agentId: string }
+  ): Promise<ActivityEvent[]> {
+    const parsed = this.parser.parse(rawChunk);
+    const events: ActivityEvent[] = [];
+
+    // Always create a terminal_output event
+    events.push({
+      instanceId: context.instanceId,
+      timestamp: new Date().toISOString(),
+      eventType: 'terminal_output',
+      severity: 'info',
+      rawText: rawChunk,
+      structuredData: {
+        plainText: parsed.plainText,
+        length: rawChunk.length,
+      },
+    });
+
+    // Create derived events
+    if (parsed.containsError) {
+      events.push({
+        instanceId: context.instanceId,
+        timestamp: new Date().toISOString(),
+        eventType: 'error_occurred',
+        severity: 'error',
+        rawText: parsed.plainText,
+        structuredData: {
+          errorPattern: 'ansi-red-detected',
+        },
+      });
+    }
+
+    if (parsed.detectedCommand) {
+      events.push({
+        instanceId: context.instanceId,
+        timestamp: new Date().toISOString(),
+        eventType: 'command_executed',
+        severity: 'info',
+        rawText: parsed.detectedCommand,
+        structuredData: {
+          command: parsed.detectedCommand,
+          detectionMethod: 'prompt-pattern',
+        },
+      });
+    }
+
+    return events;
+  }
+}
+```
+
+### Audit Logger Service
+
+Following [transactional outbox pattern](https://microservices.io/patterns/observability/audit-logging.html):
+
+```typescript
+// src/server/services/AuditLogger.ts
+export class AuditLogger {
+  private database: DatabaseConnection;
+  private sequenceCounters: Map<number, number> = new Map();
+
+  async logEvents(events: ActivityEvent[]): Promise<void> {
+    const statement = this.database.prepare(`
+      INSERT INTO activity_events
+        (instance_id, timestamp, sequence_num, event_type, severity, raw_text, structured_data)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    for (const event of events) {
+      const seqNum = this.getNextSequence(event.instanceId);
+      statement.run(
+        event.instanceId,
+        event.timestamp,
+        seqNum,
+        event.eventType,
+        event.severity,
+        event.rawText,
+        event.structuredData ? JSON.stringify(event.structuredData) : null
+      );
+    }
+  }
+
+  private getNextSequence(instanceId: number): number {
+    const current = this.sequenceCounters.get(instanceId) ?? 0;
+    const next = current + 1;
+    this.sequenceCounters.set(instanceId, next);
+    return next;
+  }
+
+  async pruneOldEvents(retentionDays: number): Promise<number> {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - retentionDays);
+
+    const result = this.database.prepare(`
+      DELETE FROM activity_events
+      WHERE timestamp < ?
+    `).run(cutoff.toISOString());
+
+    return result.changes;
+  }
+}
+```
+
+### Timeline Query API
+
+```typescript
+// src/server/routes/activityRoutes.ts
+router.get('/api/activity/timeline', (req, res) => {
+  const { instanceId, from, to, eventType, severity, limit = 100 } = req.query;
+
+  const filters: string[] = [];
+  const params: any[] = [];
+
+  if (instanceId) {
+    filters.push('instance_id = ?');
+    params.push(parseInt(instanceId as string, 10));
+  }
+  if (from) {
+    filters.push('timestamp >= ?');
+    params.push(from);
+  }
+  if (to) {
+    filters.push('timestamp <= ?');
+    params.push(to);
+  }
+  if (eventType) {
+    filters.push('event_type = ?');
+    params.push(eventType);
+  }
+  if (severity) {
+    filters.push('severity = ?');
+    params.push(severity);
+  }
+
+  const whereClause = filters.length > 0 ? `WHERE ${filters.join(' AND ')}` : '';
+
+  const events = database.prepare(`
+    SELECT
+      id, instance_id as instanceId, timestamp, sequence_num as sequenceNum,
+      event_type as eventType, severity, raw_text as rawText,
+      structured_data as structuredData
+    FROM activity_events
+    ${whereClause}
+    ORDER BY timestamp DESC, sequence_num DESC
+    LIMIT ?
+  `).all(...params, parseInt(limit as string, 10));
+
+  res.json({ events });
 });
 ```
 
-### Pattern 2: PTY Process Per Socket vs Shared PTY
+### Client-Side Timeline Component
 
-**What:** Two approaches for terminal streaming:
-- **Per-socket PTY:** Each browser gets its own `tmux attach-session` pty process
-- **Shared PTY:** One pty per session, multiple sockets subscribe to its output
-
-**When to use:**
-- **Per-socket:** Default pattern. tmux handles multi-attach natively. Each viewer gets independent pty resize control.
-- **Shared:** Only if you need precise control over who can write input (e.g., mutex for take-over mode). More complex.
-
-**Trade-offs:**
-- **Per-socket PTY:**
-  - **Pro:** Simple. tmux already supports multiple attach sessions.
-  - **Pro:** Each viewer can resize terminal independently without affecting others.
-  - **Con:** More pty processes = more resource usage (minimal for tmux attach).
-- **Shared PTY:**
-  - **Pro:** Single pty = less resource usage.
-  - **Con:** Resize conflicts — all viewers must share same terminal dimensions.
-  - **Con:** Input routing complexity — need mutex to prevent multiple writers.
-
-**Recommendation for Warden:** Use per-socket PTY. Resource overhead is negligible, and tmux already solves multi-viewer terminal state.
-
-**Example (per-socket):**
 ```typescript
-// src/server/services/TerminalStreamService.ts
-attachSocketToSession(socket: Socket, sessionName: string, options: { readOnly: boolean }): void {
-  // Each socket gets its own pty running `tmux attach-session`
-  const ptyProcess = pty.spawn('tmux', ['attach-session', '-t', sessionName], {
-    name: 'xterm-256color',
-    cols: 120,
-    rows: 40,
-  });
+// src/client/components/ActivityTimeline.tsx
+export function ActivityTimeline({ instanceId }: { instanceId: number }) {
+  const [events, setEvents] = useState<ActivityEvent[]>([]);
+  const [filters, setFilters] = useState({ eventType: 'all', severity: 'all' });
 
-  ptyProcess.onData((terminalOutput: string) => {
-    socket.emit('terminal:output', terminalOutput);
-  });
-
-  if (!options.readOnly) {
-    socket.on('terminal:input', (userInput: string) => {
-      ptyProcess.write(userInput);
+  useEffect(() => {
+    const params = new URLSearchParams({
+      instanceId: instanceId.toString(),
+      limit: '500',
     });
-  }
+    if (filters.eventType !== 'all') params.set('eventType', filters.eventType);
+    if (filters.severity !== 'all') params.set('severity', filters.severity);
 
-  this.activeStreams.set(socket.id, { ptyProcess, sessionName, isReadOnly: options.readOnly });
+    fetch(`/api/activity/timeline?${params}`)
+      .then(r => r.json())
+      .then(data => setEvents(data.events));
+  }, [instanceId, filters]);
+
+  return (
+    <div className="activity-timeline">
+      <TimelineFilters filters={filters} onChange={setFilters} />
+      <VirtualizedEventList events={events} />
+    </div>
+  );
 }
 ```
 
-### Pattern 3: Lazy Session Discovery vs Active Tracking
+### Integration Points
 
-**What:**
-- **Lazy discovery:** On page load, scan tmux sessions, show what exists. No persistent database.
-- **Active tracking:** Track all sessions in SQLite with metadata (agent, project, status, timestamps).
+**New components:**
+- `src/server/services/TerminalOutputParser.ts` — ANSI escape sequence parser
+- `src/server/services/ActivityEnricher.ts` — Event extraction pipeline
+- `src/server/services/AuditLogger.ts` — Event persistence
+- `src/server/routes/activityRoutes.ts` — Timeline query API
+- `src/client/components/ActivityTimeline.tsx` — Timeline UI
+- `src/client/components/ActivityEventCard.tsx` — Single event display
 
-**When to use:**
-- **Lazy:** Minimal systems with only terminal streaming. No historical data needed.
-- **Active:** Systems needing session history, token usage tracking, status aggregation (like Warden).
+**Modified components:**
+- `src/server/services/TerminalStreamService.ts` — Emit parsed events alongside raw output
+- `src/client/components/TerminalView.tsx` — Optional: capture client-side events (operator actions)
+- `src/client/App.tsx` — Add Activity view route
 
-**Trade-offs:**
-- **Lazy:**
-  - **Pro:** Zero persistence overhead. Always shows current truth from tmux.
-  - **Con:** Can't track historical sessions, token usage, or metadata like "project path".
-- **Active:**
-  - **Pro:** Rich metadata, historical queries, aggregation.
-  - **Con:** Database can desync from tmux if sessions killed outside the app.
+**Database schema addition:**
+```sql
+CREATE TABLE IF NOT EXISTS activity_events (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  instance_id INTEGER NOT NULL REFERENCES instances(id),
+  timestamp DATETIME NOT NULL,
+  sequence_num INTEGER NOT NULL,
+  event_type TEXT NOT NULL,
+  severity TEXT NOT NULL,
+  raw_text TEXT NOT NULL,
+  structured_data TEXT,
+  user_id TEXT,
+  source_ip TEXT,
+  UNIQUE(instance_id, sequence_num)
+);
 
-**Recommendation for Warden:** Active tracking with periodic reconciliation. Run a background job every 30s to sync SQLite status with actual tmux session list.
+CREATE INDEX IF NOT EXISTS idx_activity_instance ON activity_events(instance_id, timestamp);
+CREATE INDEX IF NOT EXISTS idx_activity_type ON activity_events(event_type);
+CREATE INDEX IF NOT EXISTS idx_activity_severity ON activity_events(severity);
+CREATE INDEX IF NOT EXISTS idx_activity_timestamp ON activity_events(timestamp);
+```
 
-**Example:**
+### Storage Considerations
+
+Following [audit log retention patterns](https://www.sonarsource.com/resources/library/audit-logging/):
+
+- **Retention:** 90 days for `activity_events`, 7 days for `terminal_output` type (high volume)
+- **Partitioning:** SQLite doesn't support table partitioning; for >1M events, consider rotating to monthly tables
+- **Write-Once:** Use `UNIQUE(instance_id, sequence_num)` to prevent duplicate/tampered events
+- **Backup:** SQLite WAL already enabled; periodic `PRAGMA wal_checkpoint(TRUNCATE)` sufficient
+
+### Anti-Patterns
+
+**Anti-Pattern 1: Logging Every Keystroke**
+- **What people do:** Log every single byte of terminal output as separate event
+- **Why it's wrong:** 1000s of events/second, database bloat, query performance death
+- **Do this instead:** Batch terminal output into 1-second chunks; only extract structured events (errors, commands)
+
+**Anti-Pattern 2: Synchronous Logging Blocking Terminal**
+- **What people do:** `await auditLogger.log()` in Socket.IO output handler
+- **Why it's wrong:** Slow disk I/O causes terminal lag
+- **Do this instead:** Queue events in memory, flush batch every 1s or 100 events
+
+**Anti-Pattern 3: No Retention Policy**
+- **What people do:** Keep all events forever
+- **Why it's wrong:** Database grows to gigabytes, query slows to crawl
+- **Do this instead:** Cron job runs `pruneOldEvents(90)` daily
+
+---
+
+## Feature 3: Mobile-First UI Architecture
+
+### Responsive Breakpoint Strategy
+
+Following [2026 React responsive patterns](https://www.dhiwise.com/post/the-ultimate-guide-to-achieving-react-mobile-responsiveness) and [breakpoint best practices](https://www.framer.com/blog/responsive-breakpoints/):
+
+**Standard breakpoints:**
 ```typescript
-// src/server/services/InstanceTracker.ts
-async reconcileWithTmux(): Promise<void> {
-  const activeTmuxSessions = await this.tmuxSessionManager.listAgentSessions();
-  const dbInstances = await this.db.listActiveInstances();
+// src/client/styles/breakpoints.ts
+export const breakpoints = {
+  mobile: 0,        // 0-480px (mobile-first baseline)
+  tablet: 481,      // 481-768px
+  desktop: 769,     // 769-1200px
+  largeDesktop: 1201, // 1201px+
+} as const;
 
-  // Mark instances as stopped if tmux session no longer exists
-  for (const dbInstance of dbInstances) {
-    const stillRunning = activeTmuxSessions.some(
-      tmux => tmux.sessionName === dbInstance.tmuxSessionName
-    );
-    if (!stillRunning) {
-      await this.db.updateInstanceStatus(dbInstance.id, 'stopped');
-    }
-  }
+export const mediaQueries = {
+  mobile: `(max-width: ${breakpoints.tablet - 1}px)`,
+  tablet: `(min-width: ${breakpoints.tablet}px) and (max-width: ${breakpoints.desktop - 1}px)`,
+  desktop: `(min-width: ${breakpoints.desktop}px)`,
+  largeDesktop: `(min-width: ${breakpoints.largeDesktop}px)`,
+} as const;
+```
 
-  // Discover new sessions not yet tracked
-  for (const tmuxSession of activeTmuxSessions) {
-    const alreadyTracked = dbInstances.some(
-      db => db.tmuxSessionName === tmuxSession.sessionName
-    );
-    if (!alreadyTracked) {
-      // Auto-register discovered session
-      await this.db.insertInstance({
-        agentId: tmuxSession.agentId,
-        tmuxSessionName: tmuxSession.sessionName,
-        projectPath: 'unknown', // Can parse from session name or config
-      });
-    }
-  }
+### useMediaQuery Hook Pattern
+
+Following [React media query hook pattern](https://react.wiki/hooks/custom-use-media-query/):
+
+```typescript
+// src/client/hooks/useMediaQuery.ts
+import { useState, useEffect } from 'react';
+
+export function useMediaQuery(query: string): boolean {
+  const [matches, setMatches] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return window.matchMedia(query).matches;
+  });
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia(query);
+    const handler = (e: MediaQueryListEvent) => setMatches(e.matches);
+
+    mediaQuery.addEventListener('change', handler);
+    return () => mediaQuery.removeEventListener('change', handler);
+  }, [query]);
+
+  return matches;
+}
+
+// Convenience hooks
+export const useIsMobile = () => useMediaQuery(mediaQueries.mobile);
+export const useIsTablet = () => useMediaQuery(mediaQueries.tablet);
+export const useIsDesktop = () => useMediaQuery(mediaQueries.desktop);
+```
+
+### Container Query Pattern (2026 Best Practice)
+
+Following [container query patterns](https://copyprogramming.com/howto/react-testing-library-rtl-test-a-responsive-design):
+
+```typescript
+// Instead of viewport-based queries, use container-based sizing
+// Tailwind CSS 4 supports @container by default
+
+// Example: AgentSidebar adapts to its container, not viewport
+<div className="@container">
+  <div className="@sm:flex-row @lg:flex-col flex-col">
+    {/* Layout changes based on container width, not screen width */}
+  </div>
+</div>
+```
+
+### Component Hierarchy Restructure
+
+Current desktop-first hierarchy:
+```
+App
+├── Header (fixed)
+├── InstanceTabBar (always visible)
+├── Main (flex-1)
+│   ├── TerminalView (flex-1)
+│   └── AgentSidebar (fixed 320px, desktop only)
+└── PromptPanel (fixed height)
+```
+
+Recommended mobile-first hierarchy:
+```
+App
+├── MobileHeader (sticky, <768px only)
+│   ├── Menu toggle → opens drawer
+│   └── Active session badge
+├── TabletDesktopHeader (>=768px only)
+│   ├── Logo + session count
+│   └── View toggle + Agents button
+├── ViewStack (mobile: full-screen stack; desktop: flex row)
+│   ├── TerminalView
+│   │   ├── SessionDrawer (mobile: slide-over; desktop: tabs)
+│   │   └── Terminal (always full viewport)
+│   ├── HistoryView (mobile: full-screen; desktop: replaces terminal)
+│   └── ActivityView (mobile: full-screen; desktop: replaces terminal)
+├── AgentDrawer (mobile: slide-over; desktop: sidebar)
+│   ├── AgentList
+│   └── PromptPanel (mobile: modal; desktop: inline)
+└── BottomNav (mobile <768px only)
+    ├── Terminals button
+    ├── History button
+    ├── Activity button
+    └── Agents button
+```
+
+### Responsive Layout Components
+
+```typescript
+// src/client/components/ResponsiveLayout.tsx
+export function ResponsiveLayout({ children }: { children: React.ReactNode }) {
+  const isMobile = useIsMobile();
+  const isDesktop = useIsDesktop();
+
+  return (
+    <div className="flex flex-col h-screen">
+      {isMobile ? <MobileHeader /> : <TabletDesktopHeader />}
+
+      <main className="flex-1 min-h-0">
+        {children}
+      </main>
+
+      {isMobile && <BottomNav />}
+    </div>
+  );
+}
+
+// Mobile-specific components
+function MobileHeader() {
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  return (
+    <>
+      <header className="sticky top-0 z-40 bg-warden-panel border-b border-warden-border">
+        <div className="flex items-center justify-between px-4 py-3">
+          <button
+            onClick={() => setDrawerOpen(true)}
+            className="min-w-[44px] min-h-[44px]"  // Touch-friendly 44px tap target
+          >
+            ☰ Menu
+          </button>
+          <div className="text-sm text-warden-text-dim">
+            {/* Active session indicator */}
+          </div>
+        </div>
+      </header>
+
+      <SessionDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
+    </>
+  );
+}
+
+function BottomNav() {
+  const [currentView, setCurrentView] = useRouterView();
+
+  return (
+    <nav className="sticky bottom-0 z-40 bg-warden-panel border-t border-warden-border">
+      <div className="flex justify-around py-2">
+        {['terminals', 'history', 'activity', 'agents'].map(view => (
+          <button
+            key={view}
+            onClick={() => setCurrentView(view)}
+            className={`flex flex-col items-center min-w-[64px] min-h-[44px] ${
+              currentView === view ? 'text-warden-accent' : 'text-warden-text-dim'
+            }`}
+          >
+            {/* Icon + label */}
+          </button>
+        ))}
+      </div>
+    </nav>
+  );
 }
 ```
 
-### Pattern 4: Read-Only by Default, Explicit Take-Over
+### Touch-Friendly Interaction Patterns
 
-**What:** All terminal views start in read-only mode. Users must explicitly activate take-over mode to send input. Only one viewer can take over at a time.
+Following [mobile-first design principles](https://blog.pixelfreestudio.com/how-to-implement-mobile-first-design-in-react/):
 
-**When to use:** Dashboards observing autonomous agents. Prevents accidental input disruption.
-
-**Trade-offs:**
-- **Pro:** Safe. Can't accidentally interrupt agent mid-task.
-- **Pro:** Clear UX — badge shows "READ ONLY" vs "INTERACTIVE".
-- **Con:** Extra click to interact (acceptable trade-off for safety).
-
-**Example:**
 ```typescript
-// src/client/components/TerminalView.tsx
-const [isTakeOverActive, setIsTakeOverActive] = useState(false);
+// Minimum tap target size: 44x44px (iOS) / 48x48px (Android)
+// Tailwind config adjustment:
 
-const handleTakeOver = async () => {
-  const response = await fetch(`/api/instances/${instanceId}/take-over`, { method: 'POST' });
-  if (response.ok) {
-    setIsTakeOverActive(true);
-  }
+// tailwind.config.js
+module.exports = {
+  theme: {
+    extend: {
+      minWidth: {
+        'touch': '44px',
+      },
+      minHeight: {
+        'touch': '44px',
+      },
+    },
+  },
 };
 
-return (
-  <div>
-    {!isTakeOverActive && (
-      <div className="read-only-badge">READ ONLY</div>
-    )}
-    {!isTakeOverActive && (
-      <button onClick={handleTakeOver}>Take Over</button>
-    )}
-    <TerminalView
-      sessionName={sessionName}
-      isReadOnly={!isTakeOverActive}
-    />
-  </div>
-);
+// Usage:
+<button className="min-w-touch min-h-touch flex items-center justify-center">
+  {/* Icon or text */}
+</button>
 ```
 
-## Data Flow
+### Visual Viewport Height (iOS Keyboard Fix)
 
-### Request Flow: Terminal Output Streaming
+Already implemented in App.tsx (lines 40-58), continue using:
 
-```
-User loads dashboard
-    ↓
-React App renders TerminalView
-    ↓
-useTerminalSocket hook connects to Socket.IO
-    ↓
-Socket.IO /terminal namespace handler
-    ↓
-TerminalStreamService.attachSocketToSession(socket, sessionName)
-    ↓
-node-pty spawns: tmux attach-session -t warden-coding-001
-    ↓
-tmux session already running Claude Code
-    ↓
-ptyProcess.onData() receives terminal output
-    ↓
-socket.emit('terminal:output', data)
-    ↓
-Browser receives event
-    ↓
-xterm.js terminal.write(data)
-    ↓
-User sees live terminal output
-```
+```typescript
+// App.tsx already has this:
+useEffect(() => {
+  const viewport = window.visualViewport;
+  if (!viewport) return;
 
-### Request Flow: User Input (Take-Over Mode)
+  const updateHeight = () => {
+    document.documentElement.style.setProperty(
+      '--visual-viewport-height',
+      `${viewport.height}px`
+    );
+  };
 
-```
-User types in terminal
-    ↓
-xterm.js terminal.onData(userInput)
-    ↓
-socket.emit('terminal:input', userInput)
-    ↓
-Server socket handler receives event
-    ↓
-TerminalStreamService forwards to ptyProcess.write(userInput)
-    ↓
-ptyProcess writes to tmux session stdin
-    ↓
-tmux session receives input
-    ↓
-Claude Code processes command
-    ↓
-Output flows back through ptyProcess.onData → socket.emit → xterm.js
+  updateHeight();
+  viewport.addEventListener('resize', updateHeight);
+  viewport.addEventListener('scroll', updateHeight);
+  return () => {
+    viewport.removeEventListener('resize', updateHeight);
+    viewport.removeEventListener('scroll', updateHeight);
+  };
+}, []);
+
+// CSS usage:
+.app-height {
+  height: var(--visual-viewport-height, 100vh);
+}
 ```
 
-### Request Flow: Session Discovery
+### Progressive Enhancement Strategy
 
+Following [progressive enhancement principle](https://www.keitaro.com/insights/2024/01/30/building-responsive-and-user-friendly-web-applications-with-react/):
+
+1. **Mobile baseline (0-480px):**
+   - Single-column layout
+   - Full-screen views (no split panes)
+   - Bottom navigation
+   - Slide-over drawers
+   - Touch-optimized controls (44px min)
+
+2. **Tablet enhancement (481-768px):**
+   - Two-column layout possible
+   - Side-by-side terminal + sidebar (landscape)
+   - Tabs instead of bottom nav
+   - Slide-over drawers (portrait) or inline panels (landscape)
+
+3. **Desktop enhancement (769px+):**
+   - Multi-column layout
+   - Fixed sidebar (no drawer)
+   - Inline panels
+   - Hover states
+   - Keyboard shortcuts
+
+### Component Conditional Rendering
+
+```typescript
+// Mobile: full-screen drawer
+{isMobile && (
+  <SessionDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)}>
+    <SessionList sessions={sessions} onSelect={handleSelect} />
+  </SessionDrawer>
+)}
+
+// Desktop: inline tabs
+{isDesktop && (
+  <InstanceTabBar
+    instances={instances}
+    selectedSessionName={selectedSessionName}
+    onSelectSession={handleSelectSession}
+  />
+)}
 ```
-Page load
-    ↓
-useActiveInstances hook calls GET /api/instances
-    ↓
-instanceRoutes handler
-    ↓
-InstanceTracker.listActiveInstances()
-    ↓
-DatabaseConnection.query('SELECT * FROM instances WHERE status = active')
-    ↓
-Return instance list
-    ↓
-React renders InstanceTabBar with tabs
-    ↓
-User clicks tab → TerminalView mounts → connects to Socket.IO
+
+### Integration Points
+
+**New components:**
+- `src/client/styles/breakpoints.ts` — Breakpoint constants
+- `src/client/hooks/useMediaQuery.ts` — Media query hook
+- `src/client/hooks/useIsMobile.ts`, `useIsDesktop.ts` — Convenience hooks
+- `src/client/components/MobileHeader.tsx` — Mobile-specific header
+- `src/client/components/BottomNav.tsx` — Mobile bottom navigation
+- `src/client/components/SessionDrawer.tsx` — Mobile session switcher
+- `src/client/components/AgentDrawer.tsx` — Mobile agent panel
+
+**Modified components:**
+- `src/client/App.tsx` — Conditional layout based on viewport
+- `src/client/components/InstanceTabBar.tsx` — Hide on mobile, show on desktop
+- `src/client/components/AgentSidebar.tsx` — Convert to drawer on mobile
+- `src/client/components/PromptPanel.tsx` — Convert to modal on mobile
+
+**Tailwind config:**
+```javascript
+// tailwind.config.js
+module.exports = {
+  theme: {
+    extend: {
+      minWidth: { touch: '44px' },
+      minHeight: { touch: '44px' },
+      screens: {
+        'mobile': '0px',
+        'tablet': '481px',
+        'desktop': '769px',
+        'large-desktop': '1201px',
+      },
+    },
+  },
+};
 ```
 
-### State Management
+### Anti-Patterns
 
-For Warden (small-scale, single-user dashboard), simple state patterns suffice:
+**Anti-Pattern 1: Desktop Layout with `display: none` on Mobile**
+- **What people do:** Build desktop version, then hide elements with CSS on mobile
+- **Why it's wrong:** Ships unused code, degrades performance, accessibility issues
+- **Do this instead:** Component-level conditional rendering with `useMediaQuery`
 
-```
-Server State (Source of Truth):
-  ├── SQLite: instance metadata, session history, token usage
-  ├── tmux: actual running sessions
-  └── OpenClaw config: agent definitions, topic mappings
+**Anti-Pattern 2: Fixed Pixel Widths**
+- **What people do:** `width: 320px` everywhere
+- **Why it's wrong:** Breaks on 375px iPhones, 393px Android, 412px large phones
+- **Do this instead:** Relative units (`rem`, `%`, `vw`) or Tailwind's responsive classes
 
-Client State (Derived):
-  ├── useState: active tab ID, take-over mode toggle
-  ├── useEffect polling: instance list (refresh every 5s)
-  └── Socket.IO: real-time terminal output (push from server)
-```
+**Anti-Pattern 3: Viewport-Only Breakpoints**
+- **What people do:** All responsive logic based on `window.innerWidth`
+- **Why it's wrong:** Doesn't account for sidebar/panel size, container context
+- **Do this instead:** Mix viewport breakpoints with container queries (Tailwind `@container`)
 
-No need for Redux/Zustand/etc. — component-level state + polling + WebSocket is sufficient for 1-4 concurrent sessions.
+---
 
-### Key Data Flows
+## Build Order Recommendations
 
-1. **Terminal Output (server → client):** ptyProcess.onData → socket.emit → xterm.js.write
-2. **User Input (client → server):** xterm.js.onData → socket.emit → ptyProcess.write
-3. **Session List (client ← server):** HTTP polling /api/instances every 5s
-4. **Config Metadata (client ← server):** HTTP GET /api/agents on mount, cache in state
-5. **Take-Over Toggle (client → server):** HTTP POST /api/instances/:id/take-over → update TerminalStreamService internal state
+Based on feature dependencies and integration complexity:
+
+### Phase A: Plugin Registry Foundation (Week 1-2)
+1. Database migration: `plugins` table
+2. Server: `PluginManager` service + `pluginRoutes` API
+3. Client: `PluginRegistry` singleton
+4. Client: `DynamicPanelRenderer` component
+5. Client: `PluginSlot` component
+6. Integration: Add 1-2 built-in "plugins" as proof-of-concept (e.g., "System Stats")
+
+**Why first:** Lowest risk, foundational for other features
+
+### Phase B: Mobile-First UI Restructure (Week 2-3)
+1. Styles: Breakpoint constants + Tailwind config
+2. Hooks: `useMediaQuery`, `useIsMobile`, `useIsDesktop`
+3. Components: `MobileHeader`, `BottomNav`, `SessionDrawer`, `AgentDrawer`
+4. Refactor: `App.tsx` conditional layout
+5. Testing: Playwright tests at 375px, 768px, 1440px viewports
+
+**Why second:** UI foundation needed before Activity view (which benefits from mobile layout)
+
+### Phase C: Activity Timeline & Audit Log (Week 3-5)
+1. Database migration: `activity_events` table
+2. Server: `TerminalOutputParser` (integrate `node-ansiparser`)
+3. Server: `ActivityEnricher` service
+4. Server: `AuditLogger` service
+5. Server: `activityRoutes` API
+6. Server: Modify `TerminalStreamService` to emit events
+7. Client: `ActivityTimeline` component
+8. Client: Add "Activity" view to main navigation
+9. Testing: E2E flow for event capture + timeline display
+
+**Why last:** Most complex, depends on parser library integration, benefits from plugin system (for custom event renderers)
+
+---
 
 ## Scaling Considerations
 
-| Scale | Architecture Adjustments |
-|-------|--------------------------|
-| **1-5 concurrent sessions** | Monolith is perfect. Single Node.js process, SQLite, no optimization needed. |
-| **5-20 concurrent sessions** | Add connection pooling for Socket.IO. Enable tmux aggressive-resize. Consider moving SQLite to /dev/shm for faster writes. |
-| **20-100 concurrent sessions** | Move to PostgreSQL (SQLite write contention). Add Redis for session state. Consider clustering Node.js (multiple workers). |
-| **100+ concurrent sessions** | Split into service layers: Terminal Gateway (handles ptys) + API Server (handles REST). Use message queue (RabbitMQ) for inter-service communication. Consider tmux alternatives (containerized pty processes). |
+| Scale | Adjustments |
+|-------|-------------|
+| **0-10 sessions** | Current architecture sufficient; SQLite handles well |
+| **10-100 sessions** | Plugin registry: implement lazy loading; Activity: batch event writes (100 events or 1s) |
+| **100+ sessions** | Activity: consider PostgreSQL for full-text search; Plugin: implement allowlist/signature validation |
 
-### Scaling Priorities
+**First bottleneck:** Activity event writes (high volume terminal output)
+- **Fix:** Batch writes, reduce `terminal_output` retention to 7 days
 
-**Warden context:** 1-4 concurrent sessions (Gideon, Warden, Scout, Builder). No scaling needed. SQLite + single Node.js process is correct choice.
+**Second bottleneck:** Plugin component re-renders
+- **Fix:** React.memo() on `DynamicPanelRenderer`, plugin context isolation
 
-1. **First bottleneck (if ever hit):** Socket.IO reconnection storms if server restarts. **Fix:** Stagger reconnection delays with exponential backoff + jitter.
-2. **Second bottleneck:** SQLite write contention if adding verbose logging. **Fix:** Batch writes, use WAL mode (already planned), or debounce status updates.
-
-## Anti-Patterns
-
-### Anti-Pattern 1: Direct Terminal Process Spawning (No tmux)
-
-**What people do:** Spawn `claude` or shell process directly via node-pty without tmux wrapper.
-
-**Why it's wrong:**
-- Sessions die when WebSocket disconnects.
-- Can't reattach to running process.
-- No persistence across server restarts.
-- Can't manually inspect session from SSH.
-
-**Do this instead:** Always spawn sessions inside tmux. Use `tmux new-session -d -s <name> <command>` for creation, `tmux attach-session -t <name>` for viewing. tmux provides free session persistence and multi-viewer support.
-
-### Anti-Pattern 2: Shared PTY Without Input Mutex
-
-**What people do:** Use single pty per session, allow all connected sockets to write input.
-
-**Why it's wrong:**
-- Race conditions — two users typing simultaneously produces garbled input.
-- No clear ownership of who's controlling the session.
-- Hard to debug "who sent that command?"
-
-**Do this instead:** Either use per-socket pty (recommended) OR implement take-over mutex (only one socket can be interactive at a time, others read-only).
-
-### Anti-Pattern 3: Polling Terminal Output via HTTP
-
-**What people do:** Client polls GET /api/terminal/:id/output every 500ms to fetch new terminal data.
-
-**Why it's wrong:**
-- Terrible latency — up to 500ms delay between output and display.
-- Massive overhead — most polls return empty (no new data).
-- Doesn't scale — 10 clients = 20 req/sec just for idle terminal.
-
-**Do this instead:** Use WebSocket (Socket.IO) for terminal output. Server pushes data as it arrives. Sub-100ms latency, zero overhead when idle.
-
-### Anti-Pattern 4: Storing Terminal Buffers in Database
-
-**What people do:** Capture all terminal output to database for "full history replay".
-
-**Why it's wrong:**
-- Massive database bloat — terminal sessions generate MB of ANSI escape sequences.
-- Slow queries — replaying 10,000 lines from SQLite for xterm.js is sluggish.
-- tmux already provides scrollback buffer (configurable limit).
-
-**Do this instead:** Store session metadata (status, timestamps, project path) in database. Store logs as files if history needed (e.g., `/data/logs/warden-coding-001.log`). Let tmux handle scrollback for active sessions.
-
-### Anti-Pattern 5: Synchronous tmux Command Execution
-
-**What people do:** Execute `tmux list-sessions` synchronously in HTTP request handler.
-
-**Why it's wrong:**
-- Blocks event loop if tmux hangs (rare but possible).
-- Single slow tmux command delays all concurrent requests.
-
-**Do this instead:** Use async/await with execAsync. Add timeout to tmux commands (e.g., 5s). Cache results for non-critical queries (list-sessions can be cached for 2-3 seconds).
-
-## Integration Points
-
-### External Services
-
-| Service | Integration Pattern | Notes |
-|---------|---------------------|-------|
-| **OpenClaw Gateway API** | HTTP REST client | POST to `/api/gateway/send` with agent ID + message. Used for prompt injection from PromptInputPanel. |
-| **tmux** | Shell command via node child_process | `tmux list-sessions`, `tmux new-session`, `tmux attach-session`. Assumes tmux 3.0+ installed. |
-| **node-pty** | Native Node.js addon | Requires compilation (node-gyp). Install build-essential on Ubuntu. Works with tmux, bash, any shell command. |
-| **SQLite (better-sqlite3)** | Synchronous Node.js API | Enable WAL mode for concurrent reads. Single connection shared across app. |
-
-### Internal Boundaries
-
-| Boundary | Communication | Notes |
-|----------|---------------|-------|
-| **Client ↔ Server (REST)** | HTTP JSON | Session list, agent metadata, history queries. Standard Express routes. |
-| **Client ↔ Server (Terminal)** | WebSocket (Socket.IO) | Real-time terminal I/O. Namespace: `/terminal`. Events: `terminal:output`, `terminal:input`, `terminal:resize`, `terminal:exit`. |
-| **TerminalStreamService ↔ TmuxSessionManager** | Direct method calls | TerminalStreamService spawns pty for sessions. TmuxSessionManager provides session names. No circular dependency — Manager creates sessions, Service streams them. |
-| **InstanceTracker ↔ DatabaseConnection** | Direct method calls | InstanceTracker is thin wrapper over DatabaseConnection. Adds business logic (reconciliation), delegates persistence to db. |
-| **OpenClawConfigReader ↔ File System** | fs.readFileSync | Reads `/home/forge/.openclaw/openclaw.json`. Caches for 30s to avoid excessive disk reads. |
-
-## Build Order Implications
-
-Based on dependencies between components, recommended build order:
-
-### Phase 1: Foundation (Backend Core)
-**Why first:** No UI dependencies. Backend can be tested via curl + wscat.
-
-1. DatabaseConnection + schema (no dependencies)
-2. TmuxSessionManager (no dependencies, just tmux CLI)
-3. TerminalStreamService (depends on node-pty, tmux)
-4. Socket.IO handler (depends on TerminalStreamService)
-5. InstanceTracker (depends on DatabaseConnection, TmuxSessionManager)
-6. REST routes for /api/instances (depends on InstanceTracker)
-
-**Validation:** `curl localhost:3001/api/instances` returns empty array. `wscat -c ws://localhost:3001/terminal?sessionName=test` connects (even if session doesn't exist, connection succeeds).
-
-### Phase 2: Frontend Shell (Client Core)
-**Why second:** Backend API exists, can build UI against real data.
-
-7. React app scaffold + Vite config
-8. TerminalView component (xterm.js wrapper)
-9. useTerminalSocket hook (Socket.IO client)
-10. InstanceTabBar (depends on useActiveInstances hook)
-11. useActiveInstances hook (polls /api/instances)
-
-**Validation:** Dashboard shows empty state. Manually create tmux session via SSH, refresh page, see it appear in tab bar. Click tab, see terminal output.
-
-### Phase 3: Agent Integration (Config + Gateway)
-**Why third:** Requires backend + frontend working. Adds business logic layer.
-
-12. OpenClawConfigReader service
-13. GatewayApiClient service
-14. /api/agents REST route (depends on OpenClawConfigReader)
-15. AgentDetailsSidebar component (depends on /api/agents)
-16. PromptInputPanel component (depends on GatewayApiClient)
-17. TelegramTopicMap component (depends on OpenClawConfigReader)
-
-**Validation:** Sidebar shows agent SOUL.md. PromptInputPanel sends message to gateway (check OpenClaw logs). Topic map shows correct agent → topic mappings.
-
-### Phase 4: History & Polish
-**Why last:** Nice-to-have features. Core functionality already works.
-
-18. Session history table + search
-19. Token usage dashboard
-20. Dark theme polish
-21. Error boundaries, loading states
-22. Playwright tests
-
-**Dependency reasoning:**
-- TerminalView must exist before InstanceTabBar (tab bar switches between TerminalViews).
-- useTerminalSocket must exist before TerminalView (component needs socket hook).
-- InstanceTracker must exist before REST routes (routes query tracker).
-- DatabaseConnection must exist before InstanceTracker (tracker persists to db).
-
-**Critical path:** DatabaseConnection → InstanceTracker → REST routes → useActiveInstances → InstanceTabBar → TerminalView → useTerminalSocket → Socket.IO handler → TerminalStreamService.
+---
 
 ## Sources
 
-**Confidence note:** This architecture research is based on training data knowledge of established patterns in browser terminal systems (Wetty, ttyd, Gotty, xterm.js, Socket.IO, node-pty). WebSearch and WebFetch were unavailable during research. Patterns described are industry-standard as of 2024-2025. Specific library versions and API details should be verified against official documentation during implementation.
+**Plugin Architecture:**
+- [Plugin Architecture Pattern (Medium)](https://medium.com/omarelgabrys-blog/plug-in-architecture-dec207291800)
+- [Registry Pattern (GeeksforGeeks)](https://www.geeksforgeeks.org/system-design/registry-pattern/)
+- [dotCMS Plugin Architecture](https://www.dotcms.com/blog/plugin-achitecture)
+- [ArjanCodes Plugin Best Practices](https://arjancodes.com/blog/best-practices-for-decoupling-software-using-plugins/)
 
-**Referenced patterns from:**
-- Browser terminal emulators: Wetty (butlerx/wetty), ttyd (tsl0922/ttyd), Gotty (yudai/gotty)
-- Terminal rendering: xterm.js (xtermjs.org)
-- WebSocket multiplexing: Socket.IO room-based architecture
-- PTY abstraction: node-pty (microsoft/node-pty)
-- Session persistence: tmux multi-viewer patterns
+**React Dynamic Components:**
+- [Storyblok Dynamic Component Rendering](https://www.storyblok.com/tp/react-dynamic-component-from-json)
+- [Kyle Shevlin: Dynamic React Components](https://kyleshevlin.com/how-to-dynamically-render-react-components/)
+- [Tambo 1.0: React Component Rendering Agents](https://aitoolly.com/ai-news/article/2026-02-11-tambo-10-open-source-toolkit-for-agents-rendering-react-components-launched)
+
+**Audit Logging & Activity Timeline:**
+- [Microservices Audit Logging Pattern](https://microservices.io/patterns/observability/audit-logging.html)
+- [Martin Fowler: Audit Log](https://martinfowler.com/eaaDev/AuditLog.html)
+- [Confluent: Real-Time Audit Logging with Kafka](https://www.confluent.io/blog/build-real-time-compliance-audit-logging-kafka/)
+- [Activity Logs Pattern (Business Central)](https://alguidelines.dev/docs/navpatterns/patterns/activity-log/)
+- [Sonar: Audit Logging Best Practices](https://www.sonarsource.com/resources/library/audit-logging/)
+
+**ANSI Parsing:**
+- [VT100.net ANSI Parser](https://vt100.net/emu/dec_ansi_parser)
+- [node-ansiparser (GitHub)](https://github.com/netzkolchose/node-ansiparser)
+- [ANSI Escape Code (Wikipedia)](https://en.wikipedia.org/wiki/ANSI_escape_code)
+
+**Mobile-First & Responsive Design:**
+- [Keitaro: Responsive React Apps](https://www.keitaro.com/insights/2024/01/30/building-responsive-and-user-friendly-web-applications-with-react/)
+- [DhiWise: React Mobile Responsiveness](https://www.dhiwise.com/post/the-ultimate-guide-to-achieving-react-mobile-responsiveness/)
+- [PixelFreeStudio: Mobile-First Design in React](https://blog.pixelfreestudio.com/how-to-implement-mobile-first-design-in-react/)
+- [React Testing Library: Responsive Design Testing](https://copyprogramming.com/howto/react-testing-library-rtl-test-a-responsive-design)
+- [Framer: Breakpoints Guide 2026](https://www.framer.com/blog/responsive-breakpoints/)
+- [React Wiki: useMediaQuery Hook](https://react.wiki/hooks/custom-use-media-query/)
+
+**Event-Driven Architecture:**
+- [Event-Driven Patterns (SimpleAWS)](https://newsletter.simpleaws.dev/p/event-driven-architecture-patterns)
+- [Event-Driven Cloud Security Architecture](https://www.cy5.io/blog/event-driven-cloud-security-architecture/)
 
 ---
-*Architecture research for: Warden Dashboard (Browser-Based Terminal Multiplexer)*
-*Researched: 2026-02-12*
+
+*Architecture research for: Warden Dashboard v2.0 Mission Control Extensions*
+*Researched: 2026-02-16*
