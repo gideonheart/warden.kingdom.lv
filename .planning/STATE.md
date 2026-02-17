@@ -6,16 +6,16 @@ See: .planning/PROJECT.md (updated 2026-02-16)
 
 **Core value:** Real-time visibility into all active Claude Code agent sessions from a single browser tab
 
-**Current focus:** Phase 11 - Activity Timeline & Audit Log
+**Current focus:** All v2.0 phases complete
 
 ## Current Position
 
 Phase: 11 of 11 (Activity Timeline & Audit Log)
-Plan: 1 of 2 in current phase
-Status: In Progress
-Last activity: 2026-02-17 — Phase 11 Plan 01 complete: ActivityEventService, activity_events table, REST API, all integration hooks
+Plan: 2 of 2 in current phase
+Status: Complete
+Last activity: 2026-02-17 — Phase 11 Plan 02 complete: ActivityView frontend, HistoryView integration, E2E tests fixed
 
-Progress: [████████▓░] 82% (9/11 phases complete)
+Progress: [██████████] 100% (11/11 phases complete)
 
 ## Performance Metrics
 
@@ -50,6 +50,7 @@ Progress: [████████▓░] 82% (9/11 phases complete)
 | 8 | Prompt Panel & Gateway Integration | v1.1 | `effa33c` |
 | 9 | Plugin Registry Foundation | v2.0 | `918d6d5` |
 | 10 | Mobile-First UI Restructure | v2.0 | `39eeea8` |
+| 11 | Activity Timeline & Audit Log | v2.0 | `24306a0` |
 
 ## Accumulated Context
 
@@ -63,9 +64,11 @@ Recent decisions affecting v2.0:
 - v2.0: Plugin registry with build-time type-safe registration — avoid over-engineering
 - v2.0: Vite import.meta.glob for auto-discovery — zero manual plugin registration
 - v2.0: 185 LOC total for complete plugin system — under 200 LOC budget
-- [Phase 11-activity-timeline-audit-log]: Inline ansi-regex@5 pattern instead of importing strip-ansi (CJS incompatible with ESM project)
-- [Phase 11-activity-timeline-audit-log]: setImmediate for PTY output tap ensures zero terminal latency impact on event capture
-- [Phase 11-activity-timeline-audit-log]: Operator input batched: flush on Enter or 2s inactivity (prevents per-keystroke event explosion)
+- [Phase 11]: Inline ansi-regex@5 pattern instead of importing strip-ansi (CJS incompatible with ESM project)
+- [Phase 11]: setImmediate for PTY output tap ensures zero terminal latency impact on event capture
+- [Phase 11]: Operator input batched: flush on Enter or 2s inactivity (prevents per-keystroke event explosion)
+- [Phase 11]: Activity tab placed first and default in HistoryView
+- [Phase 11]: Export fetches full filtered dataset (limit=10000), not just current page
 
 ### Quick Tasks Completed
 
@@ -82,19 +85,13 @@ None
 
 ### Blockers/Concerns
 
-**Phase 10 (Mobile UI):**
-- Critical decision needed: xterm.js mobile touch support is fundamentally broken (5+ year issue)
+**Phase 10 (Mobile UI) — deferred:**
+- xterm.js mobile touch support is fundamentally broken (5+ year issue)
 - Options: (1) read-only mobile terminal, (2) budget 2-3 weeks debugging, (3) defer mobile terminal
 - Research flag: Needs testing on real iOS/Android devices before implementation
-
-**Phase 11 Plan 01 complete — risks mitigated:**
-- ANSI stripping implemented inline (ansi-regex@5 pattern); never stored in DB
-- Selective terminal parsing only (known Claude Code markers); no exponential storage growth
-- 7-day retention cleanup via setInterval every 6 hours
-- Non-blocking setImmediate tap for zero terminal latency impact
 
 ## Session Continuity
 
 Last session: 2026-02-17
-Stopped at: Completed 11-activity-timeline-audit-log-01-PLAN.md
-Next step: Execute Phase 11 Plan 02 (ActivityView frontend component)
+Stopped at: All v2.0 phases complete (11/11)
+Next step: Milestone audit or new milestone planning
