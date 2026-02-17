@@ -39,6 +39,29 @@ export function MobilePromptSheet({ agents, selectedAgentId }: MobilePromptSheet
     };
   }, [isExpanded]);
 
+  // Float above iOS keyboard by tracking visual viewport offset
+  useEffect(() => {
+    const viewport = window.visualViewport;
+    const sheet = sheetRef.current;
+    if (!viewport || !sheet) return;
+
+    const updateBottomPosition = () => {
+      const offsetFromLayoutBottom =
+        window.innerHeight - (viewport.offsetTop + viewport.height);
+      sheet.style.bottom = `${Math.max(0, offsetFromLayoutBottom)}px`;
+    };
+
+    viewport.addEventListener('resize', updateBottomPosition);
+    viewport.addEventListener('scroll', updateBottomPosition);
+    updateBottomPosition();
+
+    return () => {
+      viewport.removeEventListener('resize', updateBottomPosition);
+      viewport.removeEventListener('scroll', updateBottomPosition);
+      sheet.style.bottom = '';
+    };
+  }, []);
+
   return (
     <>
       {/* Backdrop when expanded */}
