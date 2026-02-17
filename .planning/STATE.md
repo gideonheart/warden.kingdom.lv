@@ -6,16 +6,16 @@ See: .planning/PROJECT.md (updated 2026-02-16)
 
 **Core value:** Real-time visibility into all active Claude Code agent sessions from a single browser tab
 
-**Current focus:** All v2.0 phases complete
+**Current focus:** Phase 11.1 - Fix tmux visibility when mobile keyboard opens
 
 ## Current Position
 
-Phase: 11 of 11 (Activity Timeline & Audit Log)
-Plan: 2 of 2 in current phase
-Status: Complete
-Last activity: 2026-02-17 — Phase 11 Plan 02 complete: ActivityView frontend, HistoryView integration, E2E tests fixed
+Phase: 11.1 (Fix tmux visibility when mobile keyboard opens)
+Plan: 0 of ? in current phase
+Status: Not planned yet
+Last activity: 2026-02-17 — Phase 11.1 inserted after Phase 11
 
-Progress: [██████████] 100% (11/11 phases complete)
+Progress: [█████████▓] 92% (11/12 phases complete)
 
 ## Performance Metrics
 
@@ -79,6 +79,10 @@ Recent decisions affecting v2.0:
 | 4 | iOS keyboard toolbar visibility & 3x scroll-down escape | 2026-02-15 | `c2d7756` |
 | 5 | Move PromptPanel to sidebar for maximum terminal vertical space | 2026-02-16 | `8fc0c66` |
 
+### Roadmap Evolution
+
+- Phase 11.1 inserted after Phase 11: Fix tmux visibility when mobile keyboard opens (URGENT)
+
 ### Pending Todos
 
 None
@@ -93,5 +97,5 @@ None
 ## Session Continuity
 
 Last session: 2026-02-17
-Stopped at: All v2.0 phases complete (11/11)
-Next step: Milestone audit or new milestone planning
+Stopped at: Phase 11.1 inserted
+Next step: /gsd:plan-phase 11.1
