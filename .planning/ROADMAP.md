@@ -47,10 +47,11 @@
 4. Plugin UI panels render in designated layout slots without breaking the main application
 5. TypeScript compiler catches invalid plugin manifests at build time
 
-**Plans:** TBD
+**Plans:** 2 plans
 
 Plans:
-- [ ] 09-01: TBD during planning
+- [ ] 09-01-PLAN.md — Plugin types, auto-discovery registry, usePluginRegistry hook, example plugin
+- [ ] 09-02-PLAN.md — PluginRegistryView table, PluginSlotRenderer, App.tsx integration with nav and slots
 
 #### Phase 10: Mobile-First UI Restructure
 
@@ -106,6 +107,6 @@ Plans:
 | 6. Close v1 Audit Gaps | v1.0 | 3/3 | Complete | 2026-02-12 |
 | 7. Terminal Interactivity & Scrollback | v1.1 | 1/1 | Complete | 2026-02-12 |
 | 8. Prompt Panel & Gateway Integration | v1.1 | 1/1 | Complete | 2026-02-12 |
-| 9. Plugin Registry Foundation | v2.0 | 0/0 | Not started | - |
+| 9. Plugin Registry Foundation | v2.0 | 0/2 | Planning | - |
 | 10. Mobile-First UI Restructure | v2.0 | 0/0 | Not started | - |
 | 11. Activity Timeline & Audit Log | v2.0 | 0/0 | Not started | - |
