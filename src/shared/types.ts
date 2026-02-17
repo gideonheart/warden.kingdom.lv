@@ -37,3 +37,31 @@ export interface TerminalExitPayload {
   sessionName: string;
   exitCode: number;
 }
+
+export type ActivityEventType =
+  | 'session_start'
+  | 'session_stop'
+  | 'prompt_sent'
+  | 'operator_input'
+  | 'tool_call'
+  | 'file_edit'
+  | 'bash_command'
+  | 'error';
+
+export interface ActivityEvent {
+  id: number;
+  instanceId: number | null;
+  agentId: string;
+  sessionName: string;
+  eventType: ActivityEventType;
+  timestamp: string;
+  summary: string;
+  detail: string | null;
+  success: boolean | null;
+  metadata: string | null;
+}
+
+export interface ActivityEventsResponse {
+  events: ActivityEvent[];
+  total: number;
+}
