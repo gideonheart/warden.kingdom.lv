@@ -9,12 +9,12 @@ Requirements for v2.0 Mission Control milestone. Each maps to roadmap phases.
 
 ### Plugin Registry
 
-- [ ] **PLUG-01**: Operator can register tool modules with typed metadata (name, version, description, capabilities)
-- [ ] **PLUG-02**: Operator can view a metadata table showing all registered plugins with status
-- [ ] **PLUG-03**: Operator can enable/disable plugins via toggle
-- [ ] **PLUG-04**: Plugin modules use build-time type-safe TypeScript registration
-- [ ] **PLUG-05**: Plugins render as UI panels in designated layout slots (sidebar-top, sidebar-bottom, bottom-panel, terminal-overlay)
-- [ ] **PLUG-06**: Plugin code, metadata, and UI are co-located in a single module file
+- [x] **PLUG-01**: Operator can register tool modules with typed metadata (name, version, description, capabilities)
+- [x] **PLUG-02**: Operator can view a metadata table showing all registered plugins with status
+- [x] **PLUG-03**: Operator can enable/disable plugins via toggle
+- [x] **PLUG-04**: Plugin modules use build-time type-safe TypeScript registration
+- [x] **PLUG-05**: Plugins render as UI panels in designated layout slots (sidebar-top, sidebar-bottom, bottom-panel, terminal-overlay)
+- [x] **PLUG-06**: Plugin code, metadata, and UI are co-located in a single module file
 
 ### Activity Timeline
 
@@ -72,12 +72,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| PLUG-01 | Phase 9 | Pending |
-| PLUG-02 | Phase 9 | Pending |
-| PLUG-03 | Phase 9 | Pending |
-| PLUG-04 | Phase 9 | Pending |
-| PLUG-05 | Phase 9 | Pending |
-| PLUG-06 | Phase 9 | Pending |
+| PLUG-01 | Phase 9 | Done |
+| PLUG-02 | Phase 9 | Done |
+| PLUG-03 | Phase 9 | Done |
+| PLUG-04 | Phase 9 | Done |
+| PLUG-05 | Phase 9 | Done |
+| PLUG-06 | Phase 9 | Done |
 | MOBI-01 | Phase 10 | Pending |
 | MOBI-02 | Phase 10 | Pending |
 | MOBI-03 | Phase 10 | Pending |
@@ -103,4 +103,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-02-16*
-*Last updated: 2026-02-16 after roadmap creation*
+*Last updated: 2026-02-17 after Phase 9 completion*
