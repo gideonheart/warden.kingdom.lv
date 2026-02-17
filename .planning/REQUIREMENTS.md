@@ -18,15 +18,15 @@ Requirements for v2.0 Mission Control milestone. Each maps to roadmap phases.
 
 ### Activity Timeline
 
-- [ ] **ACTV-01**: System captures structured events (session start/stop, prompt injections, operator terminal input) in SQLite
+- [x] **ACTV-01**: System captures structured events (session start/stop, prompt injections, operator terminal input) in SQLite
 - [ ] **ACTV-02**: Operator can view chronological event list (newest first) in dedicated Activity view
 - [ ] **ACTV-03**: Operator can view event detail panel with full metadata
 - [ ] **ACTV-04**: Operator can filter activity by agent
 - [ ] **ACTV-05**: Operator can filter activity by date range
 - [ ] **ACTV-06**: Operator can filter activity by event type
 - [ ] **ACTV-07**: Operator can export activity events to CSV or JSON
-- [ ] **ACTV-08**: System parses terminal output to extract structured events (tool calls, file edits, commands)
-- [ ] **ACTV-09**: Events show success/failure indicators (parsed from exit codes, error patterns)
+- [x] **ACTV-08**: System parses terminal output to extract structured events (tool calls, file edits, commands)
+- [x] **ACTV-09**: Events show success/failure indicators (parsed from exit codes, error patterns)
 - [ ] **ACTV-10**: Operator can click an event to jump to the terminal session at that timestamp
 
 ### Mobile UI
@@ -85,15 +85,15 @@ Which phases cover which requirements. Updated during roadmap creation.
 | MOBI-05 | Phase 10 | Pending |
 | MOBI-06 | Phase 10 | Pending |
 | MOBI-07 | Phase 10 | Pending |
-| ACTV-01 | Phase 11 | Pending |
+| ACTV-01 | Phase 11 | Complete |
 | ACTV-02 | Phase 11 | Pending |
 | ACTV-03 | Phase 11 | Pending |
 | ACTV-04 | Phase 11 | Pending |
 | ACTV-05 | Phase 11 | Pending |
 | ACTV-06 | Phase 11 | Pending |
 | ACTV-07 | Phase 11 | Pending |
-| ACTV-08 | Phase 11 | Pending |
-| ACTV-09 | Phase 11 | Pending |
+| ACTV-08 | Phase 11 | Complete |
+| ACTV-09 | Phase 11 | Complete |
 | ACTV-10 | Phase 11 | Pending |
 
 **Coverage:**

@@ -91,7 +91,7 @@ Plans:
 6. System parses terminal output to extract tool calls, file edits, and commands as structured events with success/failure indicators
 7. Operator can click a terminal event and jump directly to the source terminal session at that timestamp
 
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 
 Plans:
 - [ ] 11-01-PLAN.md — Backend event capture pipeline: activity_events table, ActivityEventService with ANSI stripping + terminal parsing, activityRoutes API, hooks into InstanceTracker + TerminalStreamService + agentRoutes
@@ -111,4 +111,4 @@ Plans:
 | 8. Prompt Panel & Gateway Integration | v1.1 | 1/1 | Complete | 2026-02-12 |
 | 9. Plugin Registry Foundation | v2.0 | 2/2 | Complete | 2026-02-17 |
 | 10. Mobile-First UI Restructure | v2.0 | 0/0 | Not started | - |
-| 11. Activity Timeline & Audit Log | v2.0 | 0/2 | Planned | - |
+| 11. Activity Timeline & Audit Log | 1/2 | In Progress|  | - |

@@ -6,14 +6,14 @@ See: .planning/PROJECT.md (updated 2026-02-16)
 
 **Core value:** Real-time visibility into all active Claude Code agent sessions from a single browser tab
 
-**Current focus:** Phase 10 - Mobile-First UI Restructure (v2.0 Mission Control)
+**Current focus:** Phase 11 - Activity Timeline & Audit Log
 
 ## Current Position
 
-Phase: 10 of 11 (Mobile-First UI Restructure)
-Plan: 0 of 0 in current phase
-Status: Ready to plan
-Last activity: 2026-02-17 — Phase 9 Plugin Registry Foundation completed (2 plans, 6 requirements, 185 LOC)
+Phase: 11 of 11 (Activity Timeline & Audit Log)
+Plan: 1 of 2 in current phase
+Status: In Progress
+Last activity: 2026-02-17 — Phase 11 Plan 01 complete: ActivityEventService, activity_events table, REST API, all integration hooks
 
 Progress: [████████▓░] 82% (9/11 phases complete)
 
@@ -49,6 +49,7 @@ Progress: [████████▓░] 82% (9/11 phases complete)
 | 7 | Terminal Interactivity & Scrollback | v1.1 | `9f65d54` |
 | 8 | Prompt Panel & Gateway Integration | v1.1 | `effa33c` |
 | 9 | Plugin Registry Foundation | v2.0 | `918d6d5` |
+| 10 | Mobile-First UI Restructure | v2.0 | `39eeea8` |
 
 ## Accumulated Context
 
@@ -62,6 +63,9 @@ Recent decisions affecting v2.0:
 - v2.0: Plugin registry with build-time type-safe registration — avoid over-engineering
 - v2.0: Vite import.meta.glob for auto-discovery — zero manual plugin registration
 - v2.0: 185 LOC total for complete plugin system — under 200 LOC budget
+- [Phase 11-activity-timeline-audit-log]: Inline ansi-regex@5 pattern instead of importing strip-ansi (CJS incompatible with ESM project)
+- [Phase 11-activity-timeline-audit-log]: setImmediate for PTY output tap ensures zero terminal latency impact on event capture
+- [Phase 11-activity-timeline-audit-log]: Operator input batched: flush on Enter or 2s inactivity (prevents per-keystroke event explosion)
 
 ### Quick Tasks Completed
 
@@ -83,16 +87,14 @@ None
 - Options: (1) read-only mobile terminal, (2) budget 2-3 weeks debugging, (3) defer mobile terminal
 - Research flag: Needs testing on real iOS/Android devices before implementation
 
-**Phase 11 (Activity Timeline):**
-- Risk: Terminal output parsing becomes performance nightmare with exponential storage growth
-- Mitigation: Selective parsing (only known patterns), 7-day retention, aggressive indexing
-- Risk: ANSI escape sequence security vulnerabilities (10 CVEs enabling RCE, log manipulation)
-- Mitigation: Strip ANSI before storage with strip-ansi library, never render in web UI
-- Research flag: Needs analysis of real Claude Code terminal output to identify parsing patterns
+**Phase 11 Plan 01 complete — risks mitigated:**
+- ANSI stripping implemented inline (ansi-regex@5 pattern); never stored in DB
+- Selective terminal parsing only (known Claude Code markers); no exponential storage growth
+- 7-day retention cleanup via setInterval every 6 hours
+- Non-blocking setImmediate tap for zero terminal latency impact
 
 ## Session Continuity
 
 Last session: 2026-02-17
-Stopped at: Phase 10 context gathered
-Resume file: .planning/phases/10-mobile-first-ui-restructure/10-CONTEXT.md
-Next step: `/gsd:plan-phase 10` to create execution plan for Mobile-First UI Restructure
+Stopped at: Completed 11-activity-timeline-audit-log-01-PLAN.md
+Next step: Execute Phase 11 Plan 02 (ActivityView frontend component)
