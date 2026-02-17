@@ -112,3 +112,16 @@ Plans:
 | 9. Plugin Registry Foundation | v2.0 | 2/2 | Complete | 2026-02-17 |
 | 10. Mobile-First UI Restructure | v2.0 | 0/0 | Not started | - |
 | 11. Activity Timeline & Audit Log | 1/2 | In Progress|  | - |
+
+### Phase 11.1: Fix tmux visibility when mobile keyboard opens (INSERTED)
+
+**Goal:** Terminal content stays visible and prompt sheet floats above keyboard when mobile keyboard opens/closes
+
+**Depends on:** Phase 11
+
+**Requirements:** MOBI-KB-01, MOBI-KB-02
+
+**Plans:** 1 plan
+
+Plans:
+- [ ] 11.1-01-PLAN.md -- Add visualViewport resize listeners to TerminalView and MobilePromptSheet for cross-platform mobile keyboard handling
