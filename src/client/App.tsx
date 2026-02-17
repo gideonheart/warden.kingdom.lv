@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { InstanceTabBar } from './components/InstanceTabBar.js';
 import { TerminalView } from './components/TerminalView.js';
 import { ErrorBoundary } from './components/ErrorBoundary.js';
@@ -39,6 +39,24 @@ export function App() {
   );
   const [sidebarSelectedAgentId, setSidebarSelectedAgentId] = useState<string | null>(null);
   const [showSidebar, setShowSidebar] = useState(() => window.innerWidth >= 1024);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const mobileMenuRef = useRef<HTMLDivElement>(null);
+
+  // Close mobile menu on click outside
+  useEffect(() => {
+    if (!showMobileMenu) return;
+    const handleClickOutside = (event: MouseEvent) => {
+      if (mobileMenuRef.current && !mobileMenuRef.current.contains(event.target as Node)) {
+        setShowMobileMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside as EventListener);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside as EventListener);
+    };
+  }, [showMobileMenu]);
 
   // Track visual viewport height for iOS keyboard handling
   useEffect(() => {
@@ -143,16 +161,18 @@ export function App() {
 
   return (
     <div className="flex flex-col app-height bg-warden-bg overflow-x-hidden">
-      <header className="flex items-center justify-between px-4 py-2 bg-warden-panel border-b border-warden-border">
+      <header className="flex items-center justify-between px-4 py-2 bg-warden-panel border-b border-warden-border safe-horizontal">
         <div className="flex items-center gap-3">
           <h1 className="text-base font-semibold text-warden-text">
-            <span className="text-warden-accent">Warden</span> Dashboard
+            <span className="text-warden-accent">Warden</span> <span className="hidden sm:inline">Dashboard</span>
           </h1>
           <span className="text-xs text-warden-text-dim px-2 py-0.5 bg-warden-border/50 rounded">
             {activeInstances.length} active
           </span>
         </div>
-        <div className="flex items-center gap-2">
+
+        {/* Desktop nav buttons */}
+        <div className="hidden sm:flex items-center gap-2">
           {error && (
             <span className="text-xs text-warden-error">
               {error}
@@ -160,19 +180,19 @@ export function App() {
           )}
           <button
             onClick={() => handleViewChange('terminals')}
-            className={`px-2 py-1 text-xs transition-colors ${currentView === 'terminals' ? 'text-warden-accent' : 'text-warden-text-dim hover:text-warden-text'}`}
+            className={`px-2 py-1 min-h-[44px] text-xs transition-colors flex items-center ${currentView === 'terminals' ? 'text-warden-accent' : 'text-warden-text-dim hover:text-warden-text'}`}
           >
             Terminals
           </button>
           <button
             onClick={() => handleViewChange('history')}
-            className={`px-2 py-1 text-xs transition-colors ${currentView === 'history' ? 'text-warden-accent' : 'text-warden-text-dim hover:text-warden-text'}`}
+            className={`px-2 py-1 min-h-[44px] text-xs transition-colors flex items-center ${currentView === 'history' ? 'text-warden-accent' : 'text-warden-text-dim hover:text-warden-text'}`}
           >
             History
           </button>
           <button
             onClick={() => handleViewChange('plugins')}
-            className={`px-2 py-1 text-xs transition-colors ${currentView === 'plugins' ? 'text-warden-accent' : 'text-warden-text-dim hover:text-warden-text'}`}
+            className={`px-2 py-1 min-h-[44px] text-xs transition-colors flex items-center ${currentView === 'plugins' ? 'text-warden-accent' : 'text-warden-text-dim hover:text-warden-text'}`}
           >
             Plugins
           </button>
@@ -185,10 +205,64 @@ export function App() {
           </button>
           <button
             onClick={refetch}
-            className="px-2 py-1 text-xs text-warden-text-dim hover:text-warden-text transition-colors"
+            className="px-2 py-1 min-h-[44px] text-xs text-warden-text-dim hover:text-warden-text transition-colors flex items-center"
           >
             Refresh
           </button>
+        </div>
+
+        {/* Mobile: active view label + hamburger */}
+        <div className="flex sm:hidden items-center gap-2" ref={mobileMenuRef}>
+          <span className="text-xs text-warden-accent capitalize">{currentView}</span>
+          <button
+            onClick={() => setShowMobileMenu(!showMobileMenu)}
+            className="min-h-[44px] min-w-[44px] flex items-center justify-center text-warden-text-dim hover:text-warden-text transition-colors"
+            aria-label="Toggle menu"
+          >
+            <span className="text-lg leading-none">&#9776;</span>
+          </button>
+
+          {/* Mobile dropdown menu */}
+          {showMobileMenu && (
+            <div className="absolute right-2 top-12 z-50 bg-warden-panel border border-warden-border rounded-lg shadow-lg min-w-[160px]">
+              {error && (
+                <div className="px-3 py-2 text-xs text-warden-error border-b border-warden-border">
+                  {error}
+                </div>
+              )}
+              <button
+                onClick={() => { handleViewChange('terminals'); setShowMobileMenu(false); }}
+                className={`w-full text-left px-4 py-3 min-h-[44px] text-sm transition-colors ${currentView === 'terminals' ? 'text-warden-accent bg-warden-accent/10' : 'text-warden-text-dim hover:text-warden-text hover:bg-warden-border/30'}`}
+              >
+                Terminals
+              </button>
+              <button
+                onClick={() => { handleViewChange('history'); setShowMobileMenu(false); }}
+                className={`w-full text-left px-4 py-3 min-h-[44px] text-sm transition-colors ${currentView === 'history' ? 'text-warden-accent bg-warden-accent/10' : 'text-warden-text-dim hover:text-warden-text hover:bg-warden-border/30'}`}
+              >
+                History
+              </button>
+              <button
+                onClick={() => { handleViewChange('plugins'); setShowMobileMenu(false); }}
+                className={`w-full text-left px-4 py-3 min-h-[44px] text-sm transition-colors ${currentView === 'plugins' ? 'text-warden-accent bg-warden-accent/10' : 'text-warden-text-dim hover:text-warden-text hover:bg-warden-border/30'}`}
+              >
+                Plugins
+              </button>
+              <div className="border-t border-warden-border" />
+              <button
+                onClick={() => { setShowSidebar(!showSidebar); setShowMobileMenu(false); }}
+                className={`w-full text-left px-4 py-3 min-h-[44px] text-sm transition-colors ${showSidebar ? 'text-warden-accent bg-warden-accent/10' : 'text-warden-text-dim hover:text-warden-text hover:bg-warden-border/30'}`}
+              >
+                Agents
+              </button>
+              <button
+                onClick={() => { refetch(); setShowMobileMenu(false); }}
+                className="w-full text-left px-4 py-3 min-h-[44px] text-sm text-warden-text-dim hover:text-warden-text hover:bg-warden-border/30 transition-colors"
+              >
+                Refresh
+              </button>
+            </div>
+          )}
         </div>
       </header>
 

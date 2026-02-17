@@ -67,12 +67,12 @@ export function SessionHistory() {
           placeholder="Agent ID"
           value={filters.agentId}
           onChange={(e) => { setFilters({ ...filters, agentId: e.target.value }); setPage(0); }}
-          className="bg-warden-bg border border-warden-border rounded px-2 py-1 text-sm text-warden-text w-32"
+          className="bg-warden-bg border border-warden-border rounded px-2 py-1 min-h-[44px] text-sm text-warden-text w-32"
         />
         <select
           value={filters.status}
           onChange={(e) => { setFilters({ ...filters, status: e.target.value }); setPage(0); }}
-          className="bg-warden-bg border border-warden-border rounded px-2 py-1 text-sm text-warden-text"
+          className="bg-warden-bg border border-warden-border rounded px-2 py-1 min-h-[44px] text-sm text-warden-text"
         >
           <option value="">All statuses</option>
           <option value="active">Active</option>
@@ -84,13 +84,13 @@ export function SessionHistory() {
           type="date"
           value={filters.dateFrom}
           onChange={(e) => { setFilters({ ...filters, dateFrom: e.target.value }); setPage(0); }}
-          className="bg-warden-bg border border-warden-border rounded px-2 py-1 text-sm text-warden-text"
+          className="bg-warden-bg border border-warden-border rounded px-2 py-1 min-h-[44px] text-sm text-warden-text"
         />
         <input
           type="date"
           value={filters.dateTo}
           onChange={(e) => { setFilters({ ...filters, dateTo: e.target.value }); setPage(0); }}
-          className="bg-warden-bg border border-warden-border rounded px-2 py-1 text-sm text-warden-text"
+          className="bg-warden-bg border border-warden-border rounded px-2 py-1 min-h-[44px] text-sm text-warden-text"
         />
         <span className="text-xs text-warden-text-dim self-center">{total} sessions</span>
       </div>
@@ -107,14 +107,30 @@ export function SessionHistory() {
           {sessions.map((session) => (
             <div
               key={session.id}
-              className="flex items-center gap-3 px-3 py-2 bg-warden-border/20 rounded text-sm hover:bg-warden-border/30 transition-colors"
+              className="bg-warden-border/20 rounded hover:bg-warden-border/30 transition-colors"
             >
-              <span className={`font-medium w-24 ${statusColors[session.status] ?? 'text-warden-text-dim'}`}>
-                {session.status}
-              </span>
-              <span className="text-warden-text font-mono flex-1 truncate">{session.tmuxSessionName}</span>
-              <span className="text-warden-text-dim w-20">{session.agentId}</span>
-              <span className="text-warden-text-dim/60 text-xs w-40 text-right font-mono">{session.createdAt}</span>
+              {/* Desktop: horizontal row */}
+              <div className="hidden sm:flex items-center gap-3 px-3 py-2 text-sm">
+                <span className={`font-medium w-24 ${statusColors[session.status] ?? 'text-warden-text-dim'}`}>
+                  {session.status}
+                </span>
+                <span className="text-warden-text font-mono flex-1 truncate">{session.tmuxSessionName}</span>
+                <span className="text-warden-text-dim w-20">{session.agentId}</span>
+                <span className="text-warden-text-dim/60 text-xs w-40 text-right font-mono">{session.createdAt}</span>
+              </div>
+              {/* Mobile: stacked card */}
+              <div className="flex sm:hidden flex-col gap-1 px-3 py-2 min-h-[44px]">
+                <div className="flex items-center gap-2">
+                  <span className={`text-xs font-medium ${statusColors[session.status] ?? 'text-warden-text-dim'}`}>
+                    {session.status}
+                  </span>
+                  <span className="text-sm text-warden-text font-mono truncate">{session.tmuxSessionName}</span>
+                </div>
+                <div className="flex items-center gap-3 text-xs text-warden-text-dim">
+                  <span>{session.agentId}</span>
+                  <span className="text-warden-text-dim/60 font-mono">{session.createdAt}</span>
+                </div>
+              </div>
             </div>
           ))}
         </div>
@@ -125,7 +141,7 @@ export function SessionHistory() {
           <button
             onClick={() => setPage(Math.max(0, page - 1))}
             disabled={page === 0}
-            className="px-2 py-1 text-xs text-warden-text-dim hover:text-warden-text disabled:opacity-30"
+            className="px-3 py-2 min-h-[44px] text-xs text-warden-text-dim hover:text-warden-text disabled:opacity-30"
           >
             Previous
           </button>
@@ -135,7 +151,7 @@ export function SessionHistory() {
           <button
             onClick={() => setPage(Math.min(totalPages - 1, page + 1))}
             disabled={page >= totalPages - 1}
-            className="px-2 py-1 text-xs text-warden-text-dim hover:text-warden-text disabled:opacity-30"
+            className="px-3 py-2 min-h-[44px] text-xs text-warden-text-dim hover:text-warden-text disabled:opacity-30"
           >
             Next
           </button>

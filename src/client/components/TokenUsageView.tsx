@@ -56,7 +56,7 @@ export function TokenUsageView() {
           placeholder="Filter by agent ID"
           value={agentFilter}
           onChange={(e) => setAgentFilter(e.target.value)}
-          className="bg-warden-bg border border-warden-border rounded px-2 py-1 text-sm text-warden-text w-40"
+          className="bg-warden-bg border border-warden-border rounded px-2 py-1 min-h-[44px] text-sm text-warden-text w-40"
         />
       </div>
 
@@ -99,8 +99,12 @@ export function TokenUsageView() {
             </div>
           )}
 
+          {/* Mobile: show note instead of daily table */}
+          <p className="sm:hidden text-xs text-warden-text-dim text-center py-2">View on desktop for daily breakdown</p>
+
+          {/* Desktop: daily breakdown table */}
           {usage.length > 0 ? (
-            <div>
+            <div className="hidden sm:block">
               <h3 className="text-sm font-semibold text-warden-text mb-3">Daily Breakdown</h3>
               <div className="space-y-1">
                 <div className="flex items-center gap-3 px-3 py-1.5 text-xs text-warden-text-dim font-medium border-b border-warden-border">

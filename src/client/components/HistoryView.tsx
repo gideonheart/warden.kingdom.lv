@@ -25,7 +25,7 @@ export function HistoryView() {
           <button
             key={tab.id}
             onClick={() => handleTabChange(tab.id)}
-            className={`px-3 py-1 text-sm rounded transition-colors ${
+            className={`px-3 py-1 min-h-[44px] text-sm rounded transition-colors flex items-center ${
               activeTab === tab.id
                 ? 'bg-warden-accent/20 text-warden-accent'
                 : 'text-warden-text-dim hover:text-warden-text hover:bg-warden-border/50'

@@ -43,7 +43,7 @@ export function InstanceTabBar({ instances, selectedSessionName, onSelectSession
   }
 
   return (
-    <div className="flex items-center gap-1 px-2 py-1.5 bg-warden-panel border-b border-warden-border overflow-x-auto touch-scroll">
+    <div className="flex items-center gap-1 px-2 py-1.5 bg-warden-panel border-b border-warden-border overflow-x-auto touch-scroll tab-snap">
       {instances.map((instance) => {
         const isSelected = instance.tmuxSessionName === selectedSessionName;
         const statusColor = STATUS_COLORS[instance.status] ?? 'bg-warden-idle';

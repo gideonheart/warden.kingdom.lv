@@ -17,8 +17,23 @@ const MOUSE_TRACKING_ENABLE_PATTERN = /\x1b\[\?(1000|1002|1003|1006)h/g;
 const IS_TOUCH_DEVICE = typeof window !== 'undefined' &&
   ('ontouchstart' in window || navigator.maxTouchPoints > 0);
 
+const FONT_SIZES: Record<string, number> = { small: 10, medium: 13, large: 16 };
+const FONT_SIZE_LABELS = ['small', 'medium', 'large'] as const;
+const FONT_SIZE_DISPLAY: Record<string, string> = { small: 'S', medium: 'M', large: 'L' };
+const FONT_SIZE_STORAGE_KEY = 'warden:terminal-font-size';
+
+function getStoredFontSize(): string {
+  try {
+    const stored = localStorage.getItem(FONT_SIZE_STORAGE_KEY);
+    if (stored && stored in FONT_SIZES) return stored;
+  } catch {
+    // localStorage unavailable
+  }
+  return 'medium';
+}
+
 function getResponsiveFontSize(): number {
-  return window.innerWidth < 640 ? 11 : 14;
+  return FONT_SIZES[getStoredFontSize()] ?? 13;
 }
 
 const MOBILE_KEYS: Array<{ label: string; seq: string }> = [
@@ -63,7 +78,7 @@ function MobileKeyToolbar({ sendInput, selectMode, onToggleCopyMode }: MobileKey
   }, [showPasteInput]);
 
   return (
-    <div className="sticky bottom-0 z-40 flex-shrink-0 flex flex-col bg-warden-panel border-t border-warden-border">
+    <div className="sticky bottom-0 z-40 flex-shrink-0 flex flex-col bg-warden-panel border-t border-warden-border safe-bottom">
       {showPasteInput && (
         <div className="flex items-center gap-2 px-2 py-1.5 border-b border-warden-border">
           <textarea
@@ -138,6 +153,37 @@ export function TerminalView({ tmuxSessionName, onSessionExit }: TerminalViewPro
   const [selectMode, setSelectMode] = useState(false);
   const [terminalText, setTerminalText] = useState('');
   const [clickIndicator, setClickIndicator] = useState<{ x: number; y: number } | null>(null);
+  const [fontSizeLabel, setFontSizeLabel] = useState<string>(() => getStoredFontSize());
+
+  const cycleFontSize = useCallback(() => {
+    setFontSizeLabel((current) => {
+      const currentIndex = FONT_SIZE_LABELS.indexOf(current as typeof FONT_SIZE_LABELS[number]);
+      const nextIndex = (currentIndex + 1) % FONT_SIZE_LABELS.length;
+      const nextLabel = FONT_SIZE_LABELS[nextIndex];
+      const nextSize = FONT_SIZES[nextLabel];
+
+      // Update terminal font size immediately
+      const terminal = terminalInstanceRef.current;
+      const fitAddon = fitAddonRef.current;
+      if (terminal && fitAddon) {
+        terminal.options.fontSize = nextSize;
+        try {
+          fitAddon.fit();
+        } catch {
+          // Container may have zero dimensions
+        }
+      }
+
+      // Persist preference
+      try {
+        localStorage.setItem(FONT_SIZE_STORAGE_KEY, nextLabel);
+      } catch {
+        // localStorage unavailable
+      }
+
+      return nextLabel;
+    });
+  }, []);
 
   const handleTerminalOutput = useCallback((data: string) => {
     const filtered = data.replace(MOUSE_TRACKING_ENABLE_PATTERN, '');
@@ -344,15 +390,9 @@ export function TerminalView({ tmuxSessionName, onSessionExit }: TerminalViewPro
       container.addEventListener('touchend', handleTouchEnd, { passive: true });
     }
 
-    // Responsive font size on window resize / orientation change
-    let previousFontSize = getResponsiveFontSize();
+    // Resize handler — refit terminal on window resize, keep stored font size
     const handleWindowResize = () => {
       try {
-        const newFontSize = getResponsiveFontSize();
-        if (newFontSize !== previousFontSize) {
-          terminal.options.fontSize = newFontSize;
-          previousFontSize = newFontSize;
-        }
         fitAddon.fit();
       } catch {
         // Container may have zero dimensions during layout transitions
@@ -388,7 +428,16 @@ export function TerminalView({ tmuxSessionName, onSessionExit }: TerminalViewPro
           <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-warden-success' : isReconnecting ? 'bg-warden-warning animate-pulse' : 'bg-warden-error'}`} />
           <span className="text-xs text-warden-text-dim font-mono">{tmuxSessionName}</span>
         </div>
-        <span className="text-[10px] text-warden-text-dim/40 hidden sm:inline">Alt+click to position cursor</span>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={cycleFontSize}
+            className="px-2 py-0.5 text-[10px] text-warden-text-dim hover:text-warden-text bg-warden-border/30 rounded transition-colors"
+            title={`Font size: ${fontSizeLabel}`}
+          >
+            Aa {FONT_SIZE_DISPLAY[fontSizeLabel]}
+          </button>
+          <span className="text-[10px] text-warden-text-dim/40 hidden sm:inline">Alt+click to position cursor</span>
+        </div>
       </div>
 
       {/* Terminal content area — overlays scoped here, toolbar stays outside */}
