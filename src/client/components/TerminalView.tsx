@@ -390,18 +390,33 @@ export function TerminalView({ tmuxSessionName, onSessionExit }: TerminalViewPro
       container.addEventListener('touchend', handleTouchEnd, { passive: true });
     }
 
-    // Resize handler — refit terminal on window resize, keep stored font size
-    const handleWindowResize = () => {
-      try {
-        fitAddon.fit();
-      } catch {
-        // Container may have zero dimensions during layout transitions
-      }
+    // Resize handler — refit terminal on window resize AND visualViewport resize
+    // (iOS Safari fires visualViewport.resize when keyboard opens, not window.resize)
+    let resizeDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+    const refitTerminal = () => {
+      if (resizeDebounceTimer) clearTimeout(resizeDebounceTimer);
+      resizeDebounceTimer = setTimeout(() => {
+        requestAnimationFrame(() => {
+          try {
+            fitAddon.fit();
+          } catch {
+            // Container may have zero dimensions during layout transitions
+          }
+        });
+      }, 100);
     };
-    window.addEventListener('resize', handleWindowResize);
+    window.addEventListener('resize', refitTerminal);
+    const visualViewport = window.visualViewport;
+    if (visualViewport) {
+      visualViewport.addEventListener('resize', refitTerminal);
+    }
 
     return () => {
-      window.removeEventListener('resize', handleWindowResize);
+      if (resizeDebounceTimer) clearTimeout(resizeDebounceTimer);
+      window.removeEventListener('resize', refitTerminal);
+      if (visualViewport) {
+        visualViewport.removeEventListener('resize', refitTerminal);
+      }
       container.removeEventListener('click', handleAltClick);
       container.removeEventListener('wheel', handleWheel);
       if (IS_TOUCH_DEVICE) {
