@@ -96,12 +96,24 @@ class ActivityEventService {
       return;
     }
 
+    // Strip ANSI sequences before processing — terminal clients send capability queries as input
+    const cleanInput = stripAnsi(input);
+
+    // Skip if stripping removed all content (was purely ANSI/control sequences)
+    if (!cleanInput && input !== '\n' && input !== '\r') {
+      return;
+    }
+
+    // Use stripped input for batching
+    // eslint-disable-next-line no-param-reassign
+    const effectiveInput = cleanInput || input;
+
     const existing = this.inputBatches.get(sessionName);
 
     if (existing) {
       // Clear the existing debounce timer
       clearTimeout(existing.timer);
-      existing.buffer += input;
+      existing.buffer += effectiveInput;
 
       // Flush immediately on Enter
       if (input === '\n' || input === '\r') {
@@ -118,7 +130,7 @@ class ActivityEventService {
     } else {
       // New batch: flush immediately on Enter, otherwise start timer
       if (input === '\n' || input === '\r') {
-        this.flushOperatorInputBatch(sessionName, agentId, input);
+        this.flushOperatorInputBatch(sessionName, agentId, effectiveInput);
         return;
       }
 
@@ -130,7 +142,7 @@ class ActivityEventService {
         }
       }, OPERATOR_INPUT_DEBOUNCE_MS);
 
-      this.inputBatches.set(sessionName, { buffer: input, timer });
+      this.inputBatches.set(sessionName, { buffer: effectiveInput, timer });
     }
   }
 

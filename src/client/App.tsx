@@ -312,7 +312,7 @@ export function App() {
           ) : currentView === 'plugins' ? (
             <PluginRegistryView plugins={plugins} enabledState={enabledState} onToggle={togglePlugin} />
           ) : (
-            <HistoryView />
+            <HistoryView onNavigateToSession={handleSelectSession} />
           )}
           {currentView === 'terminals' && (
             <PluginSlotRenderer slot="bottom-panel" enabledPlugins={enabledPlugins} />

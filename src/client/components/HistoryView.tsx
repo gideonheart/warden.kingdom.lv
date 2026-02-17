@@ -3,8 +3,9 @@ import type { ReactNode } from 'react';
 import { SessionHistory } from './SessionHistory.js';
 import { TokenUsageView } from './TokenUsageView.js';
 import { LogViewer } from './LogViewer.js';
+import { ActivityView } from './ActivityView.js';
 
-type HistoryTab = 'sessions' | 'tokens' | 'logs';
+type HistoryTab = 'sessions' | 'tokens' | 'logs' | 'activity';
 
 function MobileAccordionSection({ title, defaultOpen, children }: {
   title: string;
@@ -24,10 +25,15 @@ function MobileAccordionSection({ title, defaultOpen, children }: {
   );
 }
 
-export function HistoryView() {
-  const [activeTab, setActiveTab] = useState<HistoryTab>('sessions');
+interface HistoryViewProps {
+  onNavigateToSession?: (sessionName: string) => void;
+}
+
+export function HistoryView({ onNavigateToSession }: HistoryViewProps) {
+  const [activeTab, setActiveTab] = useState<HistoryTab>('activity');
 
   const tabs: { id: HistoryTab; label: string }[] = [
+    { id: 'activity', label: 'Activity' },
     { id: 'sessions', label: 'Sessions' },
     { id: 'tokens', label: 'Token Usage' },
     { id: 'logs', label: 'Gateway Logs' },
@@ -58,6 +64,7 @@ export function HistoryView() {
         </div>
 
         <div className="flex-1 min-h-0 overflow-y-auto">
+          {activeTab === 'activity' && <ActivityView onNavigateToSession={onNavigateToSession} />}
           {activeTab === 'sessions' && <SessionHistory />}
           {activeTab === 'tokens' && <TokenUsageView />}
           {activeTab === 'logs' && <LogViewer />}
@@ -66,7 +73,10 @@ export function HistoryView() {
 
       {/* Mobile: accordion layout */}
       <div className="sm:hidden flex flex-col h-full overflow-y-auto">
-        <MobileAccordionSection title="Sessions" defaultOpen>
+        <MobileAccordionSection title="Activity" defaultOpen>
+          <ActivityView onNavigateToSession={onNavigateToSession} />
+        </MobileAccordionSection>
+        <MobileAccordionSection title="Sessions">
           <SessionHistory />
         </MobileAccordionSection>
         <MobileAccordionSection title="Token Usage">
