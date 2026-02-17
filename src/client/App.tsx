@@ -5,16 +5,19 @@ import { ErrorBoundary } from './components/ErrorBoundary.js';
 import { AgentSidebar } from './components/AgentSidebar.js';
 import { PromptPanel } from './components/PromptPanel.js';
 import { HistoryView } from './components/HistoryView.js';
+import { PluginRegistryView } from './components/PluginRegistryView.js';
+import { PluginSlotRenderer } from './components/PluginSlotRenderer.js';
 import { useActiveInstances } from './hooks/useActiveInstances.js';
 import { useAgentConfig } from './hooks/useAgentConfig.js';
+import { usePluginRegistry } from './hooks/usePluginRegistry.js';
 
-type AppView = 'terminals' | 'history';
+type AppView = 'terminals' | 'history' | 'plugins';
 
 function parseHash(): { view: AppView; session: string | null } {
   const hash = window.location.hash.replace(/^#/, '');
   const params = new URLSearchParams(hash);
   const viewParam = params.get('view');
-  const view: AppView = viewParam === 'history' ? 'history' : 'terminals';
+  const view: AppView = viewParam === 'history' ? 'history' : viewParam === 'plugins' ? 'plugins' : 'terminals';
   const session = params.get('session') || null;
   return { view, session };
 }
@@ -30,6 +33,7 @@ function updateHash(view: AppView, session: string | null): void {
 export function App() {
   const { instances, isLoading, error, refetch } = useActiveInstances();
   const { agents, topicMappings } = useAgentConfig();
+  const { plugins, enabledState, enabledPlugins, togglePlugin } = usePluginRegistry();
   const [selectedSessionName, setSelectedSessionName] = useState<string | null>(
     () => parseHash().session
   );
@@ -166,6 +170,12 @@ export function App() {
           >
             History
           </button>
+          <button
+            onClick={() => handleViewChange('plugins')}
+            className={`px-2 py-1 text-xs transition-colors ${currentView === 'plugins' ? 'text-warden-accent' : 'text-warden-text-dim hover:text-warden-text'}`}
+          >
+            Plugins
+          </button>
           <span className="w-px h-4 bg-warden-border" />
           <button
             onClick={() => setShowSidebar(!showSidebar)}
@@ -194,7 +204,7 @@ export function App() {
       <div className="flex flex-1 min-h-0 min-w-0">
         <main className="flex-1 min-h-0 min-w-0 flex flex-col overflow-hidden">
           {currentView === 'terminals' ? (
-            <div className="flex-1 min-h-0">
+            <div className="flex-1 min-h-0 relative">
               {isLoading ? (
                 <div className="flex items-center justify-center h-full">
                   <div className="flex items-center gap-3">
@@ -220,15 +230,26 @@ export function App() {
                   </div>
                 </div>
               )}
+              <div className="absolute inset-0 z-10 pointer-events-none">
+                <PluginSlotRenderer slot="terminal-overlay" enabledPlugins={enabledPlugins} />
+              </div>
             </div>
+          ) : currentView === 'plugins' ? (
+            <PluginRegistryView plugins={plugins} enabledState={enabledState} onToggle={togglePlugin} />
           ) : (
             <HistoryView />
+          )}
+          {currentView === 'terminals' && (
+            <PluginSlotRenderer slot="bottom-panel" enabledPlugins={enabledPlugins} />
           )}
         </main>
 
         {/* Desktop: inline sidebar */}
         {showSidebar && agents.length > 0 && (
           <div className="hidden lg:flex lg:flex-col">
+            {currentView === 'terminals' && (
+              <PluginSlotRenderer slot="sidebar-top" enabledPlugins={enabledPlugins} />
+            )}
             <AgentSidebar
               agents={agents}
               topicMappings={topicMappings}
@@ -238,6 +259,9 @@ export function App() {
             />
             {currentView === 'terminals' && (
               <PromptPanel agents={agents} selectedAgentId={derivedAgentId} />
+            )}
+            {currentView === 'terminals' && (
+              <PluginSlotRenderer slot="sidebar-bottom" enabledPlugins={enabledPlugins} />
             )}
           </div>
         )}
@@ -250,6 +274,9 @@ export function App() {
               onClick={() => setShowSidebar(false)}
             />
             <div className="absolute right-0 top-0 h-full w-[85vw] max-w-sm flex flex-col">
+              {currentView === 'terminals' && (
+                <PluginSlotRenderer slot="sidebar-top" enabledPlugins={enabledPlugins} />
+              )}
               <AgentSidebar
                 agents={agents}
                 topicMappings={topicMappings}
@@ -259,6 +286,9 @@ export function App() {
               />
               {currentView === 'terminals' && (
                 <PromptPanel agents={agents} selectedAgentId={derivedAgentId} />
+              )}
+              {currentView === 'terminals' && (
+                <PluginSlotRenderer slot="sidebar-bottom" enabledPlugins={enabledPlugins} />
               )}
             </div>
           </div>
