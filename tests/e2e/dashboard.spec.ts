@@ -35,6 +35,7 @@ test.describe('View Navigation', () => {
   test('switches to history view', async ({ page }) => {
     await page.goto('/');
     await page.getByRole('button', { name: 'History' }).click();
+    await expect(page.getByRole('button', { name: 'Activity' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Sessions' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Token Usage' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Gateway Logs' })).toBeVisible();
@@ -59,27 +60,36 @@ test.describe('View Navigation', () => {
 });
 
 test.describe('History View', () => {
+  test('activity view is default tab', async ({ page }) => {
+    await page.goto('/');
+    await page.getByRole('button', { name: 'History' }).click();
+    // Activity tab should be active by default — export buttons visible
+    await expect(page.getByRole('button', { name: 'CSV' }).first()).toBeVisible();
+    await expect(page.getByRole('button', { name: 'JSON' }).first()).toBeVisible();
+  });
+
   test('session history displays filter controls', async ({ page }) => {
     await page.goto('/');
     await page.getByRole('button', { name: 'History' }).click();
     await page.getByRole('button', { name: 'Sessions' }).click();
-    await expect(page.locator('input[placeholder="Agent ID"]')).toBeVisible();
-    await expect(page.locator('select')).toBeVisible();
+    // Use .first() — mobile accordion duplicates exist in DOM but are hidden via sm:hidden
+    await expect(page.locator('input[placeholder="Agent ID"]').first()).toBeVisible();
+    await expect(page.locator('select').first()).toBeVisible();
   });
 
   test('token usage view loads', async ({ page }) => {
     await page.goto('/');
     await page.getByRole('button', { name: 'History' }).click();
     await page.getByRole('button', { name: 'Token Usage' }).click();
-    await expect(page.locator('input[placeholder="Filter by agent ID"]')).toBeVisible();
+    await expect(page.locator('input[placeholder="Filter by agent ID"]').first()).toBeVisible();
   });
 
   test('log viewer loads', async ({ page }) => {
     await page.goto('/');
     await page.getByRole('button', { name: 'History' }).click();
     await page.getByRole('button', { name: 'Gateway Logs' }).click();
-    await expect(page.locator('input[placeholder="Filter by agent ID"]')).toBeVisible();
-    await expect(page.locator('text=Auto-refresh')).toBeVisible();
+    await expect(page.locator('input[placeholder="Filter by agent ID"]').first()).toBeVisible();
+    await expect(page.locator('text=Auto-refresh').first()).toBeVisible();
   });
 });
 

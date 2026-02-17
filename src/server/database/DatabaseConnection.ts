@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import type { AgentInstance, AgentInstanceCreateParams, AgentInstanceStatus } from '../../shared/types.js';
+import type { AgentInstance, AgentInstanceCreateParams, AgentInstanceStatus, ActivityEvent } from '../../shared/types.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -182,6 +182,96 @@ class DatabaseConnection {
     `).all() as { agentId: string; totalInputTokens: number; totalOutputTokens: number; totalCostUsd: number; dayCount: number }[];
   }
 
+  insertActivityEvent(params: {
+    instanceId: number | null;
+    agentId: string;
+    sessionName: string;
+    eventType: string;
+    summary: string;
+    detail?: string;
+    success?: boolean;
+    metadata?: string;
+  }): void {
+    this.db.prepare(`
+      INSERT INTO activity_events
+        (instance_id, agent_id, session_name, event_type, summary, detail, success, metadata)
+      VALUES
+        (@instanceId, @agentId, @sessionName, @eventType, @summary, @detail, @success, @metadata)
+    `).run({
+      instanceId: params.instanceId ?? null,
+      agentId: params.agentId,
+      sessionName: params.sessionName,
+      eventType: params.eventType,
+      summary: params.summary,
+      detail: params.detail ?? null,
+      success: params.success === undefined ? null : params.success ? 1 : 0,
+      metadata: params.metadata ?? null,
+    });
+  }
+
+  queryActivityEvents(filters: {
+    agentId?: string;
+    eventType?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    limit?: number;
+    offset?: number;
+  }): { events: ActivityEvent[]; total: number } {
+    const conditions: string[] = [];
+    const params: (string | number)[] = [];
+
+    if (filters.agentId) {
+      conditions.push('agent_id = ?');
+      params.push(filters.agentId);
+    }
+    if (filters.eventType) {
+      conditions.push('event_type = ?');
+      params.push(filters.eventType);
+    }
+    if (filters.dateFrom) {
+      conditions.push('timestamp >= ?');
+      params.push(filters.dateFrom);
+    }
+    if (filters.dateTo) {
+      conditions.push('timestamp <= ?');
+      params.push(filters.dateTo + ' 23:59:59');
+    }
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+    const limit = filters.limit ?? 50;
+    const offset = filters.offset ?? 0;
+
+    const total = (this.db.prepare(
+      `SELECT COUNT(*) as count FROM activity_events ${whereClause}`
+    ).get(...params) as { count: number }).count;
+
+    const events = this.db.prepare(`
+      SELECT id, instance_id as instanceId, agent_id as agentId,
+             session_name as sessionName, event_type as eventType,
+             timestamp, summary, detail,
+             CASE WHEN success IS NULL THEN NULL WHEN success = 1 THEN 1 ELSE 0 END as success,
+             metadata
+      FROM activity_events ${whereClause}
+      ORDER BY timestamp DESC, id DESC
+      LIMIT ? OFFSET ?
+    `).all(...params, limit, offset) as ActivityEvent[];
+
+    return { events, total };
+  }
+
+  getDistinctEventTypes(): string[] {
+    return (this.db.prepare(
+      'SELECT DISTINCT event_type FROM activity_events ORDER BY event_type'
+    ).all() as { event_type: string }[]).map(row => row.event_type);
+  }
+
+  purgeOldActivityEvents(): number {
+    const result = this.db.prepare(
+      `DELETE FROM activity_events WHERE timestamp < datetime('now', '-7 days')`
+    ).run();
+    return result.changes;
+  }
+
   close(): void {
     console.log('[Database] Checkpointing WAL before close');
     this.db.pragma('wal_checkpoint(TRUNCATE)');
@@ -225,6 +315,24 @@ class DatabaseConnection {
       CREATE INDEX IF NOT EXISTS idx_instances_status ON instances(status);
       CREATE INDEX IF NOT EXISTS idx_session_logs_instance ON session_logs(instance_id);
       CREATE INDEX IF NOT EXISTS idx_token_usage_agent_date ON token_usage(agent_id, date);
+
+      CREATE TABLE IF NOT EXISTS activity_events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        instance_id INTEGER REFERENCES instances(id),
+        agent_id TEXT NOT NULL,
+        session_name TEXT NOT NULL,
+        event_type TEXT NOT NULL,
+        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+        summary TEXT NOT NULL,
+        detail TEXT,
+        success INTEGER,
+        metadata TEXT
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_activity_events_agent_id ON activity_events(agent_id);
+      CREATE INDEX IF NOT EXISTS idx_activity_events_timestamp ON activity_events(timestamp);
+      CREATE INDEX IF NOT EXISTS idx_activity_events_event_type ON activity_events(event_type);
+      CREATE INDEX IF NOT EXISTS idx_activity_events_session ON activity_events(session_name);
     `);
   }
 }

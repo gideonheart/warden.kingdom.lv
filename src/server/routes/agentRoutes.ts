@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { openClawConfigReader } from '../services/OpenClawConfigReader.js';
 import { gatewayApiClient } from '../services/GatewayApiClient.js';
+import { activityEventService } from '../services/ActivityEventService.js';
 
 export const agentRoutes = Router();
 
@@ -34,6 +35,9 @@ agentRoutes.post('/api/agents/:agentId/prompt', async (request, response) => {
   try {
     const result = await gatewayApiClient.sendPrompt(agentId, prompt.trim());
 
+    // Capture prompt_sent event (success or failure from gateway)
+    activityEventService.capturePromptSent(agentId, 'gateway', prompt.trim(), result.success);
+
     if (result.success) {
       response.json({ success: true, message: result.message });
     } else {
@@ -46,6 +50,8 @@ agentRoutes.post('/api/agents/:agentId/prompt', async (request, response) => {
     }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    // Capture prompt_sent event for exception path (network failure, timeout, etc.)
+    activityEventService.capturePromptSent(agentId, 'gateway', prompt.trim(), false);
     console.error(`[agentRoutes] Failed to send prompt to ${agentId}:`, errorMessage);
     response.status(500).json({
       success: false,

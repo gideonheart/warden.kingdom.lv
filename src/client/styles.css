@@ -48,9 +48,29 @@ body {
   display: none;
 }
 
+/* Safe area insets for notched devices (iPhone) */
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.safe-horizontal {
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+}
+
+/* Scroll-snap for tab swiping */
+.tab-snap {
+  scroll-snap-type: x mandatory;
+}
+
+.tab-snap > * {
+  scroll-snap-align: start;
+}
+
 /* Dynamic viewport height — shrinks when iOS keyboard opens */
 .app-height {
   height: 100vh;
   height: 100dvh;
   height: var(--visual-viewport-height, 100dvh);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }

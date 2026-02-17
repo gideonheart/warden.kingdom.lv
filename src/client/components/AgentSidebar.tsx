@@ -43,7 +43,7 @@ export function AgentSidebar({ agents, topicMappings, selectedAgentId, onSelectA
           <button
             key={agent.id}
             onClick={() => onSelectAgent(agent.id)}
-            className={`flex items-center gap-2 px-2 py-1.5 rounded text-sm text-left transition-colors ${
+            className={`flex items-center gap-2 px-2 py-1.5 min-h-[44px] rounded text-sm text-left transition-colors ${
               agent.id === selectedAgentId
                 ? 'bg-warden-accent/20 text-warden-accent'
                 : 'text-warden-text-dim hover:bg-warden-border/50 hover:text-warden-text'

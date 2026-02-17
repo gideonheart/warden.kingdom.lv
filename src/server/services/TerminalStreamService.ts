@@ -1,5 +1,6 @@
 import * as pty from 'node-pty';
 import type { Server as SocketIOServer, Socket } from 'socket.io';
+import { activityEventService } from './ActivityEventService.js';
 
 interface ActiveTerminalStream {
   ptyProcess: pty.IPty;
@@ -53,6 +54,11 @@ export class TerminalStreamService {
 
     ptyProcess.onData((terminalOutput: string) => {
       socket.emit('terminal:output', terminalOutput);
+      // Non-blocking side-channel tap for activity event parsing
+      const agentId = sessionName.split('-')[0];
+      setImmediate(() => {
+        activityEventService.processTerminalChunk(sessionName, agentId, terminalOutput);
+      });
     });
 
     ptyProcess.onExit(({ exitCode }) => {
@@ -62,6 +68,9 @@ export class TerminalStreamService {
       }
       socket.emit('terminal:exit', { sessionName, exitCode });
       this.activeStreams.delete(socket.id);
+
+      // Flush and clear activity event buffers for this session
+      activityEventService.clearSessionBuffer(sessionName);
 
       // Clean up session index on PTY exit
       const socketIds = this.sessionStreams.get(sessionName);
@@ -75,6 +84,9 @@ export class TerminalStreamService {
 
     socket.on('terminal:input', (userInput: string) => {
       ptyProcess.write(userInput);
+      // Capture operator input as batched activity events
+      const agentId = sessionName.split('-')[0];
+      activityEventService.captureOperatorInput(sessionName, agentId, userInput);
     });
 
     socket.on('terminal:resize', ({ cols, rows }: { cols: number; rows: number }) => {
@@ -114,6 +126,9 @@ export class TerminalStreamService {
     if (stream) {
       stream.ptyProcess.kill();
       this.activeStreams.delete(socketId);
+
+      // Flush and clear activity event buffers for this session
+      activityEventService.clearSessionBuffer(stream.sessionName);
 
       // Clean up session index
       const socketIds = this.sessionStreams.get(stream.sessionName);

@@ -34,23 +34,28 @@ Real-time visibility into all active Claude Code agent sessions from a single br
 
 ### Active
 
-(None — define in next milestone)
+#### Current Milestone: v2.0 Mission Control
+
+**Goal:** Transform Warden from a terminal viewer into an extensible mission control platform with plugin architecture, agent activity auditing, and mobile-first design.
+
+**Target features:**
+- ~~Tool/plugin registry~~ -- SHIPPED Phase 9: Vite glob auto-discovery, type-safe manifests, 4 layout slots, enable/disable with localStorage
+- Agent activity/audit timeline — structured events (session lifecycle, operator actions) + parsed terminal output (tool calls, file edits, commands) with dedicated Activity view
+- Mobile-first UI — full experience on mobile including terminal viewing, agent list/detail with collapsible panels, bottom-sheet actions, clean typography
 
 ### Out of Scope
 
-- Mobile app — single-user internal tool, desktop browser only
 - Multi-user auth — IP-whitelisted, single operator (Gideon)
 - Agent creation/deletion — managed via openclaw.json, not the dashboard
 - Telegram bot management — handled by OpenClaw gateway
 - Terminal themes/customization — monitoring tool, single dark theme
 - Multi-pane terminal splits — tmux handles layout within sessions
-- Session recording/replay — storage cost, session history table sufficient
 - In-dashboard code editor — agents edit files, operator intervenes via prompts
 - Offline mode — real-time is core value
 
 ## Context
 
-Shipped v1.1 with 2,644 LOC TypeScript (src + tests).
+Shipped v1.1 with 2,644 LOC TypeScript (src + tests). Phase 9 added 185 LOC for plugin infrastructure.
 Tech stack: Express 5, Socket.IO 4, React 19, xterm.js 5, node-pty, SQLite (better-sqlite3), Tailwind CSS 4, Vite 6.
 Runs on Ubuntu 24 server (Laravel Forge managed), same host as gideons.kingdom.lv.
 20 Playwright E2E tests passing (12 from v1.0 + 8 from v1.1). Production Nginx config with SSL + IP whitelist + WebSocket.
@@ -79,6 +84,9 @@ tmux configured with mouse mode and 50,000-line scrollback buffer for monitoring
 | tmux 50,000-line history-limit | ~10MB/pane, adequate for monitoring use | ✓ Good — enables session debugging |
 | Derived state for prompt panel sync | Compute derivedAgentId from activeInstances lookup | ✓ Good — reliable, no manual tracking |
 | Separate sidebar/prompt panel agent state | Clean separation of concerns, avoids state conflicts | ✓ Good — independent behavior |
+| Vite import.meta.glob for plugin discovery | Zero manual registration, add .tsx file and it appears | ✓ Good — 185 LOC total |
+| Build-time satisfies for plugin validation | Catches invalid manifests at compile time, not runtime | ✓ Good — immediate feedback |
+| ErrorBoundary per plugin panel | Crashing plugin cannot break main dashboard | ✓ Good — isolates failures |
 
 ---
-*Last updated: 2026-02-12 after v1.1 milestone*
+*Last updated: 2026-02-17 after Phase 9*
