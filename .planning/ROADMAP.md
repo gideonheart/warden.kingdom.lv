@@ -121,7 +121,7 @@ Plans:
 
 **Requirements:** MOBI-KB-01, MOBI-KB-02
 
-**Plans:** 1 plan
+**Plans:** 1/1 plans complete
 
 Plans:
 - [ ] 11.1-01-PLAN.md -- Add visualViewport resize listeners to TerminalView and MobilePromptSheet for cross-platform mobile keyboard handling

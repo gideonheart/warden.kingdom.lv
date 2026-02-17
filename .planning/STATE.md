@@ -11,11 +11,11 @@ See: .planning/PROJECT.md (updated 2026-02-16)
 ## Current Position
 
 Phase: 11.1 (Fix tmux visibility when mobile keyboard opens)
-Plan: 0 of ? in current phase
-Status: Not planned yet
-Last activity: 2026-02-17 — Phase 11.1 inserted after Phase 11
+Plan: 1 of 1 in current phase
+Status: Phase complete
+Last activity: 2026-02-17 — Phase 11.1 plan 01 complete
 
-Progress: [█████████▓] 92% (11/12 phases complete)
+Progress: [██████████] 100% (12/12 phases complete)
 
 ## Performance Metrics
 
@@ -51,6 +51,7 @@ Progress: [█████████▓] 92% (11/12 phases complete)
 | 9 | Plugin Registry Foundation | v2.0 | `918d6d5` |
 | 10 | Mobile-First UI Restructure | v2.0 | `39eeea8` |
 | 11 | Activity Timeline & Audit Log | v2.0 | `24306a0` |
+| 11.1 | Fix tmux visibility when mobile keyboard opens | v2.0 | `b6e0de0` |
 
 ## Accumulated Context
 
@@ -69,6 +70,8 @@ Recent decisions affecting v2.0:
 - [Phase 11]: Operator input batched: flush on Enter or 2s inactivity (prevents per-keystroke event explosion)
 - [Phase 11]: Activity tab placed first and default in HistoryView
 - [Phase 11]: Export fetches full filtered dataset (limit=10000), not just current page
+- [Phase 11.1-fix-tmux-visibility-when-mobile-keyboard-opens]: Use visualViewport API (not window.resize) for iOS keyboard detection in TerminalView and MobilePromptSheet
+- [Phase 11.1-fix-tmux-visibility-when-mobile-keyboard-opens]: 100ms debounce + requestAnimationFrame on refitTerminal to prevent FitAddon collapse bug (xterm.js #5320)
 
 ### Quick Tasks Completed
 
@@ -97,5 +100,5 @@ None
 ## Session Continuity
 
 Last session: 2026-02-17
-Stopped at: Phase 11.1 inserted
-Next step: /gsd:plan-phase 11.1
+Stopped at: Completed 11.1-fix-tmux-visibility-when-mobile-keyboard-opens-01-PLAN.md
+Next step: Phase 11.1 complete — all phases done
