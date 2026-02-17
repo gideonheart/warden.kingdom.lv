@@ -7,6 +7,7 @@ import { PromptPanel } from './components/PromptPanel.js';
 import { HistoryView } from './components/HistoryView.js';
 import { PluginRegistryView } from './components/PluginRegistryView.js';
 import { PluginSlotRenderer } from './components/PluginSlotRenderer.js';
+import { MobilePromptSheet } from './components/MobilePromptSheet.js';
 import { useActiveInstances } from './hooks/useActiveInstances.js';
 import { useAgentConfig } from './hooks/useAgentConfig.js';
 import { usePluginRegistry } from './hooks/usePluginRegistry.js';
@@ -278,7 +279,7 @@ export function App() {
       <div className="flex flex-1 min-h-0 min-w-0">
         <main className="flex-1 min-h-0 min-w-0 flex flex-col overflow-hidden">
           {currentView === 'terminals' ? (
-            <div className="flex-1 min-h-0 relative">
+            <div className="flex-1 min-h-0 relative pb-12 lg:pb-0">
               {isLoading ? (
                 <div className="flex items-center justify-center h-full">
                   <div className="flex items-center gap-3">
@@ -368,6 +369,11 @@ export function App() {
           </div>
         )}
       </div>
+
+      {/* Mobile: bottom sheet prompt panel */}
+      {currentView === 'terminals' && agents.length > 0 && (
+        <MobilePromptSheet agents={agents} selectedAgentId={derivedAgentId} />
+      )}
     </div>
   );
 }
