@@ -68,10 +68,11 @@ Plans:
 4. Operator can scroll terminal output with touch on mobile and swipe between session tabs
 5. All interactive elements meet 44x44px minimum touch target size with proper safe area insets
 
-**Plans:** TBD
+**Plans:** 2 plans
 
 Plans:
-- [ ] 10-01: TBD during planning
+- [ ] 10-01-PLAN.md — Mobile header hamburger, safe areas, touch targets, scroll-snap tabs, font size toggle, responsive data views
+- [ ] 10-02-PLAN.md — MobilePromptSheet bottom sheet, HistoryView accordion panels
 
 #### Phase 11: Activity Timeline & Audit Log
 
