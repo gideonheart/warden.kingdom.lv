@@ -13,7 +13,7 @@ See: .planning/PROJECT.md (updated 2026-02-18)
 Phase: 14 — Enhanced Agent Visibility
 Plan: 01 complete (of 1)
 Status: Phase complete — v2.1 complete
-Last activity: 2026-02-18 — Plan 01 complete: Live agent state badges, context pressure, and GSD phase/progress in Agents grid
+Last activity: 2026-02-18 - Completed quick task 6: Agent visibility as separate nav page
 
 Progress: [███████░░░] 70%
 
