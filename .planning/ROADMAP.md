@@ -162,7 +162,8 @@ See `.planning/milestones/v1.1-ROADMAP.md`
   2. Each agent in the grid shows a context pressure percentage (e.g., "72%") with a visual indicator that distinguishes safe, warning, and critical thresholds
   3. Each agent in the grid shows the current GSD phase number and progress percentage parsed from the agent's STATE.md, falling back to "—" gracefully when STATE.md is absent or unparseable
 
-**Plans**: TBD
+**Plans**: 1 plan
+- [ ] 14-01-PLAN.md — Live-status endpoint, polling hooks, and enhanced Agents grid with State/Ctx/Phase columns
 
 ---
 
