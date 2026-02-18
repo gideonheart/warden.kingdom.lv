@@ -11,11 +11,11 @@ See: .planning/PROJECT.md (updated 2026-02-18)
 ## Current Position
 
 Phase: 12 — Backend Foundation
-Plan: —
-Status: Not started
-Last activity: 2026-02-18 — Roadmap created for v2.1
+Plan: 01 complete (of 3)
+Status: In progress
+Last activity: 2026-02-18 — Plan 01 complete: GsdRegistryService + GsdHookLogWatcher
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [███░░░░░░░] 33%
 
 ## Performance Metrics
 
@@ -89,6 +89,8 @@ Key decisions from v2.1 research (apply from Phase 12 onwards):
 - 30s registry TTL cache: matches OpenClawConfigReader pattern; PATCH writes invalidate immediately
 - GSD plugin in bottom-panel slot: confirmed at App.tsx line 318; no changes to existing plugin infrastructure
 - No new npm dependencies: all capabilities map to Node.js 22 built-ins or already-installed packages
+- [Phase 12]: Used fs.watchFile (not fs.watch) for /tmp/gsd-hooks.log — watchFile polls and works when file does not yet exist
+- [Phase 12]: GsdRegistryService: atomic registry writes via writeFile+rename (.tmp then rename), cache invalidated immediately after patchAgent
 
 ### Quick Tasks Completed
 

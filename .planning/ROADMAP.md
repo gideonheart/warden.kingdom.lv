@@ -180,6 +180,6 @@ See `.planning/milestones/v1.1-ROADMAP.md`
 | 9. Plugin Registry Foundation | v2.0 | 2/2 | Complete | 2026-02-17 |
 | 10. Mobile-First UI Restructure | v2.0 | 2/2 | Complete | 2026-02-18 |
 | 11. Activity Timeline & Audit Log | v2.0 | 2/2 | Complete | 2026-02-18 |
-| 12. Backend Foundation | v2.1 | 0/2 | Planning complete | - |
+| 12. Backend Foundation | 1/2 | In Progress|  | - |
 | 13. Client Plugin | v2.1 | 0/? | Not started | - |
 | 14. Enhanced Agent Visibility | v2.1 | 0/? | Not started | - |

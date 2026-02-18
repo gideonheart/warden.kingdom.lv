@@ -36,7 +36,7 @@ Requirements for GSD Manager Plugin milestone. Each maps to roadmap phases.
 ### Infrastructure
 
 - [ ] **INFRA-01**: Server exposes REST endpoints for registry, spawn, command dispatch, state, and hook log operations
-- [ ] **INFRA-02**: Server exposes a Socket.IO namespace for real-time hook event push
+- [x] **INFRA-02**: Server exposes a Socket.IO namespace for real-time hook event push
 - [ ] **INFRA-03**: All endpoints validate input to prevent shell injection and path traversal
 
 ## v2.0 Requirements (Complete)
@@ -138,7 +138,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | HOOK-01 | Phase 13 | Pending |
 | DX-01 | Phase 13 | Pending |
 | INFRA-01 | Phase 12 | Pending |
-| INFRA-02 | Phase 12 | Pending |
+| INFRA-02 | Phase 12 | Complete |
 | INFRA-03 | Phase 12 | Pending |
 | PLUG-01 | Phase 9 | Complete |
 | PLUG-02 | Phase 9 | Complete |
