@@ -11,9 +11,24 @@ function stripAnsi(input: string): string {
   return typeof input === 'string' ? input.replace(ANSI_REGEX, '') : input;
 }
 
+// Terminal control residue that survives ANSI stripping.
+// xterm.js strips ESC prefixes before forwarding input, leaving bare CSI parameters:
+//  - SGR mouse reports: "64;1;1M", "65;12;5M" (button;col;row + M/m)
+//  - Device attribute responses: "0;276;0c", ">1;4600;0c"
+//  - OSC color responses: "gb:e2e2/e8e8/f0f0\gb:..." (kitty/sixel color queries)
+//  - Mode query responses: "?1;2$y", "?2004;2$y"
+//  - Orphaned ESC+backslash (OSC String Terminators): \x1b\x5c
+const TERMINAL_NOISE_RE = /(?:\d+;\d+;\d+[Mm])+|(?:>?\d+;\d+;\d+c)|gb:[0-9a-f/\\]+|(?:\?\d+(?:;\d+)*\$y)|\x1b\\/g;
+
+function stripTerminalNoise(input: string): string {
+  return input.replace(TERMINAL_NOISE_RE, '');
+}
+
 // Claude Code terminal output patterns — verified from live tmux capture 2026-02-17
 // Markers: ● (U+25CF BLACK CIRCLE), ⏺ (U+23FA BLACK CIRCLE FOR RECORD), ⎿ (U+23BF BOTTOM LEFT CORNER)
-const TOOL_CALL_RE = /^[●⏺]\s+([\w]+)\((.{0,200})\)/m;
+// Tool name must be a single PascalCase/camelCase identifier (letters only, starting uppercase)
+// to avoid matching TUI summary lines like "Read 1 file (ctrl+o to expand)".
+const TOOL_CALL_RE = /^[●⏺]\s+([A-Z][a-zA-Z]*)\((.{0,200})\)/m;
 const FILE_EDIT_SUCCESS_RE = /^[⎿]\s+(?:Updated|Created|Wrote)\s+(.{1,200})/m;
 const RESULT_ERROR_RE = /^[⎿]\s+Error:/m;
 const BASH_EXIT_RE = /exit code[:\s]+(\d+)/i;
@@ -97,15 +112,18 @@ class ActivityEventService {
     }
 
     // Strip ANSI sequences before processing — terminal clients send capability queries as input
-    const cleanInput = stripAnsi(input);
+    let cleanInput = stripAnsi(input);
+
+    // Strip residual terminal control noise (mouse reports, device attributes, color queries)
+    // that survives ANSI stripping because xterm.js removes ESC prefixes before forwarding
+    cleanInput = stripTerminalNoise(cleanInput);
 
     // Skip if stripping removed all content (was purely ANSI/control sequences)
-    if (!cleanInput && input !== '\n' && input !== '\r') {
+    if (!cleanInput.trim() && input !== '\n' && input !== '\r') {
       return;
     }
 
     // Use stripped input for batching
-    // eslint-disable-next-line no-param-reassign
     const effectiveInput = cleanInput || input;
 
     const existing = this.inputBatches.get(sessionName);
@@ -218,10 +236,12 @@ class ActivityEventService {
   }
 
   private flushOperatorInputBatch(sessionName: string, agentId: string, buffer: string): void {
-    if (!buffer.trim()) return;
+    // Final cleanup: strip any terminal noise that accumulated in the batch buffer
+    const cleaned = stripTerminalNoise(buffer).trim();
+    if (!cleaned) return;
     try {
       const instanceId = this.resolveInstanceId(sessionName);
-      const truncated = buffer.slice(0, MAX_PROMPT_DETAIL_LENGTH);
+      const truncated = cleaned.slice(0, MAX_PROMPT_DETAIL_LENGTH);
       database.insertActivityEvent({
         instanceId,
         agentId,

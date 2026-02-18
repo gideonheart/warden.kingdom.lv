@@ -139,7 +139,7 @@ export function ActivityEventRow({ event, onNavigateToSession }: ActivityEventRo
             <div>
               <span className="text-warden-text-dim">Success: </span>
               <span className="text-warden-text">
-                {event.success === true ? 'Yes' : event.success === false ? 'No' : 'Unknown'}
+                {event.success === true ? 'Yes' : event.success === false ? 'No' : 'N/A'}
               </span>
             </div>
           </div>
