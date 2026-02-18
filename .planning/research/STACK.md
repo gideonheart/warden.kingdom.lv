@@ -1,457 +1,541 @@
-# Technology Stack
+# Stack Research
 
-**Project:** Warden Dashboard v2.0 Mission Control
-**Researched:** 2026-02-16
-**Focus:** Stack additions for plugin registry, agent activity/audit timeline, mobile-first UI
-
-## Executive Summary
-
-Warden v2.0 requires minimal new dependencies. The existing stack (Express 5, Socket.IO 4, React 19, xterm.js 5, SQLite, Tailwind CSS 4, Vite 6) provides all core infrastructure. New features require: (1) ANSI parsing for terminal output, (2) mobile UI components for bottom sheets/drawers, (3) SQLite schema additions with JSON virtual columns, (4) virtualized timeline rendering. **No build system changes or plugin framework dependencies needed** — use Vite's native dynamic imports + TypeScript registry pattern.
+**Domain:** GSD Manager Plugin — shell command proxying, real-time log tailing, process spawning, JSON config editing, tmux session management, STATE.md parsing
+**Researched:** 2026-02-18
+**Confidence:** HIGH
 
 ---
 
-## New Dependencies (v2.0 Features)
+## Context: Milestone v2.1 — Additive Only
 
-### Terminal Output Parsing
+This file covers only the NEW technical capabilities needed for the GSD Manager plugin. The following are validated and in production — do not re-research or re-add them:
 
-| Library | Version | Purpose | Why |
-|---------|---------|---------|-----|
-| `ansi_up` | `^6.0.2` | ANSI escape code to HTML/text parsing | Zero dependencies, isomorphic (browser+Node), actively maintained since 2011, TypeScript types included. Converts terminal output to structured data for activity events. |
+| Already Present | Version | Notes |
+|-----------------|---------|-------|
+| Express 5 | ^5.0.0 | Route module pattern: `src/server/routes/*.ts`, mounted in `index.ts` |
+| Socket.IO 4 | ^4.8.0 | `/terminal` namespace exists; adding `/gsd` follows the same pattern |
+| React 19 | ^19.0.0 | Plugin auto-discovered via `import.meta.glob('./*.tsx', {eager: true})` |
+| better-sqlite3 | ^11.0.0 | WAL mode SQLite; not needed for GSD plugin features |
+| node-pty | ^1.0.0 | Terminal streaming; not needed for GSD plugin |
+| Tailwind CSS 4 | ^4.0.0 | `warden-*` tokens established in `styles.css` |
+| TypeScript 5 | ^5.7.0 | Strict mode, ESM |
+| Node.js | v22.22.0 | Confirmed on this machine |
+| socket.io-client | ^4.8.0 | Already in devDependencies, used by client |
 
-**Alternatives considered:**
-- `ansicolor` — Smaller but less actively maintained, lacks recent updates
-- `node-ansiparser` — Low-level, overkill for our needs (designed for full terminal emulator)
-- `ansis` — More focused on colorizing output, not parsing existing ANSI
-
-**Why ansi_up wins:** Single-file ESM module with no dependencies, TypeScript support, and proven production use in VS Code extensions and terminal viewers. Handles both client-side (browser) and server-side (Node) parsing.
-
-**Installation:**
-```bash
-npm install ansi_up
-```
-
-**Confidence:** HIGH — verified via official docs, GitHub activity (last release Nov 2024), and npm registry.
+**Result: Zero new npm dependencies required for this milestone.**
 
 ---
 
-### Mobile UI Components
+## Capability Analysis
 
-| Library | Version | Purpose | Why |
-|---------|---------|---------|-----|
-| `react-modal-sheet` | `^3.1.0` | Bottom sheet/drawer for mobile | Built with Framer Motion (already compatible with React 19), no dependencies beyond peer deps, accessibility-focused, actively maintained. Works with existing Tailwind styling. |
+### Capability 1: Shell Command Proxying (spawn.sh, menu-driver.sh)
 
-**Alternatives considered:**
-- `Konsta UI` — Purpose-built for mobile but introduces entire component library; too heavy
-- `react-spring-bottom-sheet` — Strong option but adds `react-spring` dependency (unused elsewhere)
-- `@gorhom/react-native-bottom-sheet` — React Native only, not web
-- `MUI SwipeableDrawer` — Would require full Material UI (390kb), conflicts with existing Tailwind design system
+**Requirement:** Express routes that execute `spawn.sh <agent> <workdir> [cmd]` and `menu-driver.sh <session> <action> [args]` as subprocesses, capturing output and exit codes.
 
-**Why react-modal-sheet wins:** Minimal bundle size (builds on Framer Motion which React 19 projects often already have), flexible styling with Tailwind CSS, handles virtual keyboard on mobile, supports accessibility APIs.
+**Decision: `child_process.execFile` (Node.js built-in) — already in codebase.**
 
-**Installation:**
-```bash
-npm install react-modal-sheet framer-motion
-```
+`TmuxSessionManager.ts` already uses `execFile` promisified via `util.promisify`. It is the established project pattern. `execFile` does not spawn a shell, so arguments cannot be injected through shell metacharacters — each argument is passed as a discrete array element to the OS exec syscall. This is the correct security model.
 
-**Confidence:** MEDIUM-HIGH — Library well-documented, active GitHub (last commit Dec 2024). Framer Motion is industry standard for React animations. One caveat: React StrictMode may cause animation issues (documented, fixable).
+Script paths confirmed on this machine:
+- `spawn.sh`: `/home/forge/.openclaw/workspace/skills/gsd-code-skill/scripts/spawn.sh`
+- `menu-driver.sh`: `/home/forge/.openclaw/workspace/skills/gsd-code-skill/scripts/menu-driver.sh`
 
----
+`spawn.sh` takes 15–30 seconds to complete (it polls for Claude TUI readiness). Use a 60-second timeout on `execFile`.
 
-### Virtualized Timeline Rendering
+Pattern (mirrors existing `TmuxSessionManager.ts`):
 
-| Library | Version | Purpose | Why |
-|---------|---------|---------|-----|
-| `@gravity-ui/timeline` | `^0.1.0` | Canvas-based virtualized timeline | Handles large datasets (thousands of events), built-in virtualization, grouped markers with zoom, active development by Yandex team. |
-
-**Alternatives considered:**
-- `react-chrono` — Beautiful but not virtualized, will freeze with 1000+ events
-- `react-vertical-timeline-component` — Simple but DOM-heavy, no virtualization
-- `react-virtualized-timeline` (custom) — No published npm package, would need to build from scratch
-
-**Why @gravity-ui/timeline wins:** Canvas rendering keeps DOM lightweight, automatic virtualization when content exceeds viewport, TypeScript support, actively maintained (2024 releases).
-
-**Fallback option:** If `@gravity-ui/timeline` proves unstable, build custom virtualized list using existing React patterns + `IntersectionObserver` for lazy loading.
-
-**Installation:**
-```bash
-npm install @gravity-ui/timeline
-```
-
-**Confidence:** MEDIUM — Library is newer (2024), but backed by large team (Yandex Gravity UI). Virtualization is critical for performance with agent logs. Monitor stability during Phase 1 implementation.
-
----
-
-## No New Dependencies Needed
-
-### Plugin Architecture
-**Use:** Vite's native dynamic `import()` + TypeScript Registry Pattern
-
-**Why no Module Federation / plugin framework:**
-- Warden is single-server, single-user deployment — no need for remote module loading
-- Plugins will be local TypeScript modules in `src/plugins/` directory
-- Vite's `import.meta.glob()` provides build-time discovery
-- TypeScript's discriminated unions + registry pattern provides type safety
-
-**Pattern to implement:**
 ```typescript
-// src/plugins/registry.ts
-export interface PluginManifest {
-  id: string;
-  name: string;
-  version: string;
-  component: React.ComponentType<PluginProps>;
+import { execFile } from 'child_process';
+import { promisify } from 'util';
+
+const execFileAsync = promisify(execFile);
+
+const SPAWN_SCRIPT_PATH =
+  '/home/forge/.openclaw/workspace/skills/gsd-code-skill/scripts/spawn.sh';
+const MENU_DRIVER_SCRIPT_PATH =
+  '/home/forge/.openclaw/workspace/skills/gsd-code-skill/scripts/menu-driver.sh';
+
+async function spawnGsdAgent(
+  agentId: string,
+  workingDirectory: string,
+  firstCommand: string
+): Promise<{ stdout: string; stderr: string }> {
+  return execFileAsync(
+    SPAWN_SCRIPT_PATH,
+    [agentId, workingDirectory, firstCommand],
+    { timeout: 60_000 }
+  );
 }
 
-// Auto-discover plugins at build time
-const pluginModules = import.meta.glob('./*/manifest.ts', { eager: true });
-
-// Type-safe registry with discriminated union
-export const registry = new Map<string, PluginManifest>();
-```
-
-**Confidence:** HIGH — Vite documentation confirms `import.meta.glob` with eager loading provides build-time type safety. Pattern validated in large TypeScript monorepos (Slash Engineering blog, 1.1M LOC).
-
----
-
-### Mobile Terminal Support
-**Use:** Existing `xterm.js` (v5.3.0) + custom touch handlers
-
-**Why no additional library:**
-- xterm.js has partial mobile support (works with mobile keyboards)
-- Known limitations: ballistic scrolling, touch selection
-- Custom touch event handling simpler than full wrapper library
-- Virtual keyboard already handled in App.tsx via `window.visualViewport`
-
-**Enhancement approach:**
-- Add `TouchHandlingService` for basic tap/swipe on terminal viewport
-- Use CSS `touch-action` directives for scroll behavior
-- Leverage existing `FitAddon` for responsive resizing
-
-**Confidence:** HIGH — xterm.js GitHub confirms mobile keyboard support works. Touch limitations documented but not blockers for primary use case (prompt injection, read-only viewing). Custom touch handlers proven pattern in VS Code mobile web.
-
----
-
-## SQLite Schema Changes
-
-### No Library Additions Required
-**Use:** Existing `better-sqlite3` (v11.0.0)
-
-### New Tables
-
-#### 1. Activity Events Table
-```sql
-CREATE TABLE activity_events (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  instance_id INTEGER NOT NULL REFERENCES instances(id),
-  timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-  event_type TEXT NOT NULL, -- 'session_start', 'prompt_sent', 'tool_call', 'error', etc.
-  summary TEXT NOT NULL,     -- Human-readable summary
-  details TEXT,              -- JSON blob with event-specific data
-  terminal_output TEXT,      -- Captured ANSI output (if applicable)
-
-  -- Virtual columns for indexing JSON
-  agent_id TEXT GENERATED ALWAYS AS (json_extract(details, '$.agentId')) VIRTUAL,
-  severity TEXT GENERATED ALWAYS AS (json_extract(details, '$.severity')) VIRTUAL
-);
-
-CREATE INDEX idx_activity_events_instance ON activity_events(instance_id, timestamp DESC);
-CREATE INDEX idx_activity_events_agent ON activity_events(agent_id, timestamp DESC);
-CREATE INDEX idx_activity_events_type ON activity_events(event_type, timestamp DESC);
-CREATE INDEX idx_activity_events_severity ON activity_events(severity) WHERE severity IS NOT NULL;
-```
-
-**Why virtual columns:** SQLite's `GENERATED ALWAYS AS` columns with `json_extract` provide B-tree index speed on JSON fields without data duplication. Pattern confirmed in recent SQLite best practices (2025-2026).
-
-#### 2. Plugin Registry Table
-```sql
-CREATE TABLE plugin_registry (
-  id TEXT PRIMARY KEY,       -- Plugin ID (matches manifest)
-  name TEXT NOT NULL,
-  version TEXT NOT NULL,
-  enabled INTEGER DEFAULT 1,
-  config TEXT,               -- JSON configuration blob
-  installed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);
-```
-
-**Why not use file system only:** Enables/disables state and user configuration persistence. Plugin code lives in `src/plugins/`, but registry table tracks runtime state.
-
-### Full-Text Search for Activity
-```sql
-CREATE VIRTUAL TABLE activity_events_fts USING fts5(
-  summary,
-  terminal_output,
-  content='activity_events',
-  content_rowid='id',
-  tokenize='porter unicode61'
-);
-
--- Triggers to keep FTS in sync
-CREATE TRIGGER activity_events_ai AFTER INSERT ON activity_events BEGIN
-  INSERT INTO activity_events_fts(rowid, summary, terminal_output)
-  VALUES (new.id, new.summary, new.terminal_output);
-END;
-
-CREATE TRIGGER activity_events_ad AFTER DELETE ON activity_events BEGIN
-  DELETE FROM activity_events_fts WHERE rowid = old.id;
-END;
-
-CREATE TRIGGER activity_events_au AFTER UPDATE ON activity_events BEGIN
-  UPDATE activity_events_fts
-  SET summary = new.summary, terminal_output = new.terminal_output
-  WHERE rowid = new.id;
-END;
-```
-
-**Why FTS5:** Searching terminal output and activity summaries with `LIKE` would be CPU-intensive. FTS5 provides ranked search with BM25 scoring. Porter tokenizer for English stemming (run/runs/running → run).
-
-**Confidence:** HIGH — Pattern validated in SQLite FTS5 official docs and production SQLite deployments (DB Pro Blog, TheLinuxCode guides, 2025-2026).
-
----
-
-## Mobile-First CSS Additions
-
-### No Library Needed
-**Use:** Existing Tailwind CSS 4
-
-### New Utilities via `@layer utilities`
-```css
-@layer utilities {
-  /* Mobile-safe touch targets (min 44x44px) */
-  .touch-target {
-    min-width: 44px;
-    min-height: 44px;
-  }
-
-  /* Bottom sheet safe area handling */
-  .safe-area-bottom {
-    padding-bottom: max(1rem, env(safe-area-inset-bottom));
-  }
-
-  /* Prevent text selection during touch interactions */
-  .no-touch-select {
-    -webkit-user-select: none;
-    user-select: none;
-    -webkit-touch-callout: none;
-  }
-
-  /* Smooth momentum scrolling for iOS */
-  .momentum-scroll {
-    -webkit-overflow-scrolling: touch;
-    overflow-y: auto;
-  }
+async function runMenuDriverAction(
+  sessionName: string,
+  action: string,
+  actionArgs: string[]
+): Promise<{ stdout: string; stderr: string }> {
+  return execFileAsync(
+    MENU_DRIVER_SCRIPT_PATH,
+    [sessionName, action, ...actionArgs],
+    { timeout: 10_000 }
+  );
 }
 ```
 
-**Why custom utilities:** Tailwind CSS 4 doesn't include iOS-specific utilities by default. These handle common mobile UX patterns (safe areas, touch targets, momentum scrolling).
+**Input validation** — manual TypeScript guards, same pattern as `agentRoutes.ts`:
+- `agentId`: must match `/^[a-z][a-z0-9-]{0,50}$/` (agent names are lowercase identifiers)
+- `workingDirectory`: must be absolute path starting with `/`; verify it exists with `fs.stat()` before calling script
+- `firstCommand`: string, reject if it contains null bytes
+- `sessionName` in route params: must match `/^[a-zA-Z0-9_-]+$/` before passing to execFile
+- `action` for menu-driver: validate against allowlist: `['snapshot', 'enter', 'esc', 'clear_then', 'choose', 'type', 'submit']`
 
-**Confidence:** HIGH — Standard CSS properties, verified in iOS Safari and Chrome mobile documentation.
+**Why not `child_process.exec`:** `exec` spawns `/bin/sh -c`, creating a shell injection vector. `execFile` bypasses the shell entirely. This is a principle, not just a performance concern.
+
+**Why not `child_process.spawn` for streaming:** `spawn.sh` runs to completion before the session is useful. `execFile` with timeout is simpler and the established pattern. No streaming of spawn output is needed.
+
+**Why not rewrite spawn.sh logic in TypeScript:** The script handles flock-based concurrent registry writes, TUI readiness polling (polling for `❯` character), system prompt composition, session name conflict resolution, and `jq`-based JSON manipulation. Rewriting creates maintenance divergence with a proven script. Call it; don't copy it.
 
 ---
 
-## Development Workflow Additions
+### Capability 2: Real-Time Log File Tailing (gsd-hooks.log)
 
-### Type Safety for Plugin Development
+**Requirement:** Push new lines from `/tmp/gsd-hooks.log` to the browser as they are appended — the "Hook Activity Feed" showing the last ~20 events.
 
-```bash
-# No new tools needed - use existing TypeScript + Vite
-npm run typecheck  # Validates plugin manifest types
-npm run dev:all    # Hot-reload includes plugin changes
+**Decision: `fs.watch` (Node.js built-in) + new Socket.IO `/gsd` namespace — no new dependency.**
+
+On Linux, `fs.watch` uses inotify, which fires reliably on file appends without polling. Verified on this machine: `fs.watch` on `/tmp/gsd-hooks.log` registers correctly. Incremental reads from the last known byte offset capture only new content.
+
+The log format is consistent line-by-line. Each entry:
+```
+[2026-02-17T22:21:21Z] [stop-hook.sh] FIRED — PID=2798 TMUX=/tmp/...
+[2026-02-17T22:21:21Z] [stop-hook.sh] tmux_session=warden-main-2
+[2026-02-17T22:21:21Z] [stop-hook.sh] state=permission_prompt
 ```
 
-### E2E Testing for Mobile UI
+For the initial page load, tail the last 100 lines via a GET endpoint (read whole file, split, slice last 100).
 
-```bash
-# Use existing Playwright with mobile viewport emulation
-npx playwright test --project=mobile
-```
+For live updates, use a `GsdHookLogWatcher` service singleton that holds the `fs.watch` handle and emits to all `/gsd` namespace subscribers:
 
-**Playwright config addition:**
 ```typescript
-// playwright.config.ts
+import { watch, statSync, openSync, readSync, closeSync } from 'fs';
+import type { Server as SocketIOServer } from 'socket.io';
+
+const GSD_HOOKS_LOG_PATH = '/tmp/gsd-hooks.log';
+
+class GsdHookLogWatcher {
+  private lastFileOffset = 0;
+  private fileWatcher: ReturnType<typeof watch> | null = null;
+
+  setupSocketNamespace(socketServer: SocketIOServer): void {
+    const gsdNamespace = socketServer.of('/gsd');
+
+    gsdNamespace.on('connection', () => {
+      // Client connected — tailing happens server-side, broadcast to all
+    });
+
+    this.startWatching((newLines) => {
+      gsdNamespace.emit('gsd:hook-lines', { lines: newLines });
+    });
+  }
+
+  private startWatching(onNewLines: (lines: string[]) => void): void {
+    // Start at end-of-file — don't replay history on server start
+    try {
+      this.lastFileOffset = statSync(GSD_HOOKS_LOG_PATH).size;
+    } catch {
+      this.lastFileOffset = 0;
+    }
+
+    this.fileWatcher = watch(GSD_HOOKS_LOG_PATH, (event) => {
+      if (event !== 'change') return;
+      try {
+        const currentSize = statSync(GSD_HOOKS_LOG_PATH).size;
+        if (currentSize <= this.lastFileOffset) {
+          // File truncated — reset offset
+          this.lastFileOffset = 0;
+          return;
+        }
+
+        const newByteCount = currentSize - this.lastFileOffset;
+        const buffer = Buffer.alloc(newByteCount);
+        const fd = openSync(GSD_HOOKS_LOG_PATH, 'r');
+        readSync(fd, buffer, 0, newByteCount, this.lastFileOffset);
+        closeSync(fd);
+        this.lastFileOffset = currentSize;
+
+        const newLines = buffer
+          .toString('utf-8')
+          .split('\n')
+          .filter((line) => line.trim().length > 0);
+
+        if (newLines.length > 0) onNewLines(newLines);
+      } catch {
+        // Log may not exist yet — ignore until it appears
+      }
+    });
+  }
+
+  stopWatching(): void {
+    this.fileWatcher?.close();
+    this.fileWatcher = null;
+  }
+}
+
+export const gsdHookLogWatcher = new GsdHookLogWatcher();
+```
+
+**Mount in `index.ts`:** Call `gsdHookLogWatcher.setupSocketNamespace(socketServer)` and `gsdHookLogWatcher.stopWatching()` in the shutdown handler.
+
+**Client-side:** In the plugin component, connect to `/gsd` namespace via `socket.io-client` (already installed). Listen for `gsd:hook-lines` event. Keep a rolling buffer of last 100 lines in React state. This mirrors the `useTerminalSocket` hook pattern.
+
+**Why not chokidar:** chokidar is a polling wrapper. On Linux it delegates to inotify (same as `fs.watch`). It adds ~100KB of transitive dependencies for zero benefit in this environment. The PRD explicitly states "No new dependencies required."
+
+**Why not SSE (EventSource):** Socket.IO is already the real-time transport for this project. The client already opens a Socket.IO connection. Adding `/gsd` namespace is 10 lines. SSE would require a new `EventSource` client setup and a new server-side paradigm.
+
+**Why not polling the log endpoint:** Polling every 1-2s creates unnecessary HTTP traffic and has latency. inotify is instant.
+
+---
+
+### Capability 3: JSON Config File Reading and Editing (recovery-registry.json)
+
+**Requirement:** GET registry to display agent list (enabled/disabled, working directory, session name). PATCH individual agents to toggle `enabled`, update `working_directory`, etc.
+
+**Decision: `fs/promises` (Node.js built-in) with atomic write-then-rename — no new dependency.**
+
+The recovery-registry.json is **plain JSON** — not JSON5. Verified: `JSON.parse` works directly on the file. No comment stripping is needed (unlike `openclaw.json` which uses the existing `OpenClawConfigReader`).
+
+Registry structure (confirmed from live file):
+```json
 {
-  name: 'mobile',
-  use: {
-    ...devices['iPhone 13'],
-    viewport: { width: 390, height: 844 },
-    hasTouch: true,
-  },
+  "global_status_openclaw_session_id": "...",
+  "global_status_openclaw_session_key": "...",
+  "agents": [
+    {
+      "agent_id": "forge",
+      "enabled": true,
+      "auto_wake": false,
+      "topic_id": 1,
+      "openclaw_session_id": "...",
+      "working_directory": "/home/forge",
+      "tmux_session_name": "forge-main",
+      "claude_resume_target": "",
+      "claude_launch_command": "claude --dangerously-skip-permissions",
+      "claude_post_launch_mode": "resume_then_agent_pick"
+    }
+  ]
 }
 ```
 
-**Confidence:** HIGH — Playwright mobile emulation is production-ready, used by Microsoft for Edge mobile testing.
+Atomic write pattern (mirrors `spawn.sh`'s own `mv "$tmp_file" "$registry_file_path"` pattern):
+
+```typescript
+import { readFile, writeFile, rename } from 'fs/promises';
+import path from 'path';
+
+const REGISTRY_PATH =
+  '/home/forge/.openclaw/workspace/skills/gsd-code-skill/config/recovery-registry.json';
+
+interface RegistryAgent {
+  agent_id: string;
+  enabled: boolean;
+  auto_wake: boolean;
+  topic_id: number;
+  openclaw_session_id: string;
+  working_directory: string;
+  tmux_session_name: string;
+  claude_resume_target: string;
+  claude_launch_command: string;
+  claude_post_launch_mode: string;
+}
+
+interface RegistryData {
+  global_status_openclaw_session_id: string;
+  global_status_openclaw_session_key: string;
+  agents: RegistryAgent[];
+}
+
+class GsdRegistryService {
+  async readRegistry(): Promise<RegistryData> {
+    const content = await readFile(REGISTRY_PATH, 'utf-8');
+    return JSON.parse(content) as RegistryData;
+  }
+
+  async patchAgent(
+    agentId: string,
+    changes: Partial<Pick<RegistryAgent, 'enabled' | 'working_directory'>>
+  ): Promise<void> {
+    const registry = await this.readRegistry();
+    const agent = registry.agents.find((a) => a.agent_id === agentId);
+    if (!agent) throw new Error(`Agent not found: ${agentId}`);
+    Object.assign(agent, changes);
+    await this.writeRegistryAtomically(registry);
+  }
+
+  private async writeRegistryAtomically(data: RegistryData): Promise<void> {
+    const tempPath = REGISTRY_PATH + '.warden-tmp';
+    await writeFile(tempPath, JSON.stringify(data, null, 2), 'utf-8');
+    await rename(tempPath, REGISTRY_PATH); // atomic on same filesystem
+  }
+}
+
+export const gsdRegistryService = new GsdRegistryService();
+```
+
+**Concurrency:** The operator is a single user. `spawn.sh` uses `flock` on the registry file. To avoid conflicting with spawn.sh writes, Warden's PATCH endpoint should be quick (read-modify-write in <100ms). No file locking library is needed. If a race condition occurs (extremely rare — spawn takes 15+ seconds), the last writer wins and the registry remains valid JSON.
+
+**Why not json5 package:** The registry is plain JSON written by `jq`, not JSON5.
+
+**Why not a JSON schema validator (zod):** Single-operator trusted environment. TypeScript interface + `JSON.parse` type assertion is sufficient. Adding zod adds a dependency for no practical security gain in this context.
 
 ---
 
-## Anti-Patterns: What NOT to Add
+### Capability 4: Tmux Session Spawning and Management
 
-### Don't Add
-| Library | Why Not |
-|---------|---------|
-| `react-virtualized` | Deprecated (maintainer recommends `react-window` or `@tanstack/react-virtual`), but timeline library handles virtualization |
-| `blessed` / `node-pty` wrappers | Already have node-pty; blessed is for TUI apps, not web UIs |
-| `Module Federation` | Overkill for single-server deployment; Vite glob imports suffice |
-| `Webpack` | Would conflict with Vite; no migration needed |
-| `MUI`, `Ant Design`, `Chakra UI` | Full UI frameworks conflict with existing Tailwind design system; 100kb+ bundle overhead |
-| `recharts`, `d3` for timelines | Timeline library handles rendering; don't over-engineer |
-| `json5` | Already used for OpenClaw config; don't need for new features |
+**Requirement:** POST `/api/gsd/spawn` launches a new GSD session. POST `/api/gsd/sessions/:session/command` runs a menu-driver action. GET endpoints check session existence.
 
----
+**Decision: Extend `TmuxSessionManager` with a `spawnGsdSession` method + call scripts via `execFile` — no new dependency.**
 
-## Migration Notes
+`TmuxSessionManager` already has:
+- `listAgentSessions()` — filtered session list
+- `sessionExists()` — check if a session is live
+- `destroySession()` — kill a session
+- `sendPromptToSession()` — send keystrokes via `tmux send-keys` (already usable for `/api/gsd/sessions/:session/prompt`)
 
-### package.json Changes
-```diff
-"dependencies": {
-  "better-sqlite3": "^11.0.0",
-  "cors": "^2.8.5",
-  "express": "^5.0.0",
-  "node-pty": "^1.0.0",
-  "socket.io": "^4.8.0",
-+ "ansi_up": "^6.0.2"
-},
-"devDependencies": {
-  "@playwright/test": "^1.58.2",
-  "@tailwindcss/vite": "^4.1.18",
-  "@types/better-sqlite3": "^7.6.0",
-  "@types/cors": "^2.8.17",
-  "@types/express": "^5.0.0",
-  "@types/node": "^22.0.0",
-  "@types/react": "^19.0.0",
-  "@types/react-dom": "^19.0.0",
-  "@vitejs/plugin-react": "^4.3.0",
-  "@xterm/addon-fit": "^0.10.0",
-  "@xterm/addon-web-links": "^0.11.0",
-  "concurrently": "^9.0.0",
-+ "framer-motion": "^11.11.17",
-  "react": "^19.0.0",
-  "react-dom": "^19.0.0",
-+ "react-modal-sheet": "^3.1.0",
-+ "@gravity-ui/timeline": "^0.1.0",
-  "socket.io-client": "^4.8.0",
-  "tailwindcss": "^4.0.0",
-  "tsx": "^4.19.0",
-  "typescript": "^5.7.0",
-  "vite": "^6.0.0",
-  "xterm": "^5.3.0"
+New methods to add to `TmuxSessionManager`:
+
+```typescript
+// Add to TmuxSessionManager class:
+
+async spawnGsdSession(
+  agentId: string,
+  workingDirectory: string,
+  firstCommand: string
+): Promise<{ sessionName: string; stdout: string }> {
+  const { stdout, stderr } = await execFileAsync(
+    SPAWN_SCRIPT_PATH,
+    [agentId, workingDirectory, firstCommand],
+    { timeout: 60_000 }
+  );
+  // spawn.sh logs "Attach: tmux attach -t <name>" at the end
+  const sessionMatch = stdout.match(/Attach: tmux attach -t (\S+)/);
+  const sessionName = sessionMatch?.[1] ?? `${agentId}-main`;
+  return { sessionName, stdout };
+}
+
+async runMenuDriverAction(
+  sessionName: string,
+  action: MenuDriverAction,
+  actionArgs: string[]
+): Promise<string> {
+  const { stdout } = await execFileAsync(
+    MENU_DRIVER_SCRIPT_PATH,
+    [sessionName, action, ...actionArgs],
+    { timeout: 10_000 }
+  );
+  return stdout;
 }
 ```
 
-### Bundle Size Impact
-| Addition | Estimated Size (gzipped) |
-|----------|-------------------------|
-| `ansi_up` | ~5kb |
-| `react-modal-sheet` | ~8kb |
-| `framer-motion` | ~35kb (tree-shakeable) |
-| `@gravity-ui/timeline` | ~20kb (canvas rendering) |
-| **Total increase** | **~68kb** |
-
-**Current bundle:** ~450kb (estimated)
-**New bundle:** ~518kb (+15%)
-
-**Mitigation:** Code-split timeline and bottom sheet components (only load when Activity view active).
+**Why not add a separate `GsdSessionSpawner` service:** The `TmuxSessionManager` already owns all tmux-related operations. Adding spawn and menu-driver methods keeps the service boundary clean (tmux operations in one place). If it grows too large later, extract — but don't pre-optimize.
 
 ---
 
-## Integration Points
+### Capability 5: STATE.md File Parsing
 
-### 1. Plugin System → Vite Build
-- Plugins discovered at build time via `import.meta.glob()`
-- Manifest validation in `PluginRegistry` service
-- React lazy loading for plugin components
+**Requirement:** GET `/api/gsd/sessions/:session/state` reads `STATE.md` from the session's project's `.planning/` directory and returns parsed fields (phase, progress, status, last activity).
 
-### 2. Activity Events → Socket.IO
-- Terminal output parsed with `ansi_up` in `TerminalStreamService`
-- Activity events emitted via new Socket.IO namespace: `/activity`
-- Client receives real-time events, stores in local state + backend logs to SQLite
+**Decision: `fs/promises.readFile` + regex field extraction — no new dependency.**
 
-### 3. Mobile UI → Existing Layout
-- Bottom sheet replaces fixed sidebar on mobile
-- Tailwind breakpoints control layout switching (`lg:` prefix for desktop)
-- Visual Viewport API already integrated in `App.tsx` (iOS keyboard handling)
+STATE.md structure is consistent across all GSD projects (verified against 3 live files on this machine: warden, gsd-code-skill, getcpsr). The `## Current Position` section always contains these fields:
 
-### 4. Timeline → Activity Events
-- `@gravity-ui/timeline` consumes activity events from `/api/activity/events` endpoint
-- Virtualization handles 1000+ events without DOM bloat
-- Search powered by FTS5 via `/api/activity/search?q=...` endpoint
+```
+Phase: 7 of 7 (Registration, Deployment, and Documentation)
+Plan: 2 of 2 in current phase
+Status: Complete
+Last activity: 2026-02-18 — Phase 7 complete, v2.0 milestone shipped
+Progress: [██████████] 100% (v1.0 complete, v2.0 complete)
+```
+
+Field values are on a single line after the label. No multi-line parsing needed.
+
+```typescript
+import { readFile } from 'fs/promises';
+import path from 'path';
+
+interface ParsedStateFile {
+  phase: string;
+  currentPhaseNumber: number | null;
+  totalPhases: number | null;
+  plan: string;
+  status: string;
+  lastActivity: string;
+  progressPercent: number | null;
+  progressBar: string;
+  rawContent: string;
+}
+
+function parseStateMdContent(content: string): ParsedStateFile {
+  const extractField = (label: string): string =>
+    content.match(new RegExp(`^${label}:\\s*(.+)$`, 'm'))?.[1]?.trim() ?? '';
+
+  const phaseRaw = extractField('Phase');
+  const phaseMatch = phaseRaw.match(/^(\d+)\s+of\s+(\d+)/);
+  const progressRaw = extractField('Progress');
+  const percentMatch = progressRaw.match(/(\d+)%/);
+
+  return {
+    phase: phaseRaw,
+    currentPhaseNumber: phaseMatch ? parseInt(phaseMatch[1], 10) : null,
+    totalPhases: phaseMatch ? parseInt(phaseMatch[2], 10) : null,
+    plan: extractField('Plan'),
+    status: extractField('Status'),
+    lastActivity: extractField('Last activity'),
+    progressPercent: percentMatch ? parseInt(percentMatch[1], 10) : null,
+    progressBar: progressRaw,
+    rawContent: content,
+  };
+}
+
+class GsdStateReader {
+  async readSessionState(workingDirectory: string): Promise<ParsedStateFile | null> {
+    const statePath = path.join(workingDirectory, '.planning', 'STATE.md');
+    try {
+      const content = await readFile(statePath, 'utf-8');
+      return parseStateMdContent(content);
+    } catch {
+      return null; // Project may not have .planning/STATE.md yet
+    }
+  }
+}
+
+export const gsdStateReader = new GsdStateReader();
+```
+
+**Working directory resolution:** Look up `agent_id` (derived from session name prefix: `sessionName.split('-')[0]`) in `recovery-registry.json` to get `working_directory`. Then construct: `path.join(workingDirectory, '.planning', 'STATE.md')`.
+
+**Why not a markdown parser (marked, remark, unified):** STATE.md is not parsed for markdown structure — only for 5 specific key-value lines in a known section. Regex on a ~100-line file is instant and dependency-free. A markdown parser would add 50–300KB of dependencies and parse structure that isn't needed.
 
 ---
 
-## Verification Checklist
+## Recommended Stack Summary
 
-Before implementing each phase:
+### Zero New Dependencies
 
-- [ ] Verify `ansi_up` version on npm registry (latest: 6.0.2 as of Feb 2026)
-- [ ] Check `react-modal-sheet` React 19 compatibility (peer deps)
-- [ ] Test `@gravity-ui/timeline` with sample dataset (1000+ events)
-- [ ] Validate TypeScript registry pattern compiles with `tsc --noEmit`
-- [ ] Run Playwright mobile viewport tests on existing xterm.js
-- [ ] Benchmark SQLite virtual column query performance (vs non-indexed JSON)
-- [ ] Measure bundle size after adding dependencies (`npm run build` + `du -sh dist/`)
+| Capability | Implementation | Node.js API |
+|------------|---------------|------------|
+| Shell command proxying | `execFile` (promisified) | `child_process` built-in |
+| Real-time log tailing | `fs.watch` + inotify | `fs` built-in |
+| JSON config read/write | `readFile` + `writeFile` + `rename` | `fs/promises` built-in |
+| Tmux session management | Extend `TmuxSessionManager` | Uses existing `execFile` |
+| STATE.md parsing | `readFile` + regex | `fs/promises` built-in |
+| Real-time push to client | Socket.IO `/gsd` namespace | `socket.io` already installed |
+| Plugin UI | `import.meta.glob` auto-discovery | Vite 6 built-in |
+
+### New Files Required
+
+| File | Type | Purpose |
+|------|------|---------|
+| `src/server/services/GsdRegistryService.ts` | Service | Read/write `recovery-registry.json` atomically |
+| `src/server/services/GsdHookLogWatcher.ts` | Service | `fs.watch` on `/tmp/gsd-hooks.log`, emit to `/gsd` namespace |
+| `src/server/services/GsdStateReader.ts` | Service | Read + parse `.planning/STATE.md` from project directory |
+| `src/server/routes/gsdRoutes.ts` | Route module | Mount at `/api/gsd/`, wire services to endpoints |
+| `src/client/plugins/gsd-manager-plugin.tsx` | Plugin | Self-registering bottom-panel plugin component |
+| `src/client/hooks/useGsdSocket.ts` | Hook | Socket.IO `/gsd` namespace hook |
+| `src/client/hooks/useGsdRegistry.ts` | Hook | Fetch + mutate registry via REST |
+| `src/client/hooks/useGsdSessionState.ts` | Hook | Fetch parsed STATE.md for a session |
+| `src/shared/gsdTypes.ts` | Types | Shared TypeScript types for GSD plugin API responses |
+
+### Extensions to Existing Files
+
+| File | Change |
+|------|--------|
+| `src/server/services/TmuxSessionManager.ts` | Add `spawnGsdSession()` and `runMenuDriverAction()` methods |
+| `src/server/index.ts` | Import and mount `gsdRoutes`, initialize `GsdHookLogWatcher` |
+
+---
+
+## What NOT to Use
+
+| Avoid | Why | Use Instead |
+|-------|-----|-------------|
+| `chokidar` | Polling wrapper; on Linux delegates to inotify = same as `fs.watch`; adds ~100KB transitive deps | `fs.watch` built-in |
+| `zod` / `joi` / `yup` | No validation library in project; single-operator trust model; TypeScript interfaces + manual guards sufficient | Manual type guards (see `agentRoutes.ts` pattern) |
+| `json5` npm package | `recovery-registry.json` is plain JSON written by `jq`; `openclaw.json` already handled by existing `OpenClawConfigReader` | `JSON.parse` for registry |
+| `proper-lockfile` / `flock` npm packages | Single writer (operator); atomic rename pattern is correct for this concurrency level | `fs.rename` atomic pattern |
+| `child_process.exec` | Spawns `/bin/sh -c`, enabling argument injection via shell metacharacters | `child_process.execFile` (no shell) |
+| `child_process.spawn` for scripts | More complex API; scripts run to completion so streaming isn't needed | `execFile` with timeout |
+| Rewriting `spawn.sh` in TypeScript | Creates maintenance divergence; script handles edge cases (flock, TUI readiness, jq writes) | Call `spawn.sh` via `execFile` |
+| `marked` / `remark` / `unified` | Full markdown parsers; overkill for reading 5 key-value fields from STATE.md | Regex field extraction |
+| SSE (`EventSource`) | Project uses Socket.IO for all real-time; adding SSE creates a second paradigm | Socket.IO `/gsd` namespace |
+
+---
+
+## Integration Points with Existing Services
+
+### `TmuxSessionManager`
+- `listAgentSessions()` — used by GSD routes to list sessions for the agent grid
+- `sessionExists()` — validate session before running menu-driver commands
+- `destroySession()` — called by stop action in GSD Manager
+- `sendPromptToSession()` — already usable for `/api/gsd/sessions/:session/prompt` (send GSD command via tmux send-keys)
+- **Add:** `spawnGsdSession()` and `runMenuDriverAction()` methods
+
+### `OpenClawConfigReader`
+- `getAgents()` — used to display agent display names alongside registry data (cross-reference by `agent_id`)
+- 30s cache is acceptable for agent names
+
+### `TerminalStreamService` / Socket.IO architecture
+- New `/gsd` namespace follows identical pattern to `/terminal` namespace
+- Instantiated in `index.ts`, passed `SocketIOServer` instance
+- `GsdHookLogWatcher` emits to all `/gsd` subscribers
+
+### `ActivityEventService`
+- Optional: GSD Manager spawn actions can call `activityEventService.capturePromptSent()` to log to the activity timeline
+- Not required for core functionality
+
+---
+
+## Version Compatibility
+
+All new capabilities use Node.js 22 built-in APIs. No version compatibility issues.
+
+| Component | Version | Confirmed By |
+|-----------|---------|-------------|
+| Node.js | v22.22.0 | `node --version` on this machine |
+| `fs.watch` inotify backend | v22 built-in | Manual test on `/tmp/gsd-hooks.log` — fires on append |
+| `fs.rename` atomic semantics | v22 built-in | POSIX guarantee; confirmed in Node.js docs |
+| `execFile` promisified | v22 built-in | Already used in `TmuxSessionManager.ts` |
+| `JSON.parse` on registry | v22 built-in | Manual test — file is valid plain JSON |
+| Socket.IO namespace | 4.8.0 | Read existing `/terminal` namespace implementation |
+| Plugin auto-discovery | Vite 6 + `import.meta.glob` | Read `src/client/plugins/index.ts` |
+| STATE.md field format | — | Verified across 3 projects on this machine |
+
+---
+
+## Installation
+
+```bash
+# No new dependencies required.
+# All capabilities use Node.js 22 built-ins and packages already installed.
+```
 
 ---
 
 ## Sources
 
-### Plugin Architecture
-- [Module Federation V2 in React](https://medium.com/@CorneflexSteve/bootstrap-a-plugin-architecture-in-react-with-webpack-module-federation-and-nx-a6f3d9727f7e)
-- [Scaling TypeScript with Registries - Slash Engineering](https://puzzles.slash.com/blog/scaling-1m-lines-of-typescript-registries)
-- [Manifest Pattern for Type-Safe UIs](https://andrewhathaway.net/blog/manifest-pattern/)
-- [Vite Plugin API](https://vite.dev/guide/api-plugin)
-- [Vite Features - Dynamic Imports](https://vite.dev/guide/features)
-
-### Terminal Output Parsing
-- [ansi_up GitHub](https://github.com/drudru/ansi_up)
-- [ansis - Modern ANSI Library](https://github.com/webdiscus/ansis)
-- [node-ansiparser](https://github.com/netzkolchose/node-ansiparser)
-
-### Mobile UI Components
-- [react-modal-sheet GitHub](https://github.com/Temzasse/react-modal-sheet)
-- [Konsta UI - Mobile Components](https://konstaui.com/)
-- [react-spring-bottom-sheet](https://react-spring.bottom-sheet.dev/)
-- [Material UI Drawer](https://mui.com/material-ui/react-drawer/)
-- [Preline UI - Tailwind CSS Components](https://preline.co/)
-- [daisyUI - Tailwind CSS Plugin](https://daisyui.com/)
-
-### xterm.js Mobile Support
-- [xterm.js Mobile Touch Support Issue #5377](https://github.com/xtermjs/xterm.js/issues/5377)
-- [xterm.js Official Docs](https://xtermjs.org/)
-
-### SQLite Best Practices
-- [SQLite FTS5 Extension](https://sqlite.org/fts5.html)
-- [SQLite JSON Virtual Columns - DB Pro Blog](https://www.dbpro.app/blog/sqlite-json-virtual-columns-indexing)
-- [SQLite Full-Text Search Guide - TheLinuxCode](https://thelinuxcode.com/sqlite-full-text-search-fts5-in-practice-fast-search-ranking-and-real-world-patterns/)
-- [JSON Virtual Columns in SQLite](https://antonz.org/json-virtual-columns/)
-
-### Timeline Libraries
-- [Gravity UI Timeline](https://gravity-ui.com/libraries/timeline)
-- [react-chrono](https://github.com/prabhuignoto/react-chrono)
-- [Comparing React Timeline Libraries - LogRocket](https://blog.logrocket.com/comparing-best-react-timeline-libraries/)
-
-### TypeScript Patterns
-- [Type Registry Pattern - Frontend Masters](https://frontendmasters.com/courses/typescript-v4/type-registry-pattern/)
-- [Function Registry Pattern](https://javascript.plainenglish.io/function-registry-pattern-explained-clean-scalable-composable-code-e483bb7f2444)
+- `/home/forge/warden.kingdom.lv/src/server/services/TmuxSessionManager.ts` — `execFile` promisify pattern (HIGH confidence, read directly)
+- `/home/forge/warden.kingdom.lv/src/server/services/LogTailService.ts` — `fs/promises.readFile` pattern (HIGH confidence, read directly)
+- `/home/forge/warden.kingdom.lv/src/server/services/TerminalStreamService.ts` — Socket.IO namespace pattern (HIGH confidence, read directly)
+- `/home/forge/warden.kingdom.lv/src/server/routes/agentRoutes.ts` — manual type guard validation pattern (HIGH confidence, read directly)
+- `/home/forge/.openclaw/workspace/skills/gsd-code-skill/config/recovery-registry.json` — plain JSON format confirmed (HIGH confidence, read directly + `JSON.parse` verified)
+- `/home/forge/.openclaw/workspace/skills/gsd-code-skill/scripts/spawn.sh` — interface `<agent> <workdir> [first-command]`, runtime ~15-30s, outputs `Attach: tmux attach -t <name>` (HIGH confidence, full read)
+- `/home/forge/.openclaw/workspace/skills/gsd-code-skill/scripts/menu-driver.sh` — actions allowlist: `snapshot|enter|esc|clear_then|choose|type|submit` (HIGH confidence, full read)
+- `node --version` → v22.22.0 (HIGH confidence, executed)
+- Manual test: `fs.watch` on `/tmp/gsd-hooks.log` registers without error; inotify-backed on Linux (HIGH confidence, executed)
+- Manual test: `execFile('tmux', ['list-sessions', ...])` returns session list (HIGH confidence, executed)
+- Manual test: `JSON.parse(fs.readFileSync(registry-path))` succeeds (HIGH confidence, executed)
+- Manual test: atomic `writeFile` + `rename` pattern works correctly (HIGH confidence, executed)
+- STATE.md verified in 3 projects (warden, gsd-code-skill, getcpsr): consistent `Phase:`, `Plan:`, `Status:`, `Progress:`, `Last activity:` fields (HIGH confidence, all 3 files read)
+- `/tmp/gsd-hooks.log` — line format `[ISO-TIMESTAMP] [script-name] message` confirmed (HIGH confidence, read directly)
 
 ---
 
-## Confidence Assessment
-
-| Area | Confidence | Notes |
-|------|-----------|-------|
-| ANSI Parsing | HIGH | `ansi_up` actively maintained, zero deps, TypeScript support |
-| Mobile Bottom Sheet | MEDIUM-HIGH | `react-modal-sheet` well-documented, React StrictMode caveat noted |
-| Virtualized Timeline | MEDIUM | `@gravity-ui/timeline` newer library, backup plan: custom implementation |
-| Plugin Architecture | HIGH | Vite glob imports + TS registry pattern validated in production |
-| Mobile Terminal | HIGH | xterm.js partial mobile support confirmed, custom handlers for gaps |
-| SQLite Schema | HIGH | Virtual columns + FTS5 patterns verified in official docs |
-| Bundle Size | HIGH | Total increase ~68kb, acceptable for feature scope |
-
-**Overall confidence:** MEDIUM-HIGH
-
-**Risks:**
-1. `@gravity-ui/timeline` stability unknown — mitigate with early Phase 1 testing, fallback to custom virtualized list
-2. `react-modal-sheet` React StrictMode issues — mitigate by testing in dev mode early, contribute fix upstream if needed
-3. Mobile xterm.js touch handling — mitigate with custom `TouchHandlingService`, document limitations in mobile UX
-
-**All risks have documented mitigations and do not block MVP delivery.**
+*Stack research for: GSD Manager Plugin (milestone v2.1) on Warden Dashboard*
+*Researched: 2026-02-18*

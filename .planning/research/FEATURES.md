@@ -1,20 +1,25 @@
-# Feature Landscape: Mission Control v2.0
+# Feature Research: GSD Manager Plugin
 
-**Domain:** Terminal multiplexer dashboard for OpenClaw agent sessions — v2.0 milestone (plugin registry, activity timeline, mobile UI)
-**Researched:** 2026-02-16
+**Domain:** Process management control panel — GSD skill browser UI (agent spawning, command dispatch, hook monitoring, registry management, inline CLI reference)
+**Researched:** 2026-02-18
+**Milestone:** v2.1 GSD Manager Plugin
 **Confidence:** HIGH
 
-## Executive Summary
+---
 
-This research covers three distinct feature domains for Warden Dashboard v2.0, building on top of the existing v1.x foundation (live terminal streaming, session tabs, prompt panel, agent sidebar, session history, token usage, log viewer):
+## Context
 
-1. **Plugin/Tool Registry** — Type-safe registration, metadata-driven discovery, UI rendering
-2. **Agent Activity/Audit Timeline** — Structured event capture, terminal output parsing, audit trail
-3. **Mobile-First UI** — Responsive terminal emulator, touch gestures, bottom-sheet actions, collapsible panels
+This research is scoped to the NEW features for the GSD Manager Plugin — a `bottom-panel` plugin that wraps GSD CLI tooling in a browser UI. It does NOT re-document features already built in v1.x / v2.0 (terminals, activity timeline, prompt panel, plugin system, etc.).
 
-Each domain has clear table stakes (expected behavior), differentiators (competitive advantages), and anti-features (commonly requested but problematic).
+Existing Warden services this plugin can reuse:
+- `GatewayApiClient` — sends prompts to agents via OpenClaw Gateway (`POST /api/agents/:id/prompt`)
+- `TmuxSessionManager.sendPromptToSession()` — sends keys directly to tmux pane
+- `TmuxSessionManager.destroySession()` — kills a session
+- `instanceRoutes` — `/api/instances` for current session list
+- Plugin slot `bottom-panel` — rendered in terminals view below the terminal
+- Plugin manifest/registration — drop-in `.tsx` file auto-discovered by `import.meta.glob`
 
-**Key insight:** These features are NOT independent. Plugin registry enables activity timeline extensions (custom event parsers as plugins). Mobile UI must work with both terminals AND activity feeds. Design for composition, not isolation.
+New backend needed: `gsdRoutes.ts` at `/api/gsd/` — wraps `spawn.sh`, `menu-driver.sh`, `recovery-registry.json`, `STATE.md` reads, `/tmp/gsd-hooks.log` tail.
 
 ---
 
@@ -22,343 +27,246 @@ Each domain has clear table stakes (expected behavior), differentiators (competi
 
 ### Table Stakes (Users Expect These)
 
-Features users assume exist. Missing these = product feels incomplete or broken.
+Features the operator will assume exist. Missing any of these = plugin feels incomplete.
 
-| Feature | Why Expected | Complexity | Dependencies |
-|---------|--------------|------------|--------------|
-| **Plugin Registry — Metadata Display** | Users need to see what plugins are loaded, their version, status | LOW | Manifest schema |
-| **Plugin Registry — Manual Enable/Disable** | Core registry UX — users must control which plugins are active | LOW | Metadata display |
-| **Activity Timeline — Chronological Event List** | Audit logs/activity feeds are always time-ordered | LOW | SQLite events table |
-| **Activity Timeline — Event Detail Panel** | Users need to see full context of an event when selected | LOW | Event list |
-| **Activity Timeline — Filter by Agent** | Multi-agent system — users need to scope timeline to one agent | LOW | Existing agent filter logic |
-| **Activity Timeline — Date Range Filter** | Standard audit log feature — users want to scope by time | MEDIUM | Existing history date filter |
-| **Activity Timeline — Export to CSV/JSON** | Audit compliance — users can export activity logs for analysis | LOW | Event list |
-| **Mobile UI — Full-Width Responsive Layout** | Mobile-first = 100% width on phone, adaptive on tablet | LOW | Tailwind responsive utilities |
-| **Mobile UI — Touch Scrolling** | Mobile terminals must support native touch scroll | MEDIUM | xterm.js custom touch handler |
-| **Mobile UI — Collapsible Panels (Accordion)** | Mobile screen space is scarce — panels must collapse | MEDIUM | Agent details, session logs, token usage |
-| **Mobile UI — Bottom Navigation or Bottom Sheet** | Mobile convention for actions/CTAs at thumb-reachable zone | MEDIUM | Prompt panel redesign |
-| **Mobile UI — Safe Zone at Top (64px)** | When bottom sheet expands, maintain 64px top safe zone for context | LOW | Bottom sheet layout |
+| Feature | Why Expected | Complexity | Warden Dependency |
+|---------|--------------|------------|-------------------|
+| **Agent grid — session status display** | Operator needs to see which agents are live vs stopped at a glance | LOW | `/api/instances` (existing) |
+| **Agent grid — working directory display** | Registry entries store `working_directory`; operator needs to know which project each agent is working on | LOW | `/api/gsd/registry` (new) |
+| **Quick command — preset GSD slash commands** | The 6 core GSD commands (`/gsd:resume-work`, `/gsd:quick`, `/gsd:new-milestone`, `/gsd:execute-phase`, `/gsd:plan-phase`, `/gsd:progress`) are the main driver of agent behavior; operators run these constantly | LOW | `POST /api/gsd/sessions/:session/command` (new) |
+| **Quick command — custom command input** | Operator sometimes needs non-preset commands; must not be locked into presets | LOW | Same as above |
+| **Quick command — success/error feedback** | After sending a command, operator needs to know if it was delivered or if something failed | LOW | Response from command endpoint |
+| **Recovery registry viewer — agent list** | The registry is the source of truth for all managed agents; operator needs to see it | LOW | `/api/gsd/registry` (new) |
+| **Recovery registry viewer — enabled/disabled toggle** | Operators enable/disable agents to control auto-wake behavior; hand-editing JSON is error-prone | MEDIUM | `PATCH /api/gsd/registry/agents/:id` (new, writes JSON file) |
+| **Hook activity feed — recent events** | `/tmp/gsd-hooks.log` is the only real-time signal about what hooks are firing and whether agents are matched; operators need to see this from the browser | LOW | `/api/gsd/hooks/log` (new, file read) |
+| **Spawn agent — agent name and workdir inputs** | Core workflow: operator picks agent identifier and project directory, clicks spawn | MEDIUM | `POST /api/gsd/spawn` (new, exec spawn.sh) |
+| **Manual command reference — inline bash equivalent** | Every UI action should show the equivalent bash command (per PRD); operators need to understand what the UI is doing and fall back to CLI if needed | LOW | Static display, no backend |
+| **Collapsible sections** | Bottom panel has limited vertical space; all sections must collapse to a header bar | LOW | None (CSS only) |
 
 ### Differentiators (Competitive Advantage)
 
-Features that set the product apart. Not required, but valuable and potentially unique to Warden.
+Features that make this control panel genuinely useful rather than just a novelty.
 
-| Feature | Value Proposition | Complexity | Dependencies |
-|---------|-------------------|------------|--------------|
-| **Plugin Registry — Type-Safe Registration (Build-Time)** | Compile-time guarantees prevent broken plugins at runtime | MEDIUM | Manifest schema, TypeScript |
-| **Plugin Registry — Manifest Pattern** | Co-locate plugin metadata + code + UI config in single manifest | MEDIUM | Type-safe registration |
-| **Plugin Registry — UI Panel Slots** | Plugins can inject custom UI panels (not just backend tools) | HIGH | Manifest pattern, React lazy loading |
-| **Activity Timeline — Structured Event Parsing from Terminal Output** | Parse ANSI terminal output into structured events (tool calls, file edits, commands) | HIGH | Event list, regex/ANSI parser |
-| **Activity Timeline — Activity Stream Protocol (Actor/Verb/Object/Target)** | Structured events follow standard: "Agent → Executed → Command → in Session X" | MEDIUM | Event schema |
-| **Activity Timeline — Linked Events (Context)** | Click a terminal output event → jump to terminal session at that timestamp | MEDIUM | session_logs table, terminal scroll API |
-| **Activity Timeline — Success/Failure State Indicators** | Events show whether action succeeded or failed (exit code, error messages) | LOW | Event parsing, metadata |
-| **Mobile UI — Predictive Touch Input (Mosh Pattern)** | Display keystrokes instantly without waiting for server roundtrip | HIGH | Custom xterm.js addon, optimistic rendering |
-| **Mobile UI — Progressive Enhancement (Desktop → Mobile)** | Start with mobile base styles, add desktop features via min-width breakpoints | LOW | Mobile-first CSS |
-| **Mobile UI — Gesture Library (Swipe, Pinch)** | Native-feeling gestures for tab switching, terminal zoom | MEDIUM | Hammer.js, xterm.js integration |
-| **Mobile UI — Offline-First with Service Worker** | Cache UI shell and recent sessions for offline terminal viewing | HIGH | Service worker, IndexedDB |
+| Feature | Value Proposition | Complexity | Warden Dependency |
+|---------|-------------------|------------|-------------------|
+| **Agent grid — state hint display** | The stop-hook sends `state` (idle / menu / working / error / permission_prompt); showing this in the grid tells operator exactly what Claude is doing without opening the terminal | MEDIUM | `/api/gsd/sessions/:session/state` reads STATE.md + hook log inference |
+| **Agent grid — context pressure indicator** | Stop-hook extracts context pressure percentage (e.g. "72% [WARNING]"); exposing this warns operator before agent hits context limit | MEDIUM | Same as above, STATE.md or hook log parsing |
+| **Spawn agent — auto-detect first command** | Mirror spawn.sh's `choose_first_cmd()` logic: if `.planning/` exists → suggest `/gsd:resume-work`; if `PRD.md` exists → suggest `/gsd:new-project @PRD.md`; show the suggestion so operator can override | MEDIUM | `POST /api/gsd/spawn` with auto-detect flag, or client-side inference |
+| **Quick command — session selector tied to tab bar** | Pre-select the command target to match the terminal tab currently open; reduces cognitive load ("which session am I sending to?") | LOW | `selectedSessionName` prop from App.tsx, passed via plugin context |
+| **Hook activity feed — per-agent filtering** | Multiple agents generate hook events; operator needs to filter to one agent's events without wading through all others | LOW | Client-side filter on log lines (all lines contain `tmux_session=`) |
+| **Hook activity feed — auto-poll with freshness indicator** | Hook log is a file; poll every 5s, show "Updated Xs ago" so operator knows if the feed is live | LOW | Polling `/api/gsd/hooks/log` — no WebSocket needed at this scale |
+| **Registry viewer — launch command display** | `claude_launch_command` and `claude_post_launch_mode` are config fields operators sometimes need to verify | LOW | `/api/gsd/registry` response includes these fields |
+| **Inline bash reference — copy-to-clipboard** | State-changing "Copy" → "Copied!" button next to every bash snippet; operator can paste into terminal for manual override without retyping | LOW | Browser `navigator.clipboard.writeText()` |
+| **Session state — read STATE.md** | Show current phase, progress %, and last activity date from `.planning/STATE.md` when available | MEDIUM | `/api/gsd/sessions/:session/state` (new, reads file at registry's `working_directory`) |
 
 ### Anti-Features (Commonly Requested, Often Problematic)
 
-Features that seem good but create problems. Document to prevent scope creep.
-
 | Feature | Why Requested | Why Problematic | Alternative |
 |---------|---------------|-----------------|-------------|
-| **Plugin Registry — Auto-Install from Public Registry** | Convenience (npm-like plugin install) | Security risk (arbitrary code execution), complexity (sandboxing, versioning, updates) | Manual install from known sources only, documented install process |
-| **Plugin Registry — Plugin Marketplace UI** | Discoverability | Scope creep for v2.0, requires hosting, moderation, legal (ToS, liability) | Documentation page with recommended plugins, GitHub topic tags |
-| **Activity Timeline — Real-Time WebSocket Streaming of Every Event** | "Live updates feel modern" | Overwhelming for high-volume agents, performance bottleneck, UI churn | Polling every 10s (matches instance tracker), manual refresh button |
-| **Activity Timeline — AI-Powered Event Summarization** | "Summarize last hour of activity" | API costs, latency, unreliable for audit purposes | Structured filters (event type, agent, date) + export for external analysis |
-| **Activity Timeline — Immutable Event Log with Blockchain** | "Tamper-proof audit trail" | Massive overkill for single-user tool, complexity, storage bloat | SQLite with append-only writes, export to read-only CSV for archival |
-| **Mobile UI — Gesture Overload (10+ Custom Gestures)** | "Power user shortcuts" | Discoverability problem, steep learning curve, conflicts with OS gestures | Stick to standard gestures (scroll, tap, swipe for tabs), explicit buttons for actions |
-| **Mobile UI — Separate Mobile App (Native iOS/Android)** | "Better performance than web" | Development/maintenance cost 3x (iOS + Android + Web), distribution hassle (App Store) | Progressive Web App (PWA) with native-like UX, add to home screen |
-| **Mobile UI — Mobile-Specific Feature Parity Reduction** | "Mobile users don't need full features" | Users resent being treated as second-class citizens | Full feature parity on mobile, just different UI patterns (bottom sheets vs sidebars) |
+| **Edit recovery-registry.json inline** | Operators want to change `system_prompt`, `claude_launch_command` from UI | JSON editing UX in a browser is fragile; schema enforcement difficult; concurrent writes from hooks can clobber edits; partial edits corrupt registry | Support toggle (enabled/disabled) and discrete field updates (PATCH endpoints) only; keep full edits in the file system |
+| **Edit STATE.md or PROJECT.md from UI** | State looks editable; operators want to advance phase markers manually | PRD explicitly flags this as a non-goal; STATE.md is auto-maintained by GSD workflow; manual edits break GSD's tracking assumptions | Read-only display; operators who need to advance state use GSD commands via the command panel |
+| **WebSocket streaming for hook log** | "Real-time" hook events feel more alive | Hook log is a local file appended by bash scripts; `tail -f` via PTY or `fs.watch()` would add complexity with minimal gain at single-operator scale; polling every 5s is imperceptible | Polling at 5s with freshness indicator; operator sees events within 5s which is fast enough for diagnostic purposes |
+| **Spawn agent — system prompt text editor** | spawn.sh supports `--system-prompt`; operators want to set custom prompts | Multi-line text editors in a bottom panel are cramped; system prompts are long and need careful editing; prompts should live in registry or files for traceability | System prompt path field only (pass a file path); the file itself is edited outside Warden; show current prompt as read-only preview |
+| **Kill session button in this plugin** | Seems logical alongside spawn | Already available in `InstanceTabBar` (existing stop button per session); duplicating it here creates confusion about authoritative kill point | Link to the session tab; keep kill in existing UI |
+| **Agent auto-wake toggle UI** | Registry has `auto_wake` field | Requires understanding of OpenClaw agent wake behavior; risk of operator accidentally disabling recovery for a critical agent | Show `auto_wake` as read-only label next to enabled toggle; add to v2.x if demand exists |
+| **Real-time terminal-in-panel** | "See the terminal without switching tabs" | Full xterm.js terminal in a bottom panel is a new PTY connection — doubles resource usage; already solved by the Terminals view | Deep-link "open in terminal" button that switches to the Terminals view and selects that session |
 
 ---
 
 ## Feature Dependencies
 
 ```
-Plugin Registry — Metadata Display
-    └──requires──> Plugin Registry — Manifest Schema
+Agent Grid — State Hint Display
+    └──requires──> /api/gsd/sessions/:session/state (new)
+                       └──requires──> working_directory from /api/gsd/registry
+                       └──reads──> .planning/STATE.md at that path
 
-Plugin Registry — UI Panel Slots
-    └──requires──> Plugin Registry — Manifest Schema
-    └──requires──> Plugin Registry — Type-Safe Registration
+Agent Grid — Context Pressure
+    └──requires──> Hook log parsing OR STATE.md parsing
+    └──enhances──> Agent Grid — State Hint Display
 
-Plugin Registry — Type-Safe Registration
-    └──requires──> Plugin Registry — Manifest Schema
+Spawn Agent — auto-detect first command
+    └──requires──> /api/gsd/spawn POST endpoint
+    └──enhances──> Quick Command (suggests first command as a preset)
 
-Activity Timeline — Chronological Event List
-    └──requires──> SQLite events table (new)
+Quick Command — session selector tied to tab bar
+    └──requires──> Plugin receives selectedSessionName from plugin context
+                       └──requires──> PluginSlotRenderer to pass App state as context prop
 
-Activity Timeline — Structured Event Parsing
-    └──requires──> Activity Timeline — Event Detail Panel
-    └──enhances──> Activity Timeline — Linked Events (Context)
+Registry Viewer — enabled toggle
+    └──requires──> /api/gsd/registry GET (to render current state)
+    └──requires──> PATCH /api/gsd/registry/agents/:id (to write)
+    └──requires──> File lock awareness (spawn.sh uses flock; server PATCH must also lock)
 
-Activity Timeline — Linked Events (Context)
-    └──requires──> session_logs table (existing)
-    └──requires──> Activity Timeline — Event Detail Panel
+Hook Activity Feed — per-agent filter
+    └──requires──> /api/gsd/hooks/log GET (raw log lines)
+    └──enhances──> Agent Grid (can show last hook event per agent)
 
-Activity Timeline — Success/Failure State Indicators
-    └──requires──> Activity Timeline — Structured Event Parsing
+Manual Command Reference — copy to clipboard
+    └──requires──> Any action that generates a bash equivalent string
+    └──enhances──> All other features (cross-cutting UX concern)
 
-Mobile UI — Bottom Sheet
-    └──requires──> Mobile UI — Collapsible Panels (accordion)
-    └──enhances──> Prompt Panel (existing)
-
-Mobile UI — Touch Scrolling
-    └──requires──> xterm.js addon or custom handler
-    └──conflicts──> xterm.js default mouse handling
-
-Mobile UI — Predictive Touch Input (Mosh Pattern)
-    └──requires──> Mobile UI — Touch Scrolling
-    └──conflicts──> Socket.IO buffering (requires custom buffering)
-
-Mobile UI — Gesture Library
-    └──requires──> Mobile UI — Touch Scrolling
-    └──conflicts──> xterm.js default touch handling
-
-Mobile UI — Progressive Enhancement
-    └──requires──> Mobile UI — Full-Width Responsive Layout
+Session State — STATE.md display
+    └──requires──> /api/gsd/sessions/:session/state
+    └──enhances──> Agent Grid (adds phase/progress to each agent card)
 ```
 
 ### Dependency Notes
 
-- **Plugin Registry — Type-Safe Registration requires Manifest Schema**: Manifest is the source of truth for plugin metadata; registration enforces the schema at build time (TypeScript `interface` + Zod/Ajv validation).
-- **Activity Timeline — Structured Event Parsing enhances Linked Events**: Parsing terminal output into structured events enables "click event → jump to terminal at timestamp" UX. Without parsing, timeline is just a dumb log.
-- **Mobile UI — Touch Scrolling conflicts with xterm.js default mouse handling**: xterm.js has limited touch support as of 2026 ([Issue #5377](https://github.com/xtermjs/xterm.js/issues/5377)); custom touch handler may be needed. Investigate xterm.js addon ecosystem first.
-- **Mobile UI — Predictive Touch Input conflicts with Socket.IO buffering**: Mosh-style instant echo requires custom buffering logic to avoid double-rendering when server echo arrives. High complexity, defer to v3+.
-- **Mobile UI — Bottom Sheet enhances existing Prompt Panel**: Move PromptPanel into bottom sheet on mobile for thumb-reachable prompt injection. Desktop keeps sidebar. Same component, different layout.
+- **Plugin context / session selector:** The existing `PluginSlotRenderer` renders `<PanelComponent />` with no props. To pass `selectedSessionName` into the GSD plugin, either the plugin context needs to be extended, or the plugin fetches it from `/api/instances` itself. The latter is simpler: plugin polls instances and cross-references with registry.
+
+- **File locking for registry PATCH:** `spawn.sh` uses `flock` on a `.lock` file when writing the registry. The `/api/gsd/registry/agents/:id` PATCH must also honor this lock (use `child_process.execFile('flock', ...)` wrapper or write a shell helper) to avoid race conditions when an agent spawns while the operator toggles enabled status.
+
+- **STATE.md path:** The path is `{working_directory}/.planning/STATE.md` where `working_directory` comes from the registry entry. The endpoint must resolve this per-agent, not assume a fixed project path.
+
+- **Hook log parsing for state hint:** Hook log lines contain `state=working`, `state=idle`, `state=menu`, `state=error`. Parsing the last matching line per session gives a cheap state approximation without a new data store.
 
 ---
 
 ## MVP Definition
 
-### Launch With (v2.0)
+### Launch With (v2.1 — Plugin v1.0)
 
-Minimum viable feature set for v2.0 milestone. Validates core concepts.
+Minimum viable set that validates the control-center concept and replaces the most common CLI workflows.
 
-#### Plugin Registry (P1)
-- [ ] **Manifest Schema** — JSON schema for plugin metadata (name, version, description, enabled, dependencies)
-- [ ] **Metadata Display** — Table of plugins with name, version, status (active/inactive), description
-- [ ] **Manual Enable/Disable** — Toggle button per plugin, persists to `~/.openclaw/warden-plugins.json`
+- [ ] **Agent grid with session status** — show active/idle/stopped per agent, pulling from `/api/instances` + registry merge — _validates the agent grid concept_
+- [ ] **Preset GSD commands** — 6 preset buttons (`/gsd:resume-work`, `/gsd:quick <task>`, `/gsd:new-milestone`, `/gsd:execute-phase`, `/gsd:plan-phase <n>`, `/gsd:progress`) sent via `menu-driver.sh clear_then` — _core operator workflow_
+- [ ] **Custom command input** — free text box + send button — _covers commands not in presets_
+- [ ] **Command success/error feedback** — inline status message (same pattern as PromptPanel) — _operator confidence_
+- [ ] **Recovery registry viewer — agent list** — read-only display of registry agents with enabled status indicator — _audit visibility_
+- [ ] **Enabled/disabled toggle** — PATCH `/api/gsd/registry/agents/:id` — _replaces hand-editing JSON_
+- [ ] **Hook activity feed — last 20 events** — polled every 5s from `/api/gsd/hooks/log` — _diagnostic value_
+- [ ] **Spawn agent form** — agent name, workdir, optional first command, submit button calling `spawn.sh` — _core operator workflow_
+- [ ] **Inline bash reference** — collapsible "Manual" row below each action with copy button — _PRD requirement; operator trust_
+- [ ] **Collapsible sections** — Agent Grid, Quick Actions, Hook Feed, Registry — accordion behavior — _space management in bottom panel_
 
-#### Activity Timeline (P1)
-- [ ] **SQLite Events Table** — Schema: `{ id, agent_id, event_type, actor, verb, object, target, metadata, timestamp, success }`
-- [ ] **Chronological Event List** — Time-sorted list of agent activity events (newest first)
-- [ ] **Event Detail Panel** — Click event → see full metadata (actor, verb, object, target, timestamp, success/failure)
-- [ ] **Filter by Agent** — Dropdown to scope timeline to single agent (reuse existing filter component)
-- [ ] **Date Range Filter** — Start/end date picker for time-scoped queries (reuse existing history filter)
-- [ ] **Export to CSV/JSON** — Download button for audit compliance
+### Add After Validation (v2.1.x)
 
-#### Mobile UI (P1)
-- [ ] **Full-Width Responsive Layout** — App renders correctly on 375px (iPhone SE) to 1920px (desktop)
-- [ ] **Collapsible Panels (Accordion)** — Agent details, session logs, token usage collapse on mobile (<768px)
-- [ ] **Bottom Navigation/Bottom Sheet** — Prompt panel moves to bottom sheet on mobile, sidebar on desktop
-- [ ] **Touch Scrolling** — Terminal supports native touch scroll (custom handler if xterm.js addon unavailable)
-- [ ] **Safe Zone at Top (64px)** — Bottom sheet full-height maintains 64px top margin for context
+- [ ] **State hint display** — parse hook log for last `state=` line per agent, show idle/menu/working/error badge — _trigger: operators asking "what is this agent doing?"_
+- [ ] **Context pressure indicator** — parse `XX% [WARNING/CRITICAL]` from hook log per agent — _trigger: agents hitting context limit unnoticed_
+- [ ] **Session selector tied to tab bar** — pre-select command target from currently viewed terminal session — _trigger: friction sending commands to wrong agent_
+- [ ] **STATE.md phase + progress display** — show phase X/N and progress % per agent — _trigger: operators asking "how far along is this project?"_
+- [ ] **Spawn agent auto-detect first command** — mirror spawn.sh logic, show suggested command in form — _trigger: operators spawning wrong command type_
+- [ ] **Per-agent hook feed filter** — client-side filter on log lines by agent/session name — _trigger: multi-agent operators confused by mixed feed_
 
-### Add After Validation (v2.x)
+### Future Consideration (v2.2+)
 
-Features to add once core is working and usage patterns emerge.
-
-#### Plugin Registry (P2)
-- [ ] **Type-Safe Registration (Build-Time)** — Enforce manifest schema at compile time with TypeScript + Zod
-- [ ] **Manifest Pattern** — Co-locate plugin metadata + code + UI config in `src/plugins/{pluginName}/manifest.ts`
-
-#### Activity Timeline (P2)
-- [ ] **Structured Event Parsing** — Parse terminal output for tool calls (`Edited file X`), file edits, commands (`$ git commit`)
-- [ ] **Activity Stream Protocol** — Standardize event schema (Actor/Verb/Object/Target): `"Warden → Edited → server.ts → in warden-dashboard-abc123"`
-- [ ] **Success/Failure State Indicators** — Green dot for success, red for failure, amber for partial (parse exit codes, error keywords)
-- [ ] **Linked Events (Context)** — Click event → jump to terminal session at timestamp (requires session_logs offset mapping)
-
-#### Mobile UI (P2)
-- [ ] **Progressive Enhancement** — Mobile-first CSS with desktop enhancements via `@media (min-width: 768px)`
-- [ ] **Gesture Library** — Swipe left/right for tab switching, pinch to zoom terminal font size
-
-### Future Consideration (v3+)
-
-Features to defer until product-market fit is established and v2.0 is stable.
-
-#### Plugin Registry (P3)
-- [ ] **UI Panel Slots** — Plugins inject custom React components into dashboard (e.g., custom metrics panel)
-
-#### Mobile UI (P3)
-- [ ] **Predictive Touch Input (Mosh Pattern)** — Instant keystroke echo without server roundtrip
-- [ ] **Offline-First with Service Worker** — Cache UI shell and sessions for offline viewing
+- [ ] **Hook log SSE streaming** — Server-Sent Events push log lines as they appear — _defer: polling at 5s is sufficient for diagnostic use; SSE adds server-side complexity_
+- [ ] **Registry field editor** — PATCH discrete fields (topic_id, claude_post_launch_mode) — _defer: currently low demand; hand-editing file is acceptable_
+- [ ] **System prompt path field in spawn form** — pass `--system-prompt /path/to/file` to spawn.sh — _defer: advanced use case, most agents use defaults_
+- [ ] **Recovery diagnostics — run diagnose-hooks.sh** — button to run the diagnostic script and show output — _defer: niche; `diagnose-hooks.sh` is already CLI-friendly_
 
 ---
 
 ## Feature Prioritization Matrix
 
-| Feature | User Value | Implementation Cost | Priority |
-|---------|------------|---------------------|----------|
-| **Plugin Registry — Manifest Schema** | MEDIUM | MEDIUM | P1 |
-| Plugin Registry — Metadata Display | HIGH | LOW | P1 |
-| Plugin Registry — Manual Enable/Disable | HIGH | LOW | P1 |
-| Plugin Registry — Type-Safe Registration | MEDIUM | MEDIUM | P2 |
-| Plugin Registry — Manifest Pattern | MEDIUM | MEDIUM | P2 |
-| Plugin Registry — UI Panel Slots | LOW | HIGH | P3 |
-| **Activity Timeline — SQLite Events Table** | HIGH | MEDIUM | P1 |
-| Activity Timeline — Chronological Event List | HIGH | LOW | P1 |
-| Activity Timeline — Event Detail Panel | HIGH | LOW | P1 |
-| Activity Timeline — Filter by Agent | HIGH | LOW | P1 |
-| Activity Timeline — Date Range Filter | MEDIUM | MEDIUM | P1 |
-| Activity Timeline — Export to CSV/JSON | MEDIUM | LOW | P1 |
-| Activity Timeline — Structured Event Parsing | HIGH | HIGH | P2 |
-| Activity Timeline — Activity Stream Protocol | MEDIUM | MEDIUM | P2 |
-| Activity Timeline — Success/Failure State Indicators | MEDIUM | LOW | P2 |
-| Activity Timeline — Linked Events (Context) | MEDIUM | MEDIUM | P2 |
-| **Mobile UI — Full-Width Responsive Layout** | HIGH | LOW | P1 |
-| Mobile UI — Collapsible Panels | HIGH | MEDIUM | P1 |
-| Mobile UI — Bottom Sheet | HIGH | MEDIUM | P1 |
-| Mobile UI — Touch Scrolling | HIGH | MEDIUM | P1 |
-| Mobile UI — Safe Zone at Top | LOW | LOW | P1 |
-| Mobile UI — Progressive Enhancement | MEDIUM | LOW | P2 |
-| Mobile UI — Gesture Library | MEDIUM | MEDIUM | P2 |
-| Mobile UI — Predictive Touch Input | LOW | HIGH | P3 |
-| Mobile UI — Offline-First | LOW | HIGH | P3 |
+| Feature | Operator Value | Implementation Cost | Priority |
+|---------|---------------|---------------------|----------|
+| Spawn agent form | HIGH | MEDIUM | P1 |
+| Preset GSD commands | HIGH | LOW | P1 |
+| Custom command input | HIGH | LOW | P1 |
+| Command success/error feedback | HIGH | LOW | P1 |
+| Agent grid — session status | HIGH | LOW | P1 |
+| Collapsible sections | HIGH | LOW | P1 |
+| Recovery registry viewer (read) | MEDIUM | LOW | P1 |
+| Enabled/disabled toggle | MEDIUM | MEDIUM | P1 |
+| Hook activity feed (polled) | MEDIUM | LOW | P1 |
+| Inline bash reference + copy | MEDIUM | LOW | P1 |
+| State hint display | MEDIUM | MEDIUM | P2 |
+| Context pressure indicator | MEDIUM | MEDIUM | P2 |
+| Session selector tied to tab bar | MEDIUM | MEDIUM | P2 |
+| STATE.md display | MEDIUM | MEDIUM | P2 |
+| Spawn auto-detect first command | LOW | MEDIUM | P2 |
+| Per-agent hook feed filter | LOW | LOW | P2 |
+| Hook log SSE streaming | LOW | HIGH | P3 |
+| Registry field editor | LOW | MEDIUM | P3 |
+| System prompt path in spawn | LOW | LOW | P3 |
 
 **Priority key:**
-- **P1**: Must have for v2.0 launch (table stakes or high-value/low-cost differentiators)
-- **P2**: Should have for v2.x after validation (medium-value differentiators, enhance P1 features)
-- **P3**: Nice to have for v3+ (low-value or high-cost, defer until product-market fit)
+- P1: Must have for v2.1 launch
+- P2: Should have; add in v2.1.x patch cycles
+- P3: Defer to v2.2+ or only if explicitly requested
 
 ---
 
-## Competitor / Reference Analysis
+## UX Patterns from Reference Analysis
 
-| Feature | VS Code Extensions | GitHub Activity Feed | Mosh (Mobile Shell) | Material Design 3 | Our Approach |
-|---------|-------------------|---------------------|---------------------|-------------------|--------------|
-| **Plugin Discovery** | Marketplace UI with search, ratings, install counts | N/A | N/A | N/A | Manual install only (v2.0), avoid marketplace scope creep |
-| **Plugin Metadata** | `package.json` manifest with `publisher`, `version`, `engines`, `activationEvents` | N/A | N/A | N/A | JSON schema manifest with name, version, description, enabled state, dependencies |
-| **Plugin Registration** | Extension API with `activate()` function, contribution points | N/A | N/A | N/A | Type-safe registration via manifest + PluginManager class |
-| **Activity Timeline** | N/A | Actor/Verb/Object format ("user pushed to repo") | N/A | N/A | Activity Stream Protocol (Actor/Verb/Object/Target) |
-| **Event Filtering** | N/A | Filter by actor, repo, event type, date | N/A | N/A | Filter by agent, date range, event type (parsed from terminal output) |
-| **Event Detail** | N/A | Click event → expand inline with metadata + diff | N/A | N/A | Right-rail panel with full event metadata + link to terminal session |
-| **Mobile Terminal** | N/A | N/A | Predictive input (instant echo), adaptive to bad connections | N/A | Touch scrolling (custom handler for xterm.js), bottom sheet for actions |
-| **Mobile Navigation** | N/A | N/A | N/A | Bottom nav bar, bottom sheets for modals | Bottom sheet for prompt panel, collapsible accordions for agent details |
-| **Collapsible Panels** | N/A | N/A | N/A | Accordion component (Material 3) | Accordion for agent details, session logs, token usage on mobile |
-| **Offline Support** | N/A | N/A | Mosh maintains connection state across network changes | N/A | Defer to v3+ (service worker + IndexedDB cache) |
+### Agent Spawning UI (confirmed patterns)
 
----
+- **Suggest-and-confirm pattern** (agentic AI UX standard): Show the auto-detected first command as a pre-filled suggestion; operator can override before confirming. Do not auto-spawn without review.
+- **Progressive disclosure**: Spawn form starts collapsed; expands on "Spawn Agent" button click. Advanced options (system prompt path, launch command override) under an "Advanced" expander.
+- **Clear feedback on long-running operations**: `spawn.sh` waits for TUI readiness (up to 20 seconds). Show a "Spawning..." state with an indeterminate progress indicator; show success/error when the endpoint resolves.
 
-## Domain-Specific Patterns
+### Command Dispatch (confirmed patterns)
 
-### Plugin Registries (VS Code, Chrome Extensions, Open VSX)
+- **Preset buttons as primary affordance**: 6 preset command buttons are the primary action surface. Custom input is secondary (collapsed or smaller).
+- **Confirmation dialogs**: Only for destructive or irreversible actions. Sending a GSD command is non-destructive (Claude will handle or ignore it) — no confirmation needed. Spawn is also recoverable (can kill session). Do NOT add confirmation modals to every action (adds friction).
+- **In-place feedback**: Use the same inline status pattern as `PromptPanel` — success message auto-dismisses after 5s, error persists until dismissed. No modal dialogs.
 
-**What they do well:**
-- **Manifest-driven registration**: `package.json` or `manifest.json` as source of truth for metadata
-- **Versioning**: SemVer, compatibility declarations (`"engines": { "vscode": "^1.80.0" }`)
-- **Activation events**: Load plugins lazily when needed (`"activationEvents": ["onCommand:myPlugin.run"]`)
+### Real-Time Log/Event Feed (confirmed patterns)
 
-**Common gaps:**
-- **No build-time type safety**: Manifest schema validated at runtime, not compile time
-- **Complex marketplace**: VS Code Marketplace is proprietary, requires Microsoft account, moderation
+- **Polling over streaming for this scale**: Single operator, file-based log, updates every few seconds. Poll at 5s intervals. WebSocket streaming is overkill here and adds server complexity.
+- **Freshness indicator**: Show "Updated Xs ago" or timestamp of last poll. Makes the feed feel live even with polling.
+- **User-driven refresh**: Add a manual "Refresh" button for operators who want immediate update without waiting 5s.
+- **Newest-first ordering**: Hook events are diagnostic — operators want the latest event, not historical scroll. Newest first, fixed max of 20-50 lines.
+- **No auto-scroll lock**: If operator is reading older events, do not scroll to bottom on new event. Use a "New events" badge at the top that scrolls when clicked.
 
-**Lesson for Warden:** Use manifest pattern, enforce with TypeScript + Zod at build time. Skip marketplace (single-user tool, manual install). Support lazy loading via React.lazy for UI plugins.
+### Process Registry Management (confirmed patterns)
 
-### Activity Timelines (GitHub, SugarCRM, Microsoft Purview)
+- **Toggle switch for enabled/disabled**: Standard UX for enable/disable. Green = enabled, grey = disabled. Show label ("Enabled" / "Disabled") next to toggle to avoid ambiguity.
+- **Optimistic UI with revert**: Apply toggle state immediately in UI, then confirm with server. If PATCH fails, revert and show error — don't leave UI in inconsistent state.
+- **Status indicators with semantic color**: `active` → green dot, `idle` → amber dot, `stopped` → grey dot, `error` → red dot. Consistent with existing `AgentInstanceStatus` type.
 
-**What they do well:**
-- **Activity Stream Protocol**: Standardized event format (Actor/Verb/Object/Target)
-- **Event detail panels**: Click event → see full context in right rail or modal
-- **Filter by multiple dimensions**: Actor, date range, event type, object type
-- **Immutability**: Audit logs are append-only, cannot be altered after creation
-- **Export to CSV/JSON**: Compliance requirement for audit trails
+### Inline Command Reference (confirmed patterns)
 
-**Common gaps:**
-- **No linkage to source context**: GitHub shows diff, but can't jump to file at that commit in IDE
-- **No structured parsing of unstructured data**: Logs are structured (API calls) OR unstructured (terminal output), not both
-
-**Lesson for Warden:** Parse terminal ANSI output into structured events (regex for known patterns: `Edited file X`, `Running command Y`, `Error: Z`). Link events to terminal session at timestamp (requires session_logs offset mapping). Export to CSV/JSON for audit compliance.
-
-### Mobile-First Dashboards (Material Design 3, Toptal Best Practices)
-
-**What they do well:**
-- **Bottom navigation**: Primary actions at thumb-reachable zone (bottom 64px)
-- **Bottom sheets**: Modals slide up from bottom, partial (peek) or full-screen
-- **Collapsible accordions**: Save vertical space, progressive disclosure
-- **Card-based layouts**: Each metric/widget in a self-contained card
-- **Touch target sizing**: Minimum 44x44px (iOS) or 48x48px (Android)
-
-**Common gaps:**
-- **Terminal emulators on mobile**: Limited touch support in xterm.js, predictive keyboards break input
-- **Offline-first**: Most dashboards require constant network connection
-
-**Lesson for Warden:** Bottom sheet for prompt panel (thumb-reachable). Collapsible accordions for agent details, session logs, token usage. Custom touch handler for xterm.js scrolling. Defer offline-first to v3+ (complex, low value for initial release).
+- **Collapsible "Manual" disclosure**: Show the bash equivalent as a collapsed row below each action form. Operator can expand when needed. Not shown by default (reduce visual noise).
+- **Inline compact clipboard copy** (PatternFly / shadcn pattern): Copy button adjacent to the command text. State changes "Copy" → "Copied!" for 2s, then resets.
+- **Monospace code block**: Wrap bash commands in `<code>` with monospace font and subtle background (`bg-warden-bg/50`), matching Warden's terminal aesthetic.
 
 ---
 
-## Research Gaps & Validation Needed
+## Backend API Surface (New Routes)
 
-**MEDIUM confidence areas (require verification during implementation):**
+All new routes are in `src/server/routes/gsdRoutes.ts` mounted at `/api/gsd/`:
 
-1. **xterm.js touch support in 2026:** Has xterm.js added first-class touch support since Issue #5377? Check npm for xterm-addon-touch or similar.
-   - **Impact:** Mobile UI — Touch Scrolling complexity (LOW if addon exists, MEDIUM if custom handler)
-   - **Mitigation:** Start with xterm.js default touch handling, add custom handler only if needed
-
-2. **Activity event volume:** How many events per hour do agents generate? Will 10s polling overwhelm the UI?
-   - **Impact:** Activity Timeline — Real-time streaming vs polling decision
-   - **Mitigation:** Start with manual refresh button, add 10s polling if event volume is manageable (<100/hour)
-
-3. **Terminal output parsing accuracy:** Can we reliably parse ANSI output for tool calls, file edits, commands? Or do we need structured logging from agents?
-   - **Impact:** Activity Timeline — Structured Event Parsing feasibility (HIGH if reliable, defer if unreliable)
-   - **Mitigation:** Start with simple regex patterns (e.g., `Edited file (.+)`), expand as patterns emerge. Fallback: require agents to log structured JSON events to separate file.
-
-4. **Plugin use cases:** What plugins will operators actually want? Custom metrics? Event parsers? UI panels?
-   - **Impact:** Plugin Registry — UI Panel Slots priority (P3 if no demand, P2 if clear use cases)
-   - **Mitigation:** Ship P1 (metadata display, enable/disable) first, gather feedback before building UI slots
+| Endpoint | Method | Action | Key Behavior |
+|----------|--------|--------|--------------|
+| `/api/gsd/registry` | GET | Read recovery-registry.json | JSON parse, return agents array with global hook_settings |
+| `/api/gsd/registry/agents/:agentId` | PATCH | Toggle enabled, update discrete fields | Use flock-compatible write; validate field allow-list |
+| `/api/gsd/spawn` | POST | Run spawn.sh | `execFile` with timeout (30s); stream stdout/stderr to response |
+| `/api/gsd/sessions/:session/command` | POST | Run menu-driver.sh action | `execFile`; action must be in allow-list |
+| `/api/gsd/sessions/:session/state` | GET | Read STATE.md from project .planning/ | Resolve path from registry; graceful 404 if not found |
+| `/api/gsd/hooks/log` | GET | Tail /tmp/gsd-hooks.log | Last N lines (default 50, max 200); optional `?session=` filter |
 
 ---
 
-## Feature Research Sources
+## Sources
 
-### Plugin Registry Research
+### Process Management UI Patterns
+- [Agentic AI Design Patterns — UX Magazine](https://uxmag.com/articles/secrets-of-agentic-ux-emerging-design-patterns-for-human-interaction-with-ai-agents)
+- [Agentic Patterns and Implementation — Salesforce Architects](https://architect.salesforce.com/fundamentals/agentic-patterns)
+- [Top 10 Agentic AI Design Patterns — AufaitUX](https://www.aufaitux.com/blog/agentic-ai-design-patterns-enterprise-guide/)
 
-- [Registry Pattern - GeeksforGeeks](https://www.geeksforgeeks.org/system-design/registry-pattern/)
-- [Optimizing Software Architecture with Plugins | ArjanCodes](https://arjancodes.com/blog/best-practices-for-decoupling-software-using-plugins/)
-- [How to Build Plugin Systems in Python | OneUptime](https://oneuptime.com/blog/post/2026-01-30-python-plugin-systems/view)
-- [Publishing Extensions | Visual Studio Code Extension API](https://code.visualstudio.com/api/working-with-extensions/publishing-extension)
-- [Extension Marketplace | VS Code](https://code.visualstudio.com/docs/configure/extensions/extension-marketplace)
-- [Open VSX Registry](https://open-vsx.org/)
-- [Building A Type-safe Plugin System In Typescript](https://peerdh.com/blogs/programming-insights/building-a-type-safe-plugin-system-in-typescript)
-- [Type-Safe User Interfaces & the Manifest Pattern | Andrew Hathaway](https://andrewhathaway.net/blog/manifest-pattern/)
-- [Extension Manifest | Visual Studio Code Extension API](https://code.visualstudio.com/api/references/extension-manifest)
-- [manifest.json - Mozilla | MDN](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/manifest.json)
+### Real-Time Log Feed Patterns
+- [Activity Stream design pattern — UI Patterns](https://ui-patterns.com/patterns/ActivityStream)
+- [Polling vs Streaming — Svix Resources](https://www.svix.com/resources/faq/polling-vs-streaming/)
+- [UX Strategies for Real-Time Dashboards — Smashing Magazine](https://www.smashingmagazine.com/2025/09/ux-strategies-real-time-dashboards/)
+- [Streaming Options for UI: SSE, WebSocket, Long Poll — VerticalServe/Medium](https://verticalserve.medium.com/streaming-options-for-ui-sse-websocket-and-long-poll-975192248506)
 
-### Activity Timeline Research
+### Inline Command Reference / Copy-to-Clipboard
+- [Clipboard Copy Design Guidelines — PatternFly](https://www.patternfly.org/components/clipboard-copy/design-guidelines/)
+- [UI Copy: UX Guidelines for Command Names and Keyboard Shortcuts — NN/g](https://www.nngroup.com/articles/ui-copy/)
+- [Top 8 UX Patterns for Contextual Help — Chameleon](https://www.chameleon.io/blog/contextual-help-ux)
 
-- [Activity Logs | Business Central Design Patterns](https://alguidelines.dev/docs/navpatterns/patterns/activity-log/)
-- [Audit log activities | Microsoft Learn](https://learn.microsoft.com/en-us/purview/audit-log-activities)
-- [Audit Logging: What It Is & How It Works | Datadog](https://www.datadoghq.com/knowledge-center/audit-logging/)
-- [Historical Summary vs. Activity Stream vs. Audit Log vs. Timeline | Sugar Support](https://support.sugarcrm.com/knowledge_base/user_interface/historical_summary_vs._activity_stream_vs._change_log/)
-- [Audit Logs Overview | Adobe Experience Platform](https://experienceleague.adobe.com/en/docs/experience-platform/landing/governance-privacy-security/audit-logs/overview)
-- [Pattern: Audit logging | Microservices.io](https://microservices.io/patterns/observability/audit-logging.html)
-- [Getting Started with Activity stream | HackerNoon](https://medium.com/hackernoon/getting-started-with-activity-stream-d7d5a528394c)
-- [Logs vs Structured Events - charity.wtf](https://charity.wtf/2019/02/05/logs-vs-structured-events/)
-- [Input Event Processing | Fish Shell](https://deepwiki.com/fish-shell/fish-shell/3.1-initialization-and-configuration)
-
-### Mobile-First UI Research
-
-- [Dashboard Design UX Patterns Best Practices](https://www.pencilandpaper.io/articles/ux-pattern-analysis-data-dashboards)
-- [Dashboard Design: best practices and examples | Justinmind](https://www.justinmind.com/ui-design/dashboard-design-best-practices-ux)
-- [Mobile First Design: Principles, Process, and Examples](https://digitalpresent.io/mobile-first-design/)
-- [Intuitive Mobile Dashboard UI: 4 Best Practices | Toptal](https://www.toptal.com/designers/dashboard-design/mobile-dashboard-ui)
-- [PatternFly Dashboard Guidelines](https://www.patternfly.org/patterns/dashboard/design-guidelines/)
-- [Bottom Sheet UI Design: Best practices | Mobbin](https://mobbin.com/glossary/bottom-sheet)
-- [Bottom Sheets: Definition and UX Guidelines - Nielsen Norman Group](https://www.nngroup.com/articles/bottom-sheet/)
-- [Bottom sheets - Material Design 3](https://m3.material.io/components/bottom-sheets/guidelines)
-- [How to design bottom sheets for optimized user experience | LogRocket](https://blog.logrocket.com/ux-design/bottom-sheets-optimized-ux/)
-- [Accordion UI Design: Best practices | Mobbin](https://mobbin.com/glossary/accordion)
-- [Accordions on Mobile - Nielsen Norman Group](https://www.nngroup.com/articles/mobile-accordions/)
-- [Accordion UI Examples: Best Practices | Eleken](https://www.eleken.co/blog-posts/accordion-ui)
-- [Limited touch support on mobile devices | xterm.js Issue #5377](https://github.com/xtermjs/xterm.js/issues/5377)
-- [Support mobile platforms | xterm.js Issue #1101](https://github.com/xtermjs/xterm.js/issues/1101)
-- [Mosh: the mobile shell](https://mosh.org/)
-- [Learning From Terminals to Design the Future of User Interfaces](https://brandur.org/interfaces)
+### Existing Codebase Reference
+- `spawn.sh` — `/home/forge/.openclaw/workspace/skills/gsd-code-skill/scripts/spawn.sh`
+- `menu-driver.sh` — `/home/forge/.openclaw/workspace/skills/gsd-code-skill/scripts/menu-driver.sh`
+- `recovery-registry.example.json` — `/home/forge/.openclaw/workspace/skills/gsd-code-skill/config/recovery-registry.example.json`
+- `/tmp/gsd-hooks.log` — live hook event log (format: `[ISO8601] [script.sh] key=value`)
+- `PRD-gsd-manager-plugin.md` — product requirements document
 
 ---
 
-*Feature research for: Warden Dashboard v2.0 Mission Control (plugin registry, activity timeline, mobile UI)*
-*Researched: 2026-02-16*
-*Confidence: HIGH (verified via official docs, GitHub issues, and multiple authoritative sources)*
+*Feature research for: GSD Manager Plugin for Warden Dashboard (v2.1 milestone)*
+*Researched: 2026-02-18*
+*Confidence: HIGH (primary sources: live codebase inspection, GSD scripts, real hook log, PRD; web: agentic UX patterns, polling vs streaming, copy-to-clipboard patterns)*

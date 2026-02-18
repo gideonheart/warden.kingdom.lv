@@ -1,354 +1,238 @@
 # Project Research Summary
 
-**Project:** Warden Dashboard v2.0 Mission Control
-**Domain:** Terminal multiplexer dashboard with plugin registry, activity timeline, and mobile-first UI
-**Researched:** 2026-02-16
+**Project:** Warden Dashboard — GSD Manager Plugin (v2.1 milestone)
+**Domain:** Browser-based control panel for GSD skill tooling — process spawning, command dispatch, config management, real-time log monitoring
+**Researched:** 2026-02-18
 **Confidence:** HIGH
 
 ## Executive Summary
 
-Warden v2.0 extends the existing terminal streaming dashboard with three major feature domains: (1) Plugin/Tool Registry for UI extensibility, (2) Activity Timeline for structured event capture and audit logging, and (3) Mobile-First UI for responsive operation. Research reveals that the current stack (Express 5, Socket.IO 4, React 19, xterm.js 5, SQLite, Tailwind CSS 4, Vite 6) provides all necessary infrastructure with minimal new dependencies.
+The GSD Manager Plugin is an additive milestone (v2.1) that wraps existing GSD CLI tooling (`spawn.sh`, `menu-driver.sh`, `recovery-registry.json`) in a browser UI within the existing Warden Dashboard. All research confirms this is a thin integration layer, not a new product — the hard work of agent lifecycle management is already done by battle-tested bash scripts. The recommended approach is to call those scripts via `child_process.execFile` (already established in `TmuxSessionManager.ts`), expose results through a new Express route module (`gsdRoutes.ts`) following the existing route pattern, and surface data through a self-registering Vite plugin (`gsd-manager-plugin.tsx`) in the `bottom-panel` slot. Zero new npm dependencies are required — every capability maps to a Node.js 22 built-in or an already-installed package.
 
-The recommended approach prioritizes simplicity and leverages existing patterns: use Vite's native dynamic imports with TypeScript registry pattern for plugins (no module federation), selective ANSI parsing with security-first event storage for activity timeline, and mobile-first CSS with progressive enhancement for responsive UI. This approach adds only ~68kb to the bundle (ansi_up, react-modal-sheet, framer-motion, @gravity-ui/timeline) and requires zero build system changes.
+The architecture is a straightforward extension of patterns already in production: a new Socket.IO namespace (`/gsd-hooks`) mirrors the `/terminal` namespace; a `GsdService` singleton mirrors `OpenClawConfigReader`; route module mounting mirrors `instanceRoutes`/`agentRoutes`. The plugin auto-discovers via `import.meta.glob` without changes to existing files beyond four lines in `src/server/index.ts`. The build order has no ambiguity: shared types first, service layer second, routes third, client hook fourth, plugin component last.
 
-Key risks center on three critical areas: (1) over-engineering the plugin system when simple build-time registration suffices, (2) xterm.js mobile touch support which remains fundamentally broken in 2026 (requires read-only mobile terminal decision), and (3) terminal output parsing performance and ANSI security vulnerabilities (requires selective parsing with aggressive sanitization). All risks have documented mitigations and do not block MVP delivery.
+The dominant risks are security and correctness, not architecture. Three pitfalls are non-negotiable from day one: shell injection through `spawn.sh`'s `tmux send-keys` path (use a strict allowlist on `firstCommand`), path traversal in `workdir` (use `path.resolve` with base-path assertion), and event loop blocking with `execFileSync` while `spawn.sh` waits 15-25 seconds for Claude TUI readiness — the API must return `202 Accepted` immediately and let `InstanceTracker` surface the new session within 10 seconds. A fourth concern (registry write collision between the Node.js API and `spawn.sh`'s `flock`-protected writes) is acceptable at single-operator scale using an atomic rename pattern, but must be documented as a known limitation.
 
 ## Key Findings
 
 ### Recommended Stack
 
-Warden v2.0 requires minimal new dependencies. The existing infrastructure handles all core functionality. Four new libraries provide specialized capabilities without architectural changes.
+The existing Warden stack handles everything. Express 5, Socket.IO 4, React 19, Vite 6, Tailwind CSS 4, TypeScript 5 strict, and Node.js 22 are all in production. The GSD plugin adds no new packages. All five new capabilities map directly to Node.js 22 built-ins already used in the codebase.
 
-**New dependencies:**
-- **ansi_up (6.0.2):** ANSI escape code parsing for terminal output — zero dependencies, isomorphic, TypeScript support, actively maintained since 2011
-- **react-modal-sheet (3.1.0):** Bottom sheet/drawer for mobile UI — built on Framer Motion, Tailwind-compatible, accessibility-focused
-- **framer-motion (11.11+):** Animation library (peer dependency of react-modal-sheet) — industry standard, React 19 compatible
-- **@gravity-ui/timeline (0.1.0):** Canvas-based virtualized timeline rendering — handles thousands of events, active development by Yandex team
+**Core technologies for new capabilities:**
+- `child_process.execFile` (promisified): shell command proxying — established pattern in `TmuxSessionManager.ts`, bypasses shell interpreter, no injection risk at execFile boundary
+- `fs.watch` (inotify-backed on Linux): real-time hook log tailing — verified working on `/tmp/gsd-hooks.log` on this machine; fires immediately on file append
+- `fs/promises.readFile` + `writeFile` + `rename`: atomic JSON config read/write — POSIX rename atomicity guarantees; mirrors `spawn.sh`'s own `mv "$tmp" "$target"` pattern
+- Socket.IO `/gsd-hooks` namespace: push log events to browser — identical setup pattern to existing `/terminal` namespace in `TerminalStreamService.ts`
+- `import.meta.glob('./*.tsx', {eager: true})`: plugin auto-discovery — zero changes to existing plugin infrastructure; dropping the file is all that is needed
 
-**No additional dependencies needed:**
-- Plugin architecture uses Vite's native `import.meta.glob()` with TypeScript registry pattern
-- Mobile terminal uses existing xterm.js with custom touch handlers
-- SQLite schema additions use existing better-sqlite3 with virtual columns and FTS5
-- Mobile UI uses existing Tailwind CSS 4 with custom utilities
+**Verified script interfaces (read from source):**
+- `spawn.sh <agentId> <workdir> [firstCommand]` — takes 15-25s waiting for TUI readiness, outputs `Attach: tmux attach -t <name>`, uses `flock -x` on registry writes (lines 103-140)
+- `menu-driver.sh <sessionName> <action> [args]` — action allowlist: `snapshot|enter|esc|clear_then|choose|type|submit`; `sleep 0.8` heuristic at line 49
+- `recovery-registry.json` — plain JSON written by `jq`, not JSON5; `JSON.parse` works directly; confirmed live schema
 
-**Bundle size impact:** +68kb gzipped (15% increase from ~450kb to ~518kb), mitigated by code-splitting timeline and bottom sheet components.
+**New files (9 total, no new dependencies):**
 
-**Critical version requirements:** None identified. All dependencies compatible with existing React 19 and Vite 6 infrastructure.
+| File | Type |
+|------|------|
+| `src/shared/gsdTypes.ts` | Shared TypeScript interfaces |
+| `src/server/services/GsdService.ts` | Shell wrapper, registry I/O, STATE.md reads |
+| `src/server/services/GsdHookLogWatcher.ts` | `fs.watch` + Socket.IO emit |
+| `src/server/routes/gsdRoutes.ts` | Express Router at `/api/gsd/` |
+| `src/client/hooks/useGsdManager.ts` | REST polling + Socket.IO subscription |
+| `src/client/plugins/gsd-manager-plugin.tsx` | Self-registering `bottom-panel` plugin |
+
+**Modified files (1 file, 4 lines):** `src/server/index.ts` — import routes + init/stop watcher.
 
 ### Expected Features
 
-Research identified three distinct feature domains with clear table stakes, differentiators, and anti-features.
+**Must have (v2.1 launch — table stakes):**
+- Agent grid with session status (active/idle/stopped per agent, from `/api/instances` + registry merge)
+- Agent grid with working directory display (from registry `working_directory` field)
+- Preset GSD slash commands — 6 presets: `/gsd:resume-work`, `/gsd:quick`, `/gsd:new-milestone`, `/gsd:execute-phase`, `/gsd:plan-phase`, `/gsd:progress`
+- Custom command input (free-text fallback for non-preset commands)
+- Command success/error feedback (same inline pattern as existing `PromptPanel`)
+- Recovery registry viewer — agent list with enabled status (read-only display)
+- Enabled/disabled toggle (PATCH endpoint writes registry atomically)
+- Hook activity feed — last 20 events pushed via Socket.IO `/gsd-hooks` namespace
+- Spawn agent form (agentName, workdir, optional firstCommand; calls `spawn.sh`)
+- Inline bash reference with copy-to-clipboard (PRD requirement; operator trust)
+- Collapsible sections (bottom panel space constraint)
 
-**Plugin Registry — Must have (P1):**
-- Manifest schema for plugin metadata (name, version, description, capabilities)
-- Metadata display table showing plugins with status (active/inactive)
-- Manual enable/disable toggle per plugin
-- Build-time type-safe registration with TypeScript
+**Should have (v2.1.x patch cycles, after validation):**
+- State hint display (idle/menu/working/error badge from hook log last-line parsing per session)
+- Context pressure indicator (percentage from hook log lines per agent)
+- Session selector tied to active terminal tab (reduces "wrong agent" friction)
+- STATE.md phase and progress display (phase X/N, progress % from `.planning/STATE.md`)
+- Spawn auto-detect first command (mirror `choose_first_cmd()` logic from spawn.sh)
+- Per-agent hook feed filtering (client-side filter on log lines by session name)
 
-**Plugin Registry — Should have (P2):**
-- Manifest pattern (co-locate metadata + code + UI in single file)
-- UI panel slots for injecting custom React components
+**Defer to v2.2+:**
+- Hook log SSE streaming (5-second polling is sufficient for single-operator scale)
+- Registry field editor for discrete fields beyond `enabled` (low demand)
+- System prompt path field in spawn form (advanced use case; defaults are sufficient)
+- Recovery diagnostics button for `diagnose-hooks.sh` (niche; already CLI-friendly)
 
-**Plugin Registry — Defer (anti-features):**
-- Auto-install from public registry (security risk, scope creep)
-- Plugin marketplace UI (requires hosting, moderation, legal complexity)
-
-**Activity Timeline — Must have (P1):**
-- SQLite events table with Activity Stream Protocol schema (Actor/Verb/Object/Target)
-- Chronological event list (time-sorted, newest first)
-- Event detail panel with full metadata
-- Filter by agent, date range, event type
-- Export to CSV/JSON for audit compliance
-
-**Activity Timeline — Should have (P2):**
-- Structured event parsing from terminal output (tool calls, file edits, commands)
-- Success/failure state indicators (parse exit codes, error keywords)
-- Linked events (click event → jump to terminal session at timestamp)
-
-**Activity Timeline — Defer (anti-features):**
-- Real-time WebSocket streaming of every event (overwhelming for high-volume agents)
-- AI-powered event summarization (API costs, unreliable for audit)
-- Immutable log with blockchain (massive overkill for single-user tool)
-
-**Mobile UI — Must have (P1):**
-- Full-width responsive layout (375px to 1920px)
-- Collapsible panels (accordions) for agent details, session logs, token usage
-- Bottom sheet for prompt panel (thumb-reachable on mobile)
-- Touch scrolling support for terminal
-- Safe zone at top (64px) when bottom sheet expands
-
-**Mobile UI — Should have (P2):**
-- Progressive enhancement (mobile baseline, desktop enhancements via min-width breakpoints)
-- Gesture library (swipe for tabs, pinch to zoom)
-
-**Mobile UI — Defer (anti-features):**
-- Separate native mobile app (3x development cost, App Store distribution)
-- Predictive touch input (Mosh pattern) — high complexity, conflicts with Socket.IO
-- Full mobile terminal interactivity (xterm.js touch support broken, requires weeks of debugging)
+**Anti-features confirmed (do not build):**
+- Inline JSON editing of recovery-registry.json (fragile; concurrent writes dangerous; PATCH endpoints for discrete fields only)
+- Editing STATE.md or PROJECT.md from UI (PRD non-goal; breaks GSD tracking assumptions)
+- Real-time terminal pane in the plugin panel (duplicates terminal view; doubles PTY resources)
+- Kill session button in this plugin (already in InstanceTabBar; duplication creates confusion)
+- Agent auto-wake toggle (show as read-only; risk of accidentally disabling recovery for critical agent)
 
 ### Architecture Approach
 
-All three features integrate cleanly into the existing architecture without major refactoring. The plugin system slots into the React component hierarchy, activity timeline extends the existing Socket.IO streaming service, and mobile UI restructures layout components using media queries.
+The plugin integrates as a clean vertical slice. Server-side, two new service classes follow the established singleton export pattern. `GsdService` owns all shell command execution, registry I/O, and STATE.md reads. `GsdHookLogWatcher` owns the `fs.watch` handle and emits to the `/gsd-hooks` Socket.IO namespace. Client-side, `useGsdManager` encapsulates all data fetching and mutations; the plugin component is pure presentation over that hook. The `PanelComponent` receives no props (enforced by `pluginTypes.ts` `ComponentType` contract) — the hook fetches everything it needs independently.
 
-**Major components for Plugin Registry:**
-1. **PluginRegistry (client singleton)** — Map-based registry with `discover()`, `load()`, `unload()` methods; type-safe component lookup
-2. **DynamicPanelRenderer (React component)** — Runtime component loader with ErrorBoundary isolation per plugin
-3. **PluginManager (server service)** — CRUD operations for plugin metadata, SQLite persistence
-4. **Panel slot architecture** — Declarative `<PluginSlot slotId="sidebar-top" />` containers in layout components
+Spawn operations use fire-and-forget (immediate `202 Accepted`) because `spawn.sh` blocks for 15-25 seconds; the new session appears in `/api/instances` via `InstanceTracker.startPeriodicSync()` within 10 seconds. Registry reads use a 30-second in-memory cache (matching `OpenClawConfigReader`); writes invalidate the cache immediately. Hook log streaming uses `GsdHookLogWatcher` as a server-side singleton that fans out to all `/gsd-hooks` namespace subscribers — there is no per-connection resource usage beyond the Socket.IO multiplexing that already exists.
 
-**Major components for Activity Timeline:**
-1. **TerminalOutputParser (server service)** — ANSI escape sequence parser using ansi_up, detects commands/errors via regex patterns
-2. **ActivityEnricher (server service)** — Event extraction pipeline, transforms raw terminal chunks into structured events
-3. **AuditLogger (server service)** — Event persistence with sequence numbers, retention policy enforcement, batch writes
-4. **ActivityTimeline (React component)** — Virtualized event list with filters, pagination, detail panel
+**Major components:**
+1. `src/shared/gsdTypes.ts` — `RegistryAgent`, `RecoveryRegistry`, `GsdHookEvent`, `GsdSessionState`, `GsdSpawnRequest`, `GsdCommandRequest`
+2. `src/server/services/GsdService.ts` — `execFile` wrapper for `spawn.sh`/`menu-driver.sh`; registry read/write with TTL cache; STATE.md reads resolved via registry `working_directory`
+3. `src/server/services/GsdHookLogWatcher.ts` — `fs.watch` on `/tmp/gsd-hooks.log`; incremental byte-offset reads; emits parsed `GsdHookEvent` to `/gsd-hooks` namespace; backfills last 20 events on new client connection
+4. `src/server/routes/gsdRoutes.ts` — Express Router at `/api/gsd/`; 6 endpoints; input validation (agentName regex, workdir prefix assertion, action enum)
+5. `src/client/hooks/useGsdManager.ts` — registry polling at 30s; Socket.IO subscription to `/gsd-hooks`; `spawnAgent`/`sendCommand` mutations
+6. `src/client/plugins/gsd-manager-plugin.tsx` — self-registering `bottom-panel` plugin; AgentGrid, QuickActions, HookFeed, RegistryViewer, InlineBashReference sections
 
-**Major components for Mobile UI:**
-1. **ResponsiveLayout (React component)** — Conditional layout based on viewport (MobileHeader + BottomNav vs TabletDesktopHeader)
-2. **useMediaQuery hook** — Viewport detection with `window.matchMedia` and event listeners
-3. **MobileHeader, BottomNav, SessionDrawer, AgentDrawer** — Mobile-specific UI components
-4. **Touch-friendly utilities** — Tailwind CSS custom utilities for safe areas, touch targets (44x44px min), momentum scrolling
-
-**Integration points:**
-- Plugin slots added to App.tsx, AgentSidebar.tsx (sidebar-top, sidebar-bottom, bottom-panel, terminal-overlay)
-- TerminalStreamService emits parsed events to new `/activity` Socket.IO namespace
-- App.tsx conditional rendering based on `useIsMobile()`, `useIsDesktop()` hooks
-- SQLite migrations add `plugins` and `activity_events` tables with indexes and FTS5 virtual table
-
-**Database schema additions:**
-```sql
--- Plugin registry table
-CREATE TABLE plugins (id TEXT PRIMARY KEY, name TEXT, version TEXT,
-  enabled INTEGER DEFAULT 1, manifest_json TEXT, installed_at DATETIME);
-
--- Activity events table with virtual columns for JSON indexing
-CREATE TABLE activity_events (id INTEGER PRIMARY KEY, instance_id INTEGER,
-  timestamp DATETIME, event_type TEXT, severity TEXT, raw_text TEXT,
-  structured_data TEXT,
-  agent_id TEXT GENERATED ALWAYS AS (json_extract(structured_data, '$.agentId')) VIRTUAL,
-  severity TEXT GENERATED ALWAYS AS (json_extract(structured_data, '$.severity')) VIRTUAL);
-
--- Full-text search for activity
-CREATE VIRTUAL TABLE activity_events_fts USING fts5(summary, terminal_output,
-  content='activity_events', tokenize='porter unicode61');
-```
+**Data flow for key operations:**
+- **Spawn:** POST `/api/gsd/spawn` → validate → `execFile` fire-and-forget → 202 returned → session appears in `/api/instances` within 10s via InstanceTracker
+- **Command:** POST `/api/gsd/sessions/:session/command` → enum-validate action → `execFileAsync(menu-driver.sh, ...)` with 5s timeout → 202 Accepted
+- **Hook feed:** hook script appends to `/tmp/gsd-hooks.log` → `GsdHookLogWatcher.onFileChange()` → parse new bytes → `namespace.emit('gsd:hook-event', event)` → `useGsdManager` prepends to rolling buffer
 
 ### Critical Pitfalls
 
-Research identified 8 critical pitfalls with verified sources (2025-2026). Top 5 most impactful:
+1. **Shell injection via `firstCommand` through `tmux send-keys`** — `execFile` prevents injection at the Node.js boundary, but `spawn.sh` passes `$first_command` directly to `tmux send-keys` where a shell is running. A payload like `/gsd:resume-work; rm -rf /home/forge` executes in the tmux pane. Prevention: use a preset enum for v2.1; if free-form text is needed, apply strict character allowlist `[/a-zA-Z0-9 @:._-]` and reject null bytes and shell metacharacters. Never use `shell: true`.
 
-1. **Over-Engineering Plugin System for Single-User Tool** — Building full plugin SDK with sandboxing, versioning, dependency management when need is "add 2-3 internal code modules." Balloons codebase from 2,644 LOC to 10,000+ LOC with zero user value. **Mitigation:** Start with simplest approach (TypeScript modules with metadata, build-time registration), set complexity budget (<200 LOC), defer sandboxing until concrete demand.
+2. **Path traversal in `workdir` parameter** — `path.join('/home/forge', '../../../etc')` returns `/etc` cleanly; `path.normalize` is also insufficient per CVE-2025-27210. Prevention: `path.resolve(userInput)` then assert the result starts with `/home/forge/` before passing to `execFile` or constructing STATE.md paths.
 
-2. **xterm.js Mobile Touch Experience is Fundamentally Broken** — 5+ year old issue still active in 2025: no native touch event handling, copy/paste broken on iOS (Issue #3727), erratic typing on Android (Issue #3600), Smart Keyboard arrows don't work (Issue #1101). **Mitigation:** Decide early if mobile terminal is core requirement; if nice-to-have, make read-only with "Use desktop" message; if core, budget 2-3 weeks mobile-specific work and expect ongoing issues.
+3. **Event loop blocking from `execFileSync` on `spawn.sh`** — `spawn.sh` blocks 15-25 seconds during TUI readiness polling. Any synchronous invocation freezes all HTTP requests and Socket.IO heartbeats for that duration. Prevention: always use `execFileAsync` (promisified `execFile`) with `timeout: 30_000`; fire-and-forget spawn with immediate `202 Accepted`.
 
-3. **Terminal Output Parsing Becomes Performance Nightmare** — Claude Code generates thousands of lines per minute; ANSI parsing is CPU-intensive; capturing everything causes exponential storage growth; queries over millions of rows timeout. **Mitigation:** Parse selectively (only known patterns like tool calls), set 7-day retention limit, index aggressively (timestamp, event_type), offload parsing to background worker, monitor database size (<100MB), run daily cleanup.
+4. **`fs.watch` memory leak from dangling watchers** — each watch handle must be explicitly closed when the client disconnects. In the singleton `GsdHookLogWatcher` pattern there is no per-connection watcher, eliminating this risk. If the log tail is ever exposed as an SSE endpoint, `response.on('close', () => watcher.close())` is mandatory.
 
-4. **ANSI Escape Sequences Create Security and Storage Vulnerabilities** — Research uncovered 10 CVEs enabling RCE, log manipulation, DoS. 2025 attacks target AI/LLM tools. ANSI codes can obfuscate malicious payloads, make logs appear empty when viewed, print billions of characters. **Mitigation:** Strip ANSI before storing (replace `\x1b` with placeholder), use battle-tested strip-ansi library, validate storage size (reject >10KB), never render ANSI in web UI.
-
-5. **Desktop-First Mobile Implementation Breaks Desktop UX** — Giant touch-friendly buttons waste space on desktop, navigation requires extra clicks, information density drops, keyboard shortcuts removed. Regression caused by treating responsive design as "afterthought." **Mitigation:** Use mobile-first CSS with min-width media queries, design viewport-specific component variants (not just resize), test desktop AND mobile throughout, use content-based breakpoints.
-
-**Other critical pitfalls:**
-- Socket.IO Connection State Recovery fails for activity timeline on network switching (WiFi → 4G) — always implement REST backfill for `socket.recovered === false`
-- Node.js memory leaks in terminal streaming from PTY event listeners not removed on disconnect — track and remove ALL listeners, use WeakMap for metadata
-- SQLite WAL checkpoint starvation from long-running activity timeline queries — ensure "reader gaps," use short-lived transactions (<1s), paginate queries
+5. **Registry write collision between Node.js API and `spawn.sh` flock** — `spawn.sh` uses `flock -x` advisory locking; Node.js `fs.write` ignores this entirely. Prevention for v2.1: atomic rename pattern (`writeFile tmp → rename`), keep PATCH writes fast (<100ms), document the known race. Acceptable at single-operator scale where spawns are rare. Full `flock`-compatible locking deferred to v2.2 if demand warrants.
 
 ## Implications for Roadmap
 
-Based on research findings, recommended phase structure prioritizes low-risk foundation, addresses mobile strategy before implementation, and defers complex parsing until infrastructure is stable.
+The plugin is a single coherent vertical slice and does not need to be split across milestones. Within the implementation, the dependency chain is strict: types before services, services before routes, routes before client. The suggested roadmap structure reflects this chain while separating security-critical backend work from UI work.
 
-### Suggested Phase Structure
+### Phase 1: Backend Foundation — Types, Services, REST API, Socket.IO
 
-#### Phase 1: Plugin Registry Foundation (Week 1-2)
-**Rationale:** Lowest-risk feature with clear scope. Establishes extensibility pattern for future enhancements. Must be built correctly from day one — over-engineering here dooms entire milestone.
+**Rationale:** Security must be baked into route layer before any client code exists. Shared types define the contract for both sides. `GsdService` methods are independently verifiable via `curl` before the plugin is written. This order makes shell injection and path traversal impossible to forget — they are the first code written.
 
-**Delivers:**
-- Simple build-time plugin registration system (<200 LOC)
-- Type-safe plugin manifest schema with TypeScript validation
-- Plugin metadata display UI (table with enable/disable toggles)
-- 1-2 proof-of-concept built-in plugins (e.g., "System Stats" panel)
+**Delivers:** Complete backend API (`/api/gsd/*` — all 6 endpoints), `GsdService` singleton, `GsdHookLogWatcher` service with `/gsd-hooks` Socket.IO namespace, shared `gsdTypes.ts`. No UI — verifiable via `curl` and `socket.io-client` test scripts.
 
-**Addresses features:**
-- Plugin Registry — Manifest Schema (P1)
-- Plugin Registry — Metadata Display (P1)
-- Plugin Registry — Manual Enable/Disable (P1)
-- Plugin Registry — Type-Safe Registration (P2)
+**Addresses features from FEATURES.md:**
+- All registry read/write operations
+- Spawn trigger endpoint
+- Command dispatch endpoint
+- Hook log tail endpoint
+- STATE.md read endpoint
 
 **Avoids pitfalls:**
-- Over-engineering (use Vite glob imports, not module federation)
-- Missing error boundaries (wrap each plugin in ErrorBoundary)
-- Type safety loss (build-time registration with TypeScript manifest)
+- Shell injection (allowlist on `firstCommand` and `action` from the first commit of `gsdRoutes.ts`)
+- Path traversal (prefix assertion on `workdir` from the first commit)
+- Event loop blocking (fire-and-forget spawn returns `202` immediately)
+- Registry corruption (atomic rename pattern; race documented as acceptable)
+- Watcher memory leak (singleton watcher pattern; lifecycle tied to server shutdown)
 
-**Research flags:** None — plugin registry has well-documented patterns, standard implementation. Skip `/gsd:research-phase`.
+### Phase 2: Client Plugin — Hook and UI Components
 
----
+**Rationale:** Client builds only after server API is verified working. The `useGsdManager` hook depends on all 6 REST endpoints being stable and the Socket.IO namespace active. The plugin component is pure presentation — no business logic.
 
-#### Phase 2: Mobile-First UI Restructure (Week 2-3)
-**Rationale:** UI foundation needed before Activity view implementation. **Critical decision point:** Must resolve xterm.js mobile touch strategy before proceeding (read-only vs interactive). Desktop regression testing required after every change.
+**Delivers:** `useGsdManager.ts` hook (REST polling + Socket.IO subscription), `gsd-manager-plugin.tsx` with all P1 features: AgentGrid, QuickActions (preset + custom), HookFeed (socket-driven events), SpawnForm (with `202` in-progress state), RegistryViewer (read + enabled toggle with optimistic UI), InlineBashReference (copy-to-clipboard), collapsible sections.
 
-**Delivers:**
-- Responsive layout hierarchy (MobileHeader, BottomNav, drawers)
-- Mobile-first CSS with progressive enhancement (min-width breakpoints)
-- Touch-friendly components (44px min targets, safe areas, momentum scroll)
-- Playwright tests at mobile (375px), tablet (768px), desktop (1440px) viewports
-
-**Addresses features:**
-- Mobile UI — Full-Width Responsive Layout (P1)
-- Mobile UI — Collapsible Panels (P1)
-- Mobile UI — Bottom Sheet (P1)
-- Mobile UI — Touch Scrolling (P1)
-- Mobile UI — Progressive Enhancement (P2)
+**Implements features from FEATURES.md:**
+- All 10 P1 MVP features
+- UX patterns: suggest-and-confirm on spawn, in-place feedback, no confirmation modals for non-destructive actions, newest-first hook feed, optimistic toggle with revert
 
 **Avoids pitfalls:**
-- xterm.js mobile touch broken (make terminal read-only on mobile OR budget 2-3 weeks debugging)
-- Desktop UX regression (mobile-first CSS, test desktop continuously)
-- Mobile keyboard covering input (use visual viewport API, already in App.tsx)
+- Component prop injection anti-pattern (plugin is self-contained; `PanelComponent` receives no props by contract)
+- Double-click spawn (UI disables button for 5s after click; shows "Spawning..." state)
+- Command feedback confusion (show "dispatched" not "executed"; reference terminal tab for visual confirmation)
+- STATE.md ENOENT (show "Starting..." during spawn window; graceful fallback to "unknown")
 
-**Research flags:** **Needs research** — xterm.js mobile touch support requires evaluation of alternatives or acceptance of read-only constraint. Consider `/gsd:research-phase` focused on mobile terminal interaction patterns.
+### Phase 3: Enhancement — P2 Features After Production Validation
 
-**Critical pre-phase decision:** Test xterm.js touch on real iOS/Android devices. If unusable, commit to read-only mobile terminal before starting phase. Document limitation in UX.
+**Rationale:** P2 features require understanding real operator friction. State hint display and context pressure require hook log parsing that may need iteration based on real log patterns. Session selector tied to the active terminal tab requires assessing whether the plugin context workaround (fetch instances in hook) is sufficient or if `PluginSlotRenderer` needs extending.
 
----
+**Delivers:** State hint badges (idle/menu/working/error), context pressure indicators (% from hook log), session selector pre-loaded from active tab, STATE.md phase/progress display, per-agent hook feed filter, spawn auto-detect first command.
 
-#### Phase 3: Activity Timeline & Audit Log (Week 3-5)
-**Rationale:** Most complex feature, depends on parser library integration, benefits from plugin system (custom event renderers as plugins). Security and performance must be designed from day one — retrofitting ANSI stripping and retention policies is difficult.
-
-**Delivers:**
-- Selective ANSI parsing with security-first sanitization
-- SQLite activity_events table with virtual columns and FTS5
-- Real-time event capture via Socket.IO with REST backfill
-- Timeline UI with filters, pagination, virtualized rendering
-- Retention policy (7-day default, daily cleanup cron)
-
-**Addresses features:**
-- Activity Timeline — SQLite Events Table (P1)
-- Activity Timeline — Chronological Event List (P1)
-- Activity Timeline — Event Detail Panel (P1)
-- Activity Timeline — Filter by Agent (P1)
-- Activity Timeline — Date Range Filter (P1)
-- Activity Timeline — Export to CSV/JSON (P1)
-- Activity Timeline — Structured Event Parsing (P2)
-- Activity Timeline — Success/Failure Indicators (P2)
+**Implements features from FEATURES.md:** All P2 features from the "Should have" list.
 
 **Avoids pitfalls:**
-- ANSI security vulnerabilities (strip before storage with strip-ansi library)
-- Parsing performance nightmare (selective parsing, pattern allowlist, background worker)
-- WAL checkpoint starvation (paginate queries, <1s transactions, daily checkpoint)
-- Socket.IO event loss (implement REST backfill for `socket.recovered === false`)
-- Memory leaks (remove PTY listeners on disconnect, WeakMap for metadata)
-
-**Research flags:** **Needs research** — ANSI parsing patterns for Claude Code tool calls require investigation. Terminal output varies by agent type. Consider `/gsd:research-phase` focused on extracting structured events from real terminal logs.
-
-**Critical pre-phase requirements:**
-- Establish pattern allowlist for parsing (tool calls, file edits, errors)
-- Design retention policy and storage budget (100MB target)
-- Implement monitoring for database size and WAL growth
-
----
+- STATE.md polling stale data (use hook log `state=` lines as primary state signal; STATE.md as supplement)
+- Session name mismatch (cross-reference registry `tmux_session_name` with live `tmux ls` output; show warning in UI when names diverge)
+- `clear_then` timing sensitivity (only surface `clear_then`-based presets when agent state shows `idle`)
 
 ### Phase Ordering Rationale
 
-**Why this sequence:**
-1. **Plugin Foundation first** — Establishes pattern for extensibility, lowest risk, required for activity timeline plugins (custom event parsers/renderers)
-2. **Mobile UI second** — Provides layout foundation for Activity view, forces xterm.js mobile decision before implementation, allows desktop regression testing throughout
-3. **Activity Timeline last** — Most complex, highest risk, benefits from plugin system, requires mobile layout for optimal UX
-
-**Why this grouping:**
-- Plugin system is standalone, no dependencies on other features
-- Mobile UI restructure affects all views (terminals, history, activity), best done before adding new view
-- Activity timeline integrates with both plugins (event renderers) and mobile UI (bottom sheet filters)
-
-**How this avoids pitfalls:**
-- Plugin complexity assessed early (Phase 1), prevents over-engineering cascade
-- Mobile strategy decided before implementation (Phase 2), prevents late discovery of xterm.js limitations
-- Activity timeline security and performance designed from start (Phase 3), prevents retrofit of ANSI stripping and retention
+- Security cannot be retrofitted: shell injection validation must be in the first version of `gsdRoutes.ts`. Starting with the server guarantees this.
+- Types before code: prevents import errors and ensures both sides agree on shapes before either side is written.
+- Server before client: the hook and plugin cannot be meaningfully tested without working endpoints.
+- P1 before P2: validates the control-center concept in daily use before adding complexity. The P2 features listed are enhancements, not MVP requirements.
+- Fire-and-forget spawn pattern is architecturally incompatible with a synchronous pattern — establishing it in Phase 1 prevents a breaking change to client expectations in Phase 2.
 
 ### Research Flags
 
-**Phases needing deeper research during planning:**
+**Phases with standard patterns (no additional research needed):**
+- **Phase 1 (backend):** All patterns copied directly from existing codebase — `execFile` from `TmuxSessionManager.ts`, route module from `instanceRoutes.ts`, Socket.IO namespace from `TerminalStreamService.ts`, service singleton from `OpenClawConfigReader.ts`. Script interfaces verified from source. No new paradigms.
+- **Phase 2 (client plugin):** Plugin pattern copied from `example-plugin.tsx`; hook pattern from `useActiveInstances.ts` and `useTerminalSocket.ts`. UX patterns drawn from existing `PromptPanel` and `InstanceTabBar` components.
 
-- **Phase 2 (Mobile UI):** xterm.js mobile touch support evaluation — test on real devices, investigate alternatives (read-only, custom handlers, alternative terminal libraries), document decision rationale
-- **Phase 3 (Activity Timeline):** Terminal output parsing patterns for Claude Code agents — analyze real terminal logs, identify tool call signatures, design pattern allowlist, validate parsing accuracy
-
-**Phases with standard patterns (skip research-phase):**
-
-- **Phase 1 (Plugin Registry):** Well-documented TypeScript registry pattern, Vite glob imports proven in production, React dynamic components established pattern
-- **Phase 2 (Mobile UI - layout):** Mobile-first CSS is established practice, Tailwind responsive utilities well-documented, media query hooks standard React pattern
-- **Phase 3 (Activity Timeline - storage):** SQLite virtual columns and FTS5 well-documented, Activity Stream Protocol established standard, audit logging patterns mature
+**Phases that may benefit from light review before planning:**
+- **Phase 3 (state hints):** Hook log format for context pressure percentage (e.g., "72% [WARNING]") needs verification from a live log containing a pressure event before writing regex. Sample a live log before planning this phase.
+- **Phase 3 (session selector):** The `PanelComponent` receives no props by contract (`ComponentType` in `pluginTypes.ts`). If fetching instances in the hook is insufficient for session selection, extending `PluginSlotRenderer` affects all plugins. Evaluate actual friction before planning.
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH | All dependencies actively maintained (2024-2025 releases), TypeScript support confirmed, React 19 compatibility verified, bundle size acceptable |
-| Features | HIGH | Feature landscape validated against competitors (VS Code, GitHub, Material Design 3), MVP definition clear, anti-features documented with rationale |
-| Architecture | HIGH | Integration points identified, component boundaries clear, database schema validated, existing infrastructure sufficient |
-| Pitfalls | HIGH | All 8 critical pitfalls verified with 2025-2026 sources, mitigations documented, phase-specific warnings mapped |
+| Stack | HIGH | All capabilities verified against running codebase; Node.js 22 built-ins manually tested on this machine; `fs.watch` confirmed inotify-backed on Linux; JSON.parse on registry confirmed; zero new dependencies |
+| Features | HIGH | PRD read directly; `spawn.sh` and `menu-driver.sh` read in full; live registry schema confirmed; hook log format confirmed from live file; anti-features reasoned from PRD non-goals |
+| Architecture | HIGH | All patterns read directly from existing source files; plugin contract confirmed from `pluginTypes.ts`; mount pattern confirmed from `index.ts`; `bottom-panel` slot render location confirmed at App.tsx line 318 |
+| Pitfalls | HIGH | Security issues verified against actual `spawn.sh`/`menu-driver.sh` source with line numbers cited; Node.js CVE-2025-27210 referenced; `flock` usage confirmed at specific lines; `sleep 0.8` heuristic confirmed at menu-driver.sh line 49 |
 
 **Overall confidence:** HIGH
 
-Research is comprehensive and current (2025-2026 sources). All major decisions have documented rationale. Risks are identified with mitigation strategies.
-
 ### Gaps to Address
 
-**Medium-confidence areas requiring validation during implementation:**
+- **Registry write locking:** The atomic rename pattern is acceptable for v2.1 single-operator scale where spawns are rare. If concurrent spawn + PATCH becomes common (multiple operators, frequent auto-spawning), upgrade to `flock`-compatible locking (either `execFile('flock', ...)` wrapper or `proper-lockfile` npm package). Document as known limitation in code comments at the PATCH endpoint.
 
-1. **@gravity-ui/timeline stability:** Library is newer (2024), backed by Yandex Gravity UI team but less mature than react-window. Monitor stability during Phase 3. **Fallback:** Custom virtualized list with IntersectionObserver if timeline library proves unstable.
+- **Context pressure log format:** The hook log format for context pressure values (e.g., "72% [WARNING/CRITICAL]") was identified in FEATURES.md as derivable from hook log lines, but a live log sample containing an actual pressure event was not available during research. Before building the context pressure indicator in Phase 3, sample a live pressure event from the log to confirm the exact format.
 
-2. **Activity event volume estimation:** Unknown how many events per hour agents generate. Affects polling interval (10s vs manual refresh) and storage growth rate. **Validation:** Monitor event volume in Phase 3 development, adjust retention policy and polling if needed.
+- **Plugin context / session selector:** The `PanelComponent` receives no props by contract. The workaround (fetch instances in hook) is documented and known. Assess actual operator friction from Phase 2 usage before deciding whether to extend `PluginSlotRenderer` in Phase 3.
 
-3. **Terminal output parsing accuracy:** Can we reliably parse ANSI output for tool calls, file edits, commands? Or do we need structured logging from agents? **Validation:** Analyze real terminal logs in Phase 3 research, test regex patterns, evaluate if structured logging needed.
-
-4. **Mobile terminal UX acceptance:** Will operators accept read-only mobile terminal or demand full interactivity? **Validation:** User testing with read-only mobile terminal in Phase 2, document limitations clearly.
-
-**Handling during planning:**
-- Test @gravity-ui/timeline with sample 1000+ event dataset in Phase 3 kickoff
-- Implement monitoring for event volume, database size, query performance from Phase 3 start
-- Allocate time in Phase 3 for pattern refinement based on real logs
-- Build read-only mobile terminal first (Phase 2), add interactivity only if user feedback demands it
+- **`menu-driver.sh clear_then` timing:** The 800ms heuristic sleep fails when Claude is compacting context (up to 30 seconds). The v2.1 UI must document this and ideally only surface `clear_then`-based presets when the agent state shows `idle`. The enforcement mechanism depends on Phase 3 state hint implementation — accept this gap in Phase 2 with clear UX language ("dispatched, not confirmed").
 
 ## Sources
 
-### Primary (HIGH confidence)
+### Primary (HIGH confidence — direct file reads on this machine)
+- `src/server/services/TmuxSessionManager.ts` — `execFile` promisify pattern, session management methods
+- `src/server/services/TerminalStreamService.ts` — Socket.IO namespace setup pattern
+- `src/server/routes/agentRoutes.ts`, `instanceRoutes.ts`, `historyRoutes.ts`, `activityRoutes.ts` — confirmed route module pattern
+- `src/server/services/OpenClawConfigReader.ts` — TTL cache pattern (30s), JSON file read
+- `src/server/index.ts` — route mounting, service initialization, shutdown handler pattern
+- `src/client/plugins/example-plugin.tsx` — plugin contract: `{ manifest, PanelComponent }`, no props
+- `src/shared/pluginTypes.ts` — `ComponentType` (no props), `PluginSlot` enum including `'bottom-panel'`
+- `src/client/plugins/index.ts` — `import.meta.glob('./*.tsx', { eager: true, import: 'default' })`
+- `src/client/App.tsx` line 318 — `bottom-panel` slot render location confirmed
+- `src/client/hooks/useActiveInstances.ts` — polling hook pattern (5s interval, `useCallback`+`useEffect`)
+- `/home/forge/.openclaw/workspace/skills/gsd-code-skill/scripts/spawn.sh` — full interface verified; `flock` at lines 103-140; `wait_for_claude_tui_readiness` at lines 249-268; `tmux send-keys "$first_command"` at lines 403-415
+- `/home/forge/.openclaw/workspace/skills/gsd-code-skill/scripts/menu-driver.sh` — action allowlist verified; `sleep 0.8` at line 49
+- `/home/forge/.openclaw/workspace/skills/gsd-code-skill/config/recovery-registry.json` — live schema: `agent_id`, `enabled`, `working_directory`, `tmux_session_name` confirmed
+- `/tmp/gsd-hooks.log` — live log format: `[ISO-timestamp] [script-name.sh] message` confirmed
+- STATE.md (warden, gsd-code-skill, getcpsr projects) — consistent `Phase:`, `Plan:`, `Status:`, `Progress:`, `Last activity:` fields confirmed across 3 live files
 
-**Stack Research:**
-- [ansi_up GitHub](https://github.com/drudru/ansi_up) — ANSI parsing library, 6.0.2 verified
-- [react-modal-sheet GitHub](https://github.com/Temzasse/react-modal-sheet) — Mobile bottom sheet component
-- [Gravity UI Timeline](https://gravity-ui.com/libraries/timeline) — Virtualized timeline library
-- [Vite Features - Dynamic Imports](https://vite.dev/guide/features) — import.meta.glob documentation
-- [SQLite FTS5 Extension](https://sqlite.org/fts5.html) — Full-text search official docs
-- [SQLite JSON Virtual Columns - DB Pro Blog](https://www.dbpro.app/blog/sqlite-json-virtual-columns-indexing) — Indexing patterns
+### Secondary (MEDIUM confidence — web research, established practices)
+- Agentic AI UX patterns (UX Magazine, Salesforce Architects, AufaitUX) — suggest-and-confirm, progressive disclosure, in-place feedback
+- PatternFly clipboard copy design guidelines — copy-to-clipboard "Copied!" state pattern
+- Polling vs streaming analysis (Svix Resources, Smashing Magazine) — confirmed 5s polling is sufficient for single-operator scale
 
-**Features Research:**
-- [Visual Studio Code Extension API](https://code.visualstudio.com/api/references/extension-manifest) — Plugin manifest patterns
-- [GitHub Activity Feed](https://docs.github.com/en/rest/activity) — Activity Stream Protocol
-- [Material Design 3 - Bottom Sheets](https://m3.material.io/components/bottom-sheets/guidelines) — Mobile UI patterns
-- [xterm.js Issue #5377](https://github.com/xtermjs/xterm.js/issues/5377) — Touch support limitations (July 2025)
-
-**Architecture Research:**
-- [Registry Pattern - GeeksforGeeks](https://www.geeksforgeeks.org/system-design/registry-pattern) — Plugin registry architecture
-- [Microservices Audit Logging Pattern](https://microservices.io/patterns/observability/audit-logging.html) — Event logging patterns
-- [React Media Query Hook](https://react.wiki/hooks/custom-use-media-query/) — Responsive design hooks
-- [Framer Breakpoints Guide 2026](https://www.framer.com/blog/responsive-breakpoints/) — Mobile-first breakpoints
-
-**Pitfalls Research:**
-- [Don't Trust This Title: ANSI Escape Security](https://www.cyberark.com/resources/threat-research-blog/dont-trust-this-title-abusing-terminal-emulators-with-ansi-escape-characters) — ANSI vulnerabilities
-- [ANSI Terminal Security 2023 - 10 CVEs](https://dgl.cx/2023/09/ansi-terminal-security) — RCE vulnerabilities
-- [Deceiving Users with ANSI in MCP](https://blog.trailofbits.com/2025/04/29/deceiving-users-with-ansi-terminal-codes-in-mcp/) — 2025 AI tool attacks
-- [Socket.IO Connection State Recovery](https://socket.io/docs/v4/connection-state-recovery) — Official documentation
-- [SQLite WAL Mode](https://sqlite.org/wal.html) — Checkpoint starvation
-- [Why Responsive Design Still Fails In 2025](https://blog.imagine.bo/responsive-design-still-fails/) — Mobile-first pitfalls
-- [Node.js Memory Leak Patches](https://securityonline.info/node-js-patches-memory-leak-and-permission-bypasses/) — CVE-2025-55131, CVE-2025-59464
-
-### Secondary (MEDIUM confidence)
-
-- [Slash Engineering: Scaling TypeScript with Registries](https://puzzles.slash.com/blog/scaling-1m-lines-of-typescript-registries) — Type-safe registry patterns
-- [Comparing React Timeline Libraries - LogRocket](https://blog.logrocket.com/comparing-best-react-timeline-libraries/) — Timeline component evaluation
-- [DhiWise: React Mobile Responsiveness](https://www.dhiwise.com/post/the-ultimate-guide-to-achieving-react-mobile-responsiveness/) — Responsive patterns
-
-### Tertiary (needs validation)
-
-- [Tambo 1.0: React Component Rendering Agents](https://aitoolly.com/ai-news/article/2026-02-11-tambo-10-open-source-toolkit-for-agents-rendering-react-components-launched) — Dynamic component rendering (new, unproven)
+### Security Sources (HIGH confidence — current CVEs and technical documentation)
+- CVE-2025-27210 — path traversal via device names; reinforces need for prefix assertion beyond `path.normalize`
+- execFile vs exec security model (StackHawk, eslint-plugin-security) — shell bypass is insufficient when args flow into a script that uses `send-keys` in a shell context
+- `flock` advisory locking — bash `flock` and Node.js `fs.write` use incompatible lock mechanisms; mixing them creates silent race conditions
+- Claude Code tmux send-keys concurrent corruption (GitHub Issue #23615, 2025) — confirmed interleaved keystrokes from concurrent `menu-driver.sh` calls corrupt TUI state
 
 ---
-
-*Research completed: 2026-02-16*
+*Research completed: 2026-02-18*
 *Ready for roadmap: yes*

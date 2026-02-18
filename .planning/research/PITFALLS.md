@@ -1,413 +1,345 @@
-# Pitfalls Research: v2.0 Mission Control
+# Pitfalls Research: GSD Manager Plugin (v2.1)
 
-**Domain:** Adding Plugin Registry, Activity Timeline, and Mobile UI to Small Monitoring Dashboard
-**Researched:** 2026-02-16
-**Confidence:** HIGH (verified with current sources 2025-2026)
+**Domain:** Adding shell-proxying, process spawning, file watching, and config editing features to existing Express 5 dashboard
+**Researched:** 2026-02-18
+**Confidence:** HIGH (verified with current sources 2025-2026, cross-checked against actual spawn.sh / menu-driver.sh source)
+
+---
 
 ## Critical Pitfalls
 
-### Pitfall 1: Over-Engineering Plugin System for Single-User Tool
+### Pitfall 1: Shell Injection via spawn.sh and menu-driver.sh Argument Proxying
 
 **What goes wrong:**
-Developers build a full-featured plugin architecture with sandboxing, versioning, dependency management, plugin discovery, and lifecycle hooks when the actual need is "add 2-3 internal code modules with metadata." The codebase balloons from 2,644 LOC to 10,000+ LOC, slowing development while adding zero user value.
+The API receives user-supplied values for `agentName`, `workdir`, `firstCommand`, `sessionName`, and `action` then passes them to `execFile('bash', [scriptPath, agentName, workdir, firstCommand])`. If any value contains shell metacharacters — semicolons, backtick subshell expansion, `$(...)` patterns, newlines, or null bytes — and the script is invoked with `shell: true` or through an intermediate bash invocation, arbitrary commands execute on the server. Even with `execFile`, passing a `firstCommand` of `$(rm -rf /)` as a positional argument to `spawn.sh` may propagate into `tmux send-keys` where the shell IS invoked.
+
+Concrete attack chain: `POST /api/gsd/spawn` with `firstCommand: "/gsd:resume-work; rm -rf /home/forge"` → `spawn.sh warden /path "/gsd:resume-work; rm -rf /home/forge"` → `tmux send-keys ... "$first_command" Enter` — the tmux session now executes the injected command.
 
 **Why it happens:**
-Plugin architecture is exciting to build and feels "professional," but there's a cognitive trap: complexity in software design often leads to systems that are difficult to maintain, debug, and scale. Developers sometimes **over-engineer solutions by adding unnecessary layers of abstraction, dependencies, or excessive configurations**, making the system harder to understand and modify.
-
-The temptation is to design for hypothetical future plugins ("What if we want third-party plugins?") rather than the actual requirement: a handful of internal tool panels with metadata.
+Developers using `execFile` (not `exec`) feel safe because "execFile doesn't invoke a shell." But `spawn.sh` itself is a bash script — it uses `tmux send-keys ... "$first_command" Enter` at line 403-415. The value lands inside a tmux pane where a shell is running. `execFile` skipping shell interpretation only prevents injection at the `execFile` boundary; the payload travels through to the tmux layer intact.
 
 **How to avoid:**
-- **Ask the YAGNI question:** "Do we need plugin isolation if all plugins are our own code?"
-- Start with the simplest thing: TypeScript modules with metadata objects, registered at build-time
-- Build-time registration (import all plugins in an index file) is fine for single-user tools
-- Use TypeScript's type system for plugin contracts instead of runtime validation
-- Defer sandboxing, versioning, and plugin marketplace features until there's concrete demand
-- Set a complexity budget: "Plugin system should be <200 LOC, not >2000 LOC"
+1. **Allowlist action values for menu-driver.sh:** Only accept enum values (`snapshot`, `enter`, `esc`, `clear_then`, `choose`, `type`, `submit`). Reject anything else with 400.
+2. **Restrict agentName to known prefixes:** Validate against `KNOWN_AGENT_PREFIXES` array (`gideon`, `warden`, `scout`, `builder`, `forge`). Reject names containing `/`, `\`, `;`, `$`, backticks, spaces, null bytes.
+3. **Validate workdir with path canonicalization:** After `path.resolve()`, verify it starts with an allowlisted base path prefix (e.g., `/home/forge`). Reject `..`, null bytes, URL-encoded traversal sequences.
+4. **Restrict firstCommand to a known slash-command allowlist** if a preset enum model is used (recommended for Phase 1). If free-form is required (Phase 2), apply strict character allowlist: `[/a-zA-Z0-9 @:._-]` only.
+5. **Never use `shell: true`** with execFile for these invocations. The existing `execFile` usage in TmuxSessionManager is correct — follow the same pattern.
+6. **Use `execFile` with explicit args array:** `execFile('/path/to/spawn.sh', [agentName, workdir, firstCommand])` not `execFile('bash', ['-c', `spawn.sh ${args}`])`.
 
 **Warning signs:**
-- Plugin architecture PR exceeds 1,000 LOC
-- Adding "plugin SDK" or "plugin API versioning" to roadmap
-- Implementing runtime plugin loading from filesystem/URLs
-- Building plugin dependency resolution system
-- Creating plugin permissions/security model for internal tools
-- More time spent on plugin infrastructure than actual plugins
+- Arguments to `execFile` include concatenated template literals from request body
+- `shell: true` appears anywhere near gsdRoutes
+- No validation of `agentName` format before passing to spawn.sh
+- `firstCommand` accepted as arbitrary freeform string without validation
+- Route handler passes `req.body.action` directly to menu-driver.sh without enum check
 
 **Phase to address:**
-Phase 1 (Plugin Foundation) - Must establish the "simple registry" pattern from day one. Over-engineering here dooms the entire milestone.
-
-**Sources:**
-- [Common Mistakes in Software Development](https://www.securitycompass.com/blog/common-mistakes-in-software-development/) — adding unnecessary complexity
-- [Trillions spent and big software projects are still failing](https://news.ycombinator.com/item?id=46045085) — over-abstraction dangers
+Phase 1 (API routes and spawn) — inject security from the first line of gsdRoutes.ts. Cannot be retrofitted safely once routes are deployed.
 
 ---
 
-### Pitfall 2: xterm.js Mobile Touch Experience is Fundamentally Broken
+### Pitfall 2: Path Traversal in workdir Parameter Escapes to Arbitrary Filesystem Access
 
 **What goes wrong:**
-After weeks of mobile UI work, the terminal is unusable on mobile: virtual keyboard doesn't work, copy/paste fails, touch scrolling conflicts with xterm.js, and the experience regresses on desktop. Users report "typing doesn't work on iPad" and "can't select text on Android."
+`POST /api/gsd/spawn` with `workdir: "/home/forge/../../../etc"` reaches spawn.sh which calls `[ -d "$workdir" ]` — this succeeds if the directory exists. Claude Code then starts in `/etc` with `--dangerously-skip-permissions`. Similarly, `GET /api/gsd/sessions/:session/state` reads `{workdir}/.planning/STATE.md` — if session workdir is attacker-controlled, it reads arbitrary files.
 
 **Why it happens:**
-xterm.js has **limited touch support on mobile devices** which severely impacts usability — users cannot effectively interact with the terminal using touch gestures and mobile-specific input methods. This is a **5+ year old issue** still actively reported in 2025.
-
-Key problems:
-- **No native touch event handling** — CoreBrowserTerminal.ts focuses on mouse/keyboard events
-- **Copy/paste broken on iOS** — Cmd+C doesn't work on iPad (Issue #3727)
-- **Erratic typing on Android/Chrome** — input duplication, missing characters (Issue #3600, #675)
-- **Smart Keyboard arrow keys don't work on iOS** (Issue #1101)
-- **Virtual/predictive keyboards not accommodated** (Issue #2403)
-
-The current implementation in `CoreBrowserTerminal.ts` focuses primarily on mouse and keyboard events, with no dedicated touch event handling.
+Node.js `path.join()` does not prevent traversal — it normalizes the path but allows the result to escape the intended base. `path.join('/home/forge', '../../../etc')` returns `/etc` cleanly. A 2025 CVE (CVE-2025-27210) confirmed even `path.normalize` is insufficient on Windows. On Linux, the vulnerability is classic `../` traversal.
 
 **How to avoid:**
-- **Decide early:** Is mobile terminal interaction a core requirement or nice-to-have?
-- If nice-to-have: Make mobile terminal **read-only** — disable input, show "Use desktop for terminal interaction" message
-- If core requirement: Budget 2-3 weeks of mobile-specific terminal work and expect ongoing issues
-- Don't promise "full mobile terminal" — it's a known hard problem xterm.js hasn't solved
-- Test on real iOS and Android devices early (emulators hide keyboard issues)
-- Consider alternative mobile UX: agent activity timeline + quick actions instead of raw terminal
+```typescript
+import path from 'path';
+
+const ALLOWED_WORKDIR_BASE = '/home/forge';
+
+function validateWorkdir(userInput: string): string {
+  const resolved = path.resolve(userInput); // Resolves symlinks, normalizes
+  if (!resolved.startsWith(ALLOWED_WORKDIR_BASE + '/') && resolved !== ALLOWED_WORKDIR_BASE) {
+    throw new Error(`workdir must be under ${ALLOWED_WORKDIR_BASE}`);
+  }
+  return resolved;
+}
+```
+Apply this check BEFORE passing to execFile. For STATE.md reads, derive the path from the registry (trusted source), not from user-supplied session parameters.
 
 **Warning signs:**
-- Product requirement says "mobile-first" but includes "interactive terminal on mobile"
-- No mobile device testing until late in development
-- Assuming xterm.js "just works" on mobile because it's HTML5
-- Planning to "add touch support" as a small task
-- No backup plan if mobile terminal is unusable
+- `workdir` from request body passed to `path.join` without boundary check
+- STATE.md read path derived from raw request params
+- No assertion that resolved path starts with allowed prefix
+- Tests only pass paths like `/home/forge/project`, never test `../` escapes
 
 **Phase to address:**
-Phase 0 (Research/Scoping) - Must decide mobile terminal strategy BEFORE starting mobile UI work. Changing this mid-phase causes rework.
-
-**Sources:**
-- [Limited touch support on mobile devices impacts terminal usability · Issue #5377](https://github.com/xtermjs/xterm.js/issues/5377) — July 2025
-- [Copy and paste do not work on touch devices · Issue #3727](https://github.com/xtermjs/xterm.js/issues/3727)
-- [Erratic text output from typing into xterm console on Chrome on Android devices · Issue #3600](https://github.com/xtermjs/xterm.js/issues/3600)
-- [Support mobile platforms · Issue #1101](https://github.com/xtermjs/xterm.js/issues/1101)
+Phase 1 (API routes) — before spawn endpoint goes live.
 
 ---
 
-### Pitfall 3: Terminal Output Parsing Becomes Performance Nightmare
+### Pitfall 3: Race Condition When API and Hook Scripts Write recovery-registry.json Concurrently
 
 **What goes wrong:**
-Real-time ANSI parsing of terminal output for activity timeline causes server CPU to spike to 100%, SQLite database grows to gigabytes within days, and the dashboard becomes sluggish. Queries like "show me all file edits today" timeout after 30 seconds.
+Two writes to `recovery-registry.json` happen simultaneously: the web UI calls `PATCH /api/gsd/registry/agents/:agentId` to toggle `enabled: false`, while `spawn.sh` runs `upsert_agent_entry_in_registry` at the same time. Both read the file, compute a new state, write to a `.tmp` file, then `mv` to the final path. The last write wins, discarding the other's changes. Alternatively, a partially written `.tmp` file is read mid-write by the hook scripts.
+
+`spawn.sh` uses `flock -x 200` around its jq transform (verified in source, lines 103-140). But the Node.js API side has no flock equivalent — `fs.readFileSync` + `fs.writeFileSync` is not atomic and does not respect the bash `flock` lock.
 
 **Why it happens:**
-Developers underestimate terminal output volume and parsing complexity:
-- Claude Code generates **thousands of lines per minute** (tool calls, file diffs, compilation output)
-- ANSI parsing requires **finite state machine** processing byte-by-byte
-- **Capturing everything** creates exponential storage growth
-- Queries over millions of unindexed terminal output rows are slow
-
-tmux's ANSI parser is highly optimized (ternary trees, compact grid encoding), but naive regex-based parsing in JavaScript is orders of magnitude slower.
+bash `flock` is advisory — it only works when ALL writers use the same lock file. If the Node.js API writes directly to the file using `fs` without acquiring the `.lock` file, it bypasses the bash flock entirely.
 
 **How to avoid:**
-- **Parse selectively, not everything:**
-  - Only parse lines matching known patterns (e.g., `Tool call: fs_edit`)
-  - Ignore noisy output (progress bars, npm install logs, compilation warnings)
-  - Use streaming regex on chunks, not character-by-character state machine
-- **Set aggressive retention limits:**
-  - Keep only last 7 days of activity events
-  - Set `PRAGMA wal_autocheckpoint = 1000` to prevent infinite WAL growth
-  - Run daily cleanup job: `DELETE FROM activity_events WHERE timestamp < DATE('now', '-7 days')`
-- **Index aggressively:**
-  - Index `(timestamp, event_type)` for timeline queries
-  - Index `(agent_id, timestamp)` for per-agent filtering
-  - Use covering indexes for common queries
-- **Offload parsing to background worker:**
-  - Don't parse in real-time streaming path
-  - Buffer raw output, parse in background thread/process
-  - Use worker threads for CPU-intensive ANSI parsing
-- **Monitor database size:**
-  - Alert if `data/warden.db` exceeds 100MB
-  - Run `PRAGMA wal_checkpoint(TRUNCATE)` on graceful shutdown
-  - Check for checkpoint starvation with long-running queries
+Option A (recommended — simpler): **In the Node.js API, acquire the bash-compatible lock before writing.**
+```typescript
+import { execFile } from 'child_process';
+
+// Use flock via shell to acquire the same lock bash uses
+async function writeRegistryAtomically(transformFn: (registry: Registry) => Registry): Promise<void> {
+  return new Promise((resolve, reject) => {
+    // -x: exclusive, -w 5: wait up to 5s, 200: fd number
+    execFile('flock', ['-x', '-w', '5', REGISTRY_LOCK_PATH, '-c',
+      `node -e "...transform script..."`
+    ], (err) => err ? reject(err) : resolve());
+  });
+}
+```
+Option B (preferred, no shell): Use Node.js `proper-lockfile` npm package with the same `.lock` file path that spawn.sh uses (`recovery-registry.json.lock`), then do atomic write via temp file + rename:
+```typescript
+import lockfile from 'proper-lockfile';
+
+async function updateRegistry(transform: (r: Registry) => Registry): Promise<void> {
+  const release = await lockfile.lock(REGISTRY_PATH, { retries: { retries: 5, minTimeout: 100 } });
+  try {
+    const current = JSON.parse(fs.readFileSync(REGISTRY_PATH, 'utf8'));
+    const updated = transform(current);
+    const tmpPath = REGISTRY_PATH + '.tmp.' + process.pid;
+    fs.writeFileSync(tmpPath, JSON.stringify(updated, null, 2));
+    fs.renameSync(tmpPath, REGISTRY_PATH); // atomic on same filesystem
+  } finally {
+    await release();
+  }
+}
+```
+Note: `proper-lockfile` uses `mkdir` strategy (atomic on NFS) rather than `O_EXCL` which has NFS bugs. The bash `flock` and Node `proper-lockfile` are compatible if both check the same `.lock` file — but they use different mechanisms. Best approach: have the Node.js API shell out `flock` itself OR use only one writer (make the API the only writer, have hook scripts call the API).
 
 **Warning signs:**
-- Database file grows >1MB/hour
-- WAL file never shrinks (checkpoint starvation from concurrent readers)
-- CPU usage correlates with terminal output volume
-- Queries slow down as data accumulates
-- No retention policy defined
-- Parsing code uses complex regex or character-by-character loops
+- Node.js API calls `fs.readFileSync` + `fs.writeFileSync` on registry without acquiring lock
+- No `.lock` file acquisition in gsdRoutes.ts
+- Tests never simulate concurrent spawn.sh + API writes
+- Registry corruption detected by `validate_registry_json` (corrupt backup created)
+- API and hook scripts disagree on agent enabled/disabled state
 
 **Phase to address:**
-Phase 2 (Activity Timeline) - Must establish parsing strategy and retention policy BEFORE going to production. Storage growth is exponential.
-
-**Sources:**
-- [SQLite performance tuning](https://phiresky.github.io/blog/2020/sqlite-performance-tuning/) — WAL growth, indexing
-- [SQLite WAL Mode](https://sqlite.org/wal.html) — checkpoint starvation
-- [tmux ANSI parsing](https://deepwiki.com/tmux/tmux/3.1-input-processing) — state machine complexity
-- [How SQLite Scales Read Concurrency](https://fly.io/blog/sqlite-internals-wal/) — concurrent readers block checkpoints
+Phase 1 (registry API) — must design atomic writes before first PATCH endpoint lands.
 
 ---
 
-### Pitfall 4: ANSI Escape Sequences Create Security and Storage Vulnerabilities
+### Pitfall 4: Log File Tailing Memory Leak and File Rotation Gaps
 
 **What goes wrong:**
-Stored terminal output in the activity timeline contains malicious ANSI escape sequences that, when viewed later, execute arbitrary code, manipulate log displays to hide evidence, or cause Denial of Service by printing billions of characters. Ransomware gangs could manipulate log files so they look empty or normal whenever viewed.
+`GET /api/gsd/hooks/log` starts watching `/tmp/gsd-hooks.log` with `fs.watch` or `fs.createReadStream`. Two failure modes:
+1. **Memory leak:** The watcher is never closed when the HTTP response ends (client disconnects, SSE stream closes). Each request creates a new dangling watcher. After 50 requests, 50 watchers hold the process active with no cleanup.
+2. **File rotation gap:** `/tmp/gsd-hooks.log` is a flat append-only file (no rotation). If the file is deleted and recreated by a script (e.g., a cron that truncates it), `fs.watch` on the old inode gets no events. The reader misses all new entries.
+3. **Missing newlines:** The last line appended by hook scripts may not end with `\n` if the script was interrupted. A naive `readline` interface will buffer forever waiting for the newline, never emitting the last line.
 
 **Why it happens:**
-ANSI escape sequences are in-band control codes mixed with data. Research has uncovered **10 CVEs against terminal emulators** that could result in Remote Code Execution (RCE). Key vulnerability classes:
-- **Full echoback vulnerabilities** — attacker can insert control characters into input stream, enabling RCE
-- **Log file manipulation** — escape sequences make logs appear empty/normal when viewed
-- **Denial of Service** — ANSI character multiplier code can print billions of characters
-- **2025: ANSI attacks target AI/LLM tools** — escape codes used to obfuscate malicious payloads in tool descriptions
-
-ANSI terminal escape codes can be used to **obfuscate malicious payloads** in MCP server tool descriptions. Claude Code (version 0.2.76) does not offer any filtering or sanitization for tool descriptions and outputs containing ANSI escape sequences. Using these sequences, an attacker can make line-jumping payloads invisible on the screen.
+`fs.watch` returns a watcher that must be explicitly `.close()`d. SSE/streaming responses in Express have `res.on('close')` and `req.on('close')` events for cleanup — but developers often forget to register cleanup handlers on the response close event. File rotation awareness requires re-opening the file by name, not holding the original file descriptor.
 
 **How to avoid:**
-- **Strip ANSI before storing in database:**
-  - Replace any byte with hex value `0x1b` (start of escape sequence) with placeholder
-  - Use battle-tested ANSI stripping library (e.g., `strip-ansi` npm package)
-  - Never store raw terminal output with escape sequences
-- **Strip ANSI before displaying in timeline:**
-  - Even if stored clean, defensively strip on display
-  - Don't render ANSI in React components (use plain text)
-- **Validate storage size:**
-  - Reject lines >10KB before storing
-  - Detect ANSI multiplier codes and reject
-  - Set max event count per session (e.g., 10,000 events)
-- **If preserving ANSI for terminal replay:**
-  - Store in separate `raw_output` table with size limits
-  - Never display raw output in web UI
-  - Use read-only xterm.js instance for replay (no input)
+```typescript
+router.get('/api/gsd/hooks/log', (request, response) => {
+  response.setHeader('Content-Type', 'text/event-stream');
+  response.setHeader('Cache-Control', 'no-cache');
+  response.setHeader('X-Accel-Buffering', 'no'); // Prevents nginx buffering SSE
 
-**Warning signs:**
-- Storing raw PTY output without sanitization
-- Activity timeline renders terminal output with `dangerouslySetInnerHTML`
-- No ANSI stripping library in dependencies
-- No max size limit on stored events
-- Log viewer shows colored/formatted terminal output (ANSI is being rendered)
+  // Tail last N lines on connect
+  const initialLines = readLastNLines(GSD_HOOKS_LOG_PATH, 100);
+  initialLines.forEach(line => response.write(`data: ${JSON.stringify(line)}\n\n`));
 
-**Phase to address:**
-Phase 2 (Activity Timeline) - Security must be built into parsing/storage from day one. Retrofitting ANSI stripping is hard.
-
-**Sources:**
-- [Don't Trust This Title: Abusing Terminal Emulators with ANSI Escape Characters](https://www.cyberark.com/resources/threat-research-blog/dont-trust-this-title-abusing-terminal-emulators-with-ansi-escape-characters)
-- ["\\u001b[31m"?! ANSI Terminal security in 2023 and finding 10 CVEs](https://dgl.cx/2023/09/ansi-terminal-security) — 10 CVE discoveries
-- [Deceiving users with ANSI terminal codes in MCP](https://blog.trailofbits.com/2025/04/29/deceiving-users-with-ansi-terminal-codes-in-mcp/) — 2025 AI tool attacks
-- [Terminal Emulator Security](https://etbe.coker.com.au/2026/01/11/terminal-emulator-security/) — 2026 overview
-
----
-
-### Pitfall 5: Desktop-First Mobile Implementation Breaks Desktop UX
-
-**What goes wrong:**
-After adding mobile support, desktop users complain: giant touch-friendly buttons waste space, navigation requires extra clicks, information density is too low, and keyboard shortcuts stop working. The desktop experience regresses to accommodate mobile.
-
-**Why it happens:**
-The most common pitfall: teams build a complex, full-featured desktop website first, treating responsive design as an "afterthought" — a resizing tool used to scale down the design for mobile. The result: **giant buttons designed for "fat fingers"** on mobile touchscreens end up ported to desktop screens, forcing users with high-precision mice to interact with a UI that looks comically large and simplistic.
-
-Another cause: **bidirectional style cascading** — styles applied to smaller breakpoints cascade down AND styles applied to larger breakpoints cascade up. Styles set on breakpoints smaller than desktop **override** styles set on the breakpoint above, causing desktop regressions.
-
-**How to avoid:**
-- **Use mobile-first CSS with `min-width` media queries:**
-  - Base styles target mobile (no media query)
-  - `@media (min-width: 768px)` for tablet enhancements
-  - `@media (min-width: 1200px)` for desktop enhancements
-  - This ensures mobile is optimized and desktop builds on solid foundation
-- **Design components with viewport-specific variants:**
-  - Mobile: bottom sheet, single column, full-width buttons
-  - Desktop: sidebar, multi-column, compact buttons
-  - Don't just resize — restructure
-- **Use content-based breakpoints, not device defaults:**
-  - Set breakpoints where the layout visually breaks
-  - Don't force mobile design on 1440px screens
-- **Test desktop AND mobile throughout development:**
-  - Don't develop mobile-only, test desktop late
-  - Use Chrome DevTools responsive mode constantly
-- **Use fluid grids with relative units:**
-  - Percentages, `em`, `rem`, `vw`/`vh` instead of fixed pixels
-  - Allows proportional scaling without breaking
-
-**Warning signs:**
-- Desktop buttons suddenly 60px tall to accommodate touch
-- Desktop users need to scroll more after mobile implementation
-- Information density drops (fewer items per screen)
-- Desktop-specific keyboard shortcuts removed "to simplify"
-- CSS using only `max-width` media queries (desktop-first anti-pattern)
-- Testing exclusively on mobile during mobile phase
-
-**Phase to address:**
-Phase 3 (Mobile UI) - Must use mobile-first CSS from the start. Desktop-first approach requires full rewrite to fix.
-
-**Sources:**
-- [Why Responsive Design Still Fails In 2025](https://blog.imagine.bo/responsive-design-still-fails/)
-- [Responsive design best practices for 2025: Mobile-first imperative](https://www.adicator.com/post/responsive-design-best-practices)
-- [Mobile First CSS Design Principles](https://allthingsprogramming.com/mobile-first-css-design-principles/)
-- [Responsive Design Breakpoints in 2025](https://www.browserstack.com/guide/responsive-design-breakpoints)
-
----
-
-### Pitfall 6: Socket.IO Connection State Recovery Fails for Activity Timeline
-
-**What goes wrong:**
-Users on flaky mobile networks (WiFi to 4G switching) miss activity events during reconnection. Timeline shows gaps, critical operator actions are lost, and `socket.recovered` is always `false` despite configuration being correct.
-
-**Why it happens:**
-Socket.IO Connection State Recovery has several known failure modes:
-- **Network switching (WiFi → 4G):** `socket.recovered` returns `false` because reconnection occurs **before the old socket is disconnected** — server isn't aware of disconnection yet
-- **Long-lived, low-traffic connections:** If server doesn't periodically send messages, recovery fails — server purges buffered events within `maxDisconnectionDuration`, and without new events it can't find the appropriate offset
-- **Multi-node deployments:** Connection state recovery works only for temporary disconnections with the same server — not across load-balanced nodes without Redis adapter
-
-For activity timeline, missed events during reconnection are **permanently lost** unless the application implements its own gap detection and backfill.
-
-**How to avoid:**
-- **Always check `socket.recovered` and handle unrecovered case:**
-  ```typescript
-  socket.on('connect', () => {
-    if (socket.recovered) {
-      // No backfill needed
-    } else {
-      // Fetch missed events via REST API
-      const lastEventId = getLastReceivedEventId();
-      fetch(`/api/activity/since/${lastEventId}`).then(backfillEvents);
+  // Watch for new content
+  let fileSize = fs.existsSync(GSD_HOOKS_LOG_PATH) ? fs.statSync(GSD_HOOKS_LOG_PATH).size : 0;
+  const watcher = fs.watch(GSD_HOOKS_LOG_PATH, { persistent: false }, () => {
+    const newSize = fs.statSync(GSD_HOOKS_LOG_PATH).size;
+    if (newSize < fileSize) {
+      // File was truncated/rotated — reset position
+      fileSize = 0;
+    }
+    if (newSize > fileSize) {
+      const stream = fs.createReadStream(GSD_HOOKS_LOG_PATH, { start: fileSize, end: newSize });
+      stream.on('data', chunk => response.write(`data: ${JSON.stringify(chunk.toString())}\n\n`));
+      stream.on('end', () => { fileSize = newSize; });
     }
   });
-  ```
-- **Send periodic heartbeat events to keep offsets valid:**
-  - Emit `activity:heartbeat` every 30s even if no activity
-  - Ensures server has recent offset for recovery
-- **Implement gap detection:**
-  - Add sequence numbers to activity events
-  - Client detects missing sequence numbers and requests backfill
-- **Use REST API for initial load and backfill:**
-  - Socket.IO for real-time updates only
-  - REST API for reliable historical data
-  - Don't rely solely on Socket.IO event stream
-- **For mobile: implement aggressive reconnection:**
-  - Lower `reconnectionDelay` (default 1000ms → 500ms)
-  - Increase `reconnectionAttempts` (default 20 → 50)
-  - Detect network change events and force reconnect
 
-**Warning signs:**
-- No backfill logic when `socket.recovered` is `false`
-- Activity timeline implementation relies solely on Socket.IO events
-- No sequence numbers or timestamps to detect gaps
-- No heartbeat events for long-idle connections
-- Testing only on stable desktop WiFi, not mobile networks
-
-**Phase to address:**
-Phase 2 (Activity Timeline) - Event delivery reliability must be designed from the start. Adding backfill logic later is complex.
-
-**Sources:**
-- [Connection state recovery](https://socket.io/docs/v4/connection-state-recovery) — official docs
-- [ConnectionStateRecovery not working when switching from wifi to 4g](https://github.com/socketio/socket.io/discussions/5248)
-- [Connection State Recovery fails for long-lived connections](https://github.com/socketio/socket.io/issues/5282)
-- [Handling disconnections](https://socket.io/docs/v4/tutorial/handling-disconnections) — tutorial
-
----
-
-### Pitfall 7: Node.js Memory Leaks in Terminal Streaming Services
-
-**What goes wrong:**
-After hours of operation with mobile users connecting/disconnecting frequently, the server runs out of memory (OOM killer terminates process) or exhibits severe GC pressure causing request latency spikes.
-
-**Why it happens:**
-Node.js has several known memory leak vectors in 2025-2026:
-- **High-severity flaw (CVE-2025-55131):** Node.js memory allocation vulnerability allows buffers to retain data from previous operations — "dirty" memory with secrets/tokens can leak
-- **TLS memory leak (CVE-2025-59464):** Remote Denial of Service against applications processing TLS client certificates
-- **Stream piping memory leaks:** Known issue involves **high memory consumption during pipe operations and memory leak after operation finishes**
-- **`fetch` memory leak in Node 24:** `await response.text()` leaks memory in successive fetch calls
-
-For terminal streaming, leaks typically occur from:
-- PTY event listeners not removed on disconnect
-- Socket.IO listeners accumulating
-- Terminal output buffers not garbage collected
-
-**How to avoid:**
-- **Track and remove ALL event listeners:**
-  ```typescript
-  const ptyDataHandler = (data: string) => socket.emit('terminal:output', data);
-  ptyProcess.onData(ptyDataHandler);
-
-  socket.on('disconnect', () => {
-    ptyProcess.removeListener('data', ptyDataHandler); // Critical!
-    ptyProcess.kill();
+  // CRITICAL: Always close watcher when client disconnects
+  response.on('close', () => {
+    watcher.close();
+    console.log('[GSD] Log tail watcher closed for disconnected client');
   });
-  ```
-- **Use WeakMap for connection metadata:**
-  - Allows garbage collection when socket is gone
-  - Prevents circular references
-- **Monitor memory usage:**
-  - Log `process.memoryUsage().heapUsed` every minute
-  - Alert if growth >10MB/hour steady-state
-  - Use heap snapshots to detect listener accumulation
-- **Limit buffer sizes:**
-  - Cap terminal output buffer at 1MB per session
-  - Use circular buffer with fixed size
-  - Implement backpressure (pause PTY when buffer full)
-- **Test with repeated connect/disconnect cycles:**
-  - 100+ connection cycles should show stable memory
-  - Use `node --inspect` and Chrome DevTools heap profiler
-  - Check `socket.listenerCount('event')` doesn't grow
+});
+```
+For the missing-newline edge case: when reading new bytes, split on `\n` and hold incomplete last line in a buffer until the next read appends to it.
 
 **Warning signs:**
-- `process.memoryUsage().heapUsed` grows linearly over time
-- Memory usage doesn't drop after clients disconnect
-- Event listener count grows: `emitter.listenerCount()` increases
-- No explicit `removeListener()` calls in disconnect handlers
-- Heap snapshots show arrays of closures
+- No `response.on('close', () => watcher.close())` in log streaming endpoint
+- `watcher.close()` not called in any code path (including error paths)
+- Using `fs.readFileSync` in a polling interval (creates N file reads per second, never streaming)
+- No handling for `newSize < fileSize` (truncation detection)
+- Process watcher count grows with each request to the log endpoint
 
 **Phase to address:**
-Phase 1 (Plugin Foundation) and Phase 2 (Activity Timeline) - Memory leaks compound with activity timeline background processing.
-
-**Sources:**
-- [Node.js Patches Memory Leak and Permission Bypasses](https://securityonline.info/node-js-patches-memory-leak-and-permission-bypasses/) — CVE-2025-55131, CVE-2025-59464
-- [High memory consumption when piping between streams · Issue #50762](https://github.com/nodejs/node/issues/50762)
-- [Node 24.0.2: Memory leak on `fetch` response `.text()`](https://github.com/nodejs/node/issues/58380)
-- [How to Profile Node.js Applications for Memory Leaks](https://oneuptime.com/blog/post/2026-01-26-nodejs-memory-leak-profiling/view)
+Phase 2 (hook activity feed) — implement SSE correctly from the start; memory leak only visible under sustained use.
 
 ---
 
-### Pitfall 8: SQLite WAL Checkpoint Starvation from Activity Timeline Queries
+### Pitfall 5: Concurrent tmux Session Operations Create Double-Spawn and State Confusion
 
 **What goes wrong:**
-The SQLite WAL file grows to gigabytes, write performance degrades dramatically, and the database eventually runs out of disk space. Queries slow from milliseconds to seconds. The issue only appears in production with real activity timeline query patterns.
+Two UI interactions fire within milliseconds: user clicks "Spawn" while the 10-second `InstanceTracker.syncWithTmux()` interval fires. Or a mobile user with flaky connection double-taps the spawn button, sending two `POST /api/gsd/spawn` requests. Both proceed through spawn.sh, both call `resolve_tmux_session_name` which checks `tmux has-session` — if the first spawn hasn't created the session yet (it's in the `wait_for_claude_tui_readiness` 3-15 second wait), the second spawn also proceeds, creating two sessions.
+
+Similarly: `menu-driver.sh clear_then "/gsd:resume-work"` while another menu-driver call is in-flight sends `C-u /clear Enter` twice into the same tmux pane, corrupting the Claude Code TUI state.
 
 **Why it happens:**
-**Checkpoint starvation** occurs when SQLite is unable to recycle the WAL file due to everlasting concurrent reads. If there is always at least one active reader, checkpointing will never complete, and **the WAL file will grow indefinitely**, leading to unacceptable disk usage and deteriorating performance.
-
-Checkpointing interferes with readers: it cannot transfer WAL changes that go after the end mark of any active transaction. So **checkpointing runs only up to the first end mark**. If a write transaction makes the WAL grow above 1000 pages, that transaction performs checkpointing — but the checkpoint **must stop when it reaches a page past the end mark of any current reader**.
-
-Activity timeline queries can be long-running: "show me all tool calls from last 7 days" might scan millions of rows, holding a read transaction open for seconds, blocking checkpoints.
+`spawn.sh`'s `resolve_tmux_session_name` uses a TOCTOU (time-of-check-time-of-use) pattern: check if session exists, then create it. The 3-15 second window between check and creation allows double-spawn. `menu-driver.sh` sends keystrokes to a specific tmux pane — interleaved keystrokes from two concurrent invocations are indistinguishable to the receiving process.
 
 **How to avoid:**
-- **Ensure "reader gaps" — times when no processes are reading:**
-  - Don't run background queries continuously
-  - Use short-lived read transactions (<1 second)
-  - Batch timeline queries: fetch 1 day at a time, not 7 days at once
-- **Run manual checkpoints:**
-  - Use `SQLITE_CHECKPOINT_TRUNCATE` on graceful shutdown
-  - Consider periodic checkpoints: `db.pragma('wal_checkpoint(RESTART)')` every hour
-- **Set busy timeout:**
-  - `db.pragma('busy_timeout = 5000')` allows 5s wait for locks
-  - Prevents immediate `SQLITE_BUSY` errors
-- **Optimize query patterns:**
-  - Use indexes to speed up timeline queries (reduce transaction duration)
-  - Implement pagination (LIMIT/OFFSET) to avoid full table scans
-  - Add `created_at` index for timeline range queries
-- **Monitor WAL file size:**
-  - Alert if `warden.db-wal` exceeds 50MB
-  - Log checkpoint failures
-- **Consider WAL2 mode (experimental) or alternative solutions:**
-  - WAL2 uses two WAL files to avoid infinite growth
-  - Turso concurrent writes (2025) eliminates `SQLITE_BUSY` errors
+1. **Per-session mutex in gsdRoutes.ts:** Use a `Map<string, Promise>` to track in-flight spawn/command operations per agent:
+```typescript
+const inflightOperations = new Map<string, Promise<unknown>>();
+
+async function withAgentLock<T>(agentId: string, operation: () => Promise<T>): Promise<T> {
+  const existing = inflightOperations.get(agentId);
+  if (existing) {
+    await existing; // Wait for in-flight operation to complete
+  }
+  const newOperation = operation();
+  inflightOperations.set(agentId, newOperation.finally(() => inflightOperations.delete(agentId)));
+  return newOperation;
+}
+```
+2. **Idempotent spawn:** Before calling spawn.sh, check if a session for this agent already exists via `tmuxSessionManager.sessionExists()`. Return 409 Conflict if already running.
+3. **UI-level debounce:** Disable spawn/command buttons for 5 seconds after click. Show in-progress state.
+4. **Timeout on long-running operations:** spawn.sh can take 15+ seconds waiting for TUI readiness. Add a 30-second `execFile` timeout to prevent hanging HTTP requests.
 
 **Warning signs:**
-- WAL file grows continuously, never shrinks
-- Write latency increases over time
-- `SQLITE_BUSY` errors in logs
-- Background queries run for >1 second
-- No `wal_checkpoint` calls in graceful shutdown
-- Pagination not implemented for timeline queries
+- No in-flight operation tracking per agent
+- Spawn endpoint doesn't check if session already exists
+- UI buttons not disabled after click
+- No timeout on execFile calls for spawn.sh (default: no timeout = hang forever)
+- Logs show sessions like `warden-main-2`, `warden-main-3` accumulating unexpectedly
 
 **Phase to address:**
-Phase 2 (Activity Timeline) - Must design query patterns with checkpoint implications from the start.
+Phase 1 (spawn API) — idempotency check is trivial; the mutex pattern must be established with first route implementation.
 
-**Sources:**
-- [Write-Ahead Logging](https://sqlite.org/wal.html) — official WAL documentation
-- [How SQLite Scales Read Concurrency](https://fly.io/blog/sqlite-internals-wal/) — checkpoint mechanics
-- [SQLite concurrent writes and "database is locked" errors](https://tenthousandmeters.com/blog/sqlite-concurrent-writes-and-database-is-locked-errors/)
-- [WAL checkpoint starved?](https://sqlite-users.sqlite.narkive.com/muT0rMYt/sqlite-wal-checkpoint-starved)
+---
+
+### Pitfall 6: spawn.sh Takes 15+ Seconds — Blocking the Node.js Event Loop if Using execFileSync
+
+**What goes wrong:**
+`spawn.sh` calls `wait_for_claude_tui_readiness` which does `sleep 3` then polls every 500ms for up to 20 seconds (lines 249-268). If the API calls `execFileSync` instead of the async `execFileAsync`, the Node.js event loop is completely blocked for up to 23 seconds. During this time: all other HTTP requests stall, Socket.IO heartbeats don't fire, and the browser disconnects. Multiple concurrent spawns multiply this: 3 concurrent spawns = 69 seconds of stall.
+
+**Why it happens:**
+`execFileSync` is synchronous and blocks the event loop. It is tempting to use because error handling looks simpler (try/catch instead of callbacks). The PRD says "No new dependencies required — uses execFile" but a developer might reach for the Sync variant.
+
+**How to avoid:**
+Always use `execFileAsync` (promisified `execFile`) for spawn.sh invocations:
+```typescript
+import { execFile } from 'child_process';
+import { promisify } from 'util';
+
+const execFileAsync = promisify(execFile);
+
+// Always async — spawn.sh takes 3-23 seconds
+const { stdout, stderr } = await execFileAsync(
+  SPAWN_SCRIPT_PATH,
+  [agentName, workdir, firstCommand],
+  { timeout: 30_000 } // 30-second hard limit
+);
+```
+The existing `TmuxSessionManager.executeTmuxCommand` follows this pattern correctly — copy it.
+
+**Warning signs:**
+- `execFileSync` anywhere in gsdRoutes.ts or related services
+- `/api/gsd/spawn` response time > 100ms (should return immediately or return a job ID for async tracking)
+- All other API endpoints slow down when spawn is in progress
+- No timeout parameter on execFileAsync for spawn.sh
+
+**Phase to address:**
+Phase 1 (spawn API) — code review gate: ban `execFileSync` in gsdRoutes.ts.
+
+---
+
+### Pitfall 7: STATE.md Polling vs. Real-Time — Stale Data Masking Agent State Changes
+
+**What goes wrong:**
+The agent grid polls `GET /api/gsd/sessions/:session/state` every N seconds (or on demand). If polling interval is 10 seconds but an agent transitions from `working` → `menu` → `idle` within that window, the UI shows stale state. Worse: STATE.md is written by GSD hook scripts via the hook system — the file content is updated by stop-hook.sh after each Claude stop event. If the API reads STATE.md at the wrong moment, it may read a partially written file.
+
+Separately: the PRD shows context pressure percentage and phase progress. These values are in STATE.md. Reading STATE.md with `fs.readFileSync` on every poll can cause ENOENT errors if the agent is mid-transition (directory being created by spawn.sh).
+
+**Why it happens:**
+STATE.md is a simple flat file maintained by hook scripts. The file is written atomically per GSD conventions (`mv tmp → final`), but there is a brief window. The polling approach shows state that may be 10-30 seconds stale — acceptable for this single-operator use case, but the UI may mislead the operator during active agent transitions.
+
+**How to avoid:**
+1. **Handle ENOENT gracefully:** Wrap STATE.md reads in try/catch; return `{ state: 'unknown', phase: null }` if file not found.
+2. **Use the hook log as primary state source:** `/tmp/gsd-hooks.log` is appended in real-time — parse its last few lines to extract current state instead of relying on STATE.md polling alone. The hook log format is well-structured (verified from source).
+3. **Choose polling interval consciously:** 5 seconds is adequate for single-operator use; 10 seconds creates too much stale appearance. State polling does NOT need to be real-time — the terminal view already shows live output.
+4. **Never parse STATE.md as live state for critical decisions:** It's for display only. Use `tmux has-session` for existence checks; use the terminal view for real-time state.
+
+**Warning signs:**
+- STATE.md read without ENOENT error handling
+- Polling interval > 10 seconds for agent state
+- UI state shown as "working" long after terminal shows idle prompt
+- ENOENT errors in server logs from STATE.md reads during spawn
+
+**Phase to address:**
+Phase 2 (agent state grid) — design state polling strategy before building the component.
+
+---
+
+### Pitfall 8: registry.json Toggle Silently Ignored When Warden Session Name Doesn't Match
+
+**What goes wrong:**
+The `PATCH /api/gsd/registry/agents/:agentId` route sets `enabled: false` for agent `warden`. The hooks read the registry using `select(.tmux_session_name == $session)` (verified in stop-hook.sh line 61-65). If the running session is `warden-main-2` (because `warden-main` was already taken, see spawn.sh `resolve_tmux_session_name`) but the registry stores `warden-main`, the hook exits early with "no agent matched." The toggle appears to succeed from the API perspective but has no effect on running hooks.
+
+**Why it happens:**
+spawn.sh resolves name conflicts by appending `-2`, `-3` suffix (lines 223-234) AND writes the actual session name back to the registry (line 418). But if the Warden API reads the registry and finds `tmux_session_name: "warden-main"` while the actual session is `warden-main-2`, toggling `enabled` on `warden` affects only the `warden-main` entry — not the running session. The session name written by spawn.sh might be stale if spawn.sh was called externally (from CLI) and the API hasn't refreshed its view.
+
+**How to avoid:**
+1. **Cross-reference registry with live tmux sessions:** When reading registry for display, augment each agent entry with the actual running session name from `tmuxSessionManager.listAgentSessions()`.
+2. **Registry viewer shows discrepancy:** If `registry.tmux_session_name` differs from actual live session, show a warning in the UI ("Running as: warden-main-2, registry shows: warden-main").
+3. **Always refresh registry from disk before returning:** Don't cache registry in memory; always read from file on each GET request (file is small, this is fine).
+4. **PATCH operation validates against live session:** Before toggling, verify the agent's registered session name matches a live tmux session; if not, show a warning.
+
+**Warning signs:**
+- Registry shows `warden-main` but `tmux ls` shows `warden-main-2`
+- Toggling `enabled: false` has no effect on hook behavior
+- API caches registry in memory without refresh on write
+- No cross-referencing between registry session names and live tmux sessions
+
+**Phase to address:**
+Phase 1 (registry viewer) — design around live session cross-referencing from day one.
+
+---
+
+### Pitfall 9: menu-driver.sh clear_then Races with Claude TUI State
+
+**What goes wrong:**
+`clear_then <slash-command>` in menu-driver.sh sends: `C-u /clear Enter` → `sleep 0.8` → `C-u <slash-command> Enter`. This 800ms sleep is designed for interactive use by a human-speed orchestrator. When called via the web API from a browser click, the 800ms feels like success — but if Claude TUI takes longer to process `/clear` (e.g., compacting context, which can take 5-30 seconds), the slash-command fires into a mid-processing TUI and is ignored or corrupts the session state.
+
+The API gets a 0 exit code from menu-driver.sh (it doesn't verify the TUI processed the command) and returns `200 OK`, but the agent never received the command.
+
+**Why it happens:**
+menu-driver.sh's `sleep 0.8` is a fixed heuristic that works 90% of the time interactively. The web API has no feedback mechanism to know whether the command was actually received and processed. tmux `send-keys` always succeeds if the session exists — it doesn't confirm the application received the input.
+
+**How to avoid:**
+1. **Return 202 Accepted, not 200 OK** for command-send operations: the command was dispatched, not confirmed received.
+2. **Document the `clear_then` latency** in the UI: show "Command sent (may take up to 30s to appear if context is compacting)."
+3. **For the initial phase, limit available actions** to those with lower collision risk: `enter`, `esc`, `submit`, `choose` are safer than `clear_then` which depends on timing.
+4. **Consider snapshot-and-compare verification** for critical commands: after sending, capture `menu-driver.sh snapshot` after 2 seconds and verify the command appears in pane output. This is complex — defer to a later phase.
+
+**Warning signs:**
+- API returns 200 OK for `clear_then` without any verification
+- UI shows "Command sent successfully" without acknowledging the fixed timing assumption
+- No documentation about `clear_then` timing sensitivity
+- `clear_then` available for all agent states (should only be available when agent is `idle`)
+
+**Phase to address:**
+Phase 1 (command API) — use 202 Accepted and document timing from the start.
 
 ---
 
@@ -415,187 +347,138 @@ Phase 2 (Activity Timeline) - Must design query patterns with checkpoint implica
 
 | Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
 |----------|-------------------|----------------|-----------------|
-| Runtime plugin loading from filesystem | Feels flexible/extensible | Security risk, testing complexity, no type safety | Never (build-time registration is simpler and safer) |
-| Storing raw terminal output with ANSI | Skip ANSI stripping logic | Security vulnerabilities, storage bloat, rendering issues | Never (strip-ansi is one npm install) |
-| Mobile terminal full interactivity | "Feature complete" claim | Ongoing xterm.js touch bugs, support burden | Never (read-only mobile terminal is acceptable) |
-| Parse all terminal output for activity | Complete audit trail | CPU/storage explosion, performance degradation | Never (selective parsing is required) |
-| Desktop-first responsive CSS | Faster initial dev | Desktop regression when adding mobile, full CSS rewrite | Never (mobile-first is same effort, better outcome) |
-| Socket.IO-only activity events (no REST backfill) | Simpler architecture | Event loss on reconnection, unreliable timeline | Never (REST backfill is ~50 LOC) |
-| No ANSI sanitization in stored events | Skip validation logic | Security vulnerabilities, potential RCE | Never (critical security issue) |
-| Long-running timeline queries without pagination | Simpler SQL queries | WAL checkpoint starvation, database growth | Acceptable only for admin-only debug queries |
-| No plugin metadata schema validation | Faster plugin development | Runtime errors, inconsistent UI, debugging difficulty | Acceptable if all plugins are internal (TypeScript types sufficient) |
-| Mobile bottom-sheet without keyboard detection | Simpler mobile layout | Keyboard covers input on iOS, broken UX | Never (visual viewport handling is essential) |
+| `execFileSync` for spawn.sh | Simpler try/catch error handling | Event loop blocks 3-23 seconds, all requests stall | Never |
+| Pass `firstCommand` directly without allowlist | Simpler API, supports any command | Shell injection via tmux send-keys | Never — even for internal single-user tool |
+| No lock on registry writes from Node.js | Simpler code, no npm dependency | Silent data loss when spawn.sh runs concurrently | Never — data corruption is silent and hard to detect |
+| Open-ended `workdir` without boundary check | Supports any project directory | Path traversal to arbitrary filesystem locations | Never |
+| `fs.watch` without cleanup on response close | Simple log streaming implementation | Memory leak from dangling watchers | Never |
+| Poll STATE.md every 1 second | "Real-time" state | File descriptor churn, unnecessary I/O | Never — 5s polling is sufficient |
+| No per-session spawn mutex | Simpler request handling | Double-spawn sessions accumulate, confusing operator | Never — mutex is ~20 LOC |
+| No timeout on execFile for spawn.sh | Simpler code | Zombie HTTP requests, eventual memory leak | Never — 30s timeout is one argument |
+| Return 200 for dispatched commands | Cleaner REST semantics appearance | False confidence that command was received | Acceptable only if UI documents the behavior |
 
 ## Integration Gotchas
 
 | Integration | Common Mistake | Correct Approach |
 |-------------|----------------|------------------|
-| Plugin rendering in React | Passing plugin component as prop causes re-render issues | Use React.lazy() + Suspense for dynamic plugin components |
-| ANSI parsing in activity timeline | Using complex regex on entire terminal output | Use streaming parser on chunks, match only known patterns |
-| Mobile viewport height | Using `100vh` (doesn't account for mobile browser chrome) | Use `100dvh` or visual viewport API with fallback |
-| Activity timeline + Socket.IO | Assuming connection state recovery prevents event loss | Always implement REST backfill for `socket.recovered === false` |
-| SQLite WAL + long timeline queries | No pagination, full table scans block checkpoints | Use indexed queries with LIMIT/OFFSET, <1s transaction duration |
-| Mobile touch + xterm.js | Expecting touch events to work like desktop | Make mobile terminal read-only or budget weeks for touch debugging |
-| Plugin registry TypeScript types | Runtime plugin discovery loses type safety | Build-time registration with generated type manifest |
-| Mobile CSS media queries | Using `max-width` (desktop-first) | Use `min-width` (mobile-first) for progressive enhancement |
+| spawn.sh via API | Calling with `shell: true` or through `bash -c` | `execFile('/path/to/spawn.sh', [args], { timeout: 30000 })` |
+| menu-driver.sh action enum | Accepting any string as action | Validate against `['snapshot','enter','esc','clear_then','choose','type','submit']` |
+| recovery-registry.json + Node.js writes | Using `fs.readFileSync` + `fs.writeFileSync` without lock | Use `proper-lockfile` with same `.lock` path spawn.sh uses |
+| InstanceTracker + gsdRoutes | Creating separate registry cache in gsdRoutes | Read registry from disk fresh on each request; use tmuxSessionManager for live session data |
+| Log tail SSE endpoint | Forgetting `response.on('close')` cleanup | Always register watcher cleanup on `response.on('close')` |
+| spawn.sh 15s TUI wait | Returning before spawn completes | Return job confirmation immediately; state will update via InstanceTracker sync |
+| TmuxSessionManager.sessionExists | Using it in TOCTOU spawn guard | sessionExists + spawn is not atomic; use per-agent mutex around the whole operation |
+| STATE.md reads | Assuming file always exists | Wrap in try/catch, return `{ state: 'unknown' }` on ENOENT |
 
 ## Performance Traps
 
 | Trap | Symptoms | Prevention | When It Breaks |
 |------|----------|------------|----------------|
-| Parsing every line of terminal output | Server CPU 100%, UI lag | Parse only lines matching activity patterns (tool calls, file edits) | >1000 lines/min per session |
-| No retention policy on activity events | Database grows to gigabytes | Delete events older than 7 days, use `PRAGMA wal_checkpoint(TRUNCATE)` | After 1 week of continuous operation |
-| Mobile: re-rendering entire timeline on new event | UI jank, battery drain | Use React virtualization (react-window), only render visible rows | Timeline >1000 events |
-| SQLite full table scans for timeline queries | Query timeout after 30s | Index `(timestamp, event_type)` and `(agent_id, timestamp)` | Database >100K events |
-| No ANSI stripping before storage | Database bloat (ANSI codes 5-10x text size) | Strip ANSI before storing, or use compressed BLOB column | High terminal output volume |
-| Long-running activity queries blocking checkpoints | WAL grows unbounded | Paginate queries (LIMIT 100), keep transactions <1s | Concurrent readers + high write volume |
-| Mobile: loading full activity timeline on page load | 10-30s load time, mobile data usage | Lazy load timeline, start with today only, fetch older on scroll | Timeline >10K events |
-| Terminal output buffer accumulation | Memory leak, OOM crashes | Circular buffer with 1MB cap per session, implement backpressure | >10 active sessions with high output |
+| `execFileSync` for spawn.sh | All HTTP requests stall for 3-23s | Always use async `execFileAsync` | First spawn request |
+| Polling STATE.md every 1s per session | High file I/O on many sessions | Poll every 5-10s; batch state reads for all sessions | >3 active sessions |
+| No SSE for hook log (polling instead) | Repeated full log reads, bandwidth waste | Use SSE with byte-range reads from last offset | >10 UI clients |
+| Registry read on every route handler invocation | File descriptor churn | Read once, cache 1-2s | High-frequency polling |
+| No timeout on spawn.sh execFile | HTTP request hangs forever | `{ timeout: 30_000 }` parameter | First hung spawn.sh (TUI never ready) |
 
 ## Security Mistakes
 
 | Mistake | Risk | Prevention |
 |---------|------|------------|
-| Storing/rendering raw ANSI in activity timeline | RCE via ANSI escape sequences, log manipulation | Strip ANSI before storage (replace `\x1b`), use plain text rendering |
-| No size limits on activity events | DoS via storage exhaustion | Max 10KB per event, max 10K events per session |
-| Plugin code execution without sandboxing | Malicious plugin can access full Node.js API | Acceptable for internal plugins; external plugins require Worker isolation |
-| Exposing activity timeline to non-authenticated users | Information disclosure (commands, file paths, tool usage) | Require authentication (already IP-whitelisted) |
-| No input validation on activity event filters | SQL injection via timeline search | Use parameterized queries, validate date ranges |
-| Rendering user-generated content in timeline without sanitization | XSS via crafted terminal output or activity descriptions | Escape HTML entities, use React's default escaping |
-| No rate limiting on activity event creation | Event flood DoS | Max 100 events/min per agent, reject overflow |
+| Passing raw `firstCommand` to spawn.sh | Remote code execution via tmux send-keys | Allowlist: preset enum OR strict character regex `[/a-zA-Z0-9 @:._-]` |
+| Accepting any string as `agentName` | Path traversal / session name injection | Validate against `KNOWN_AGENT_PREFIXES`; allow only `[a-z-]` characters |
+| `workdir` without boundary check | Claude Code starts in arbitrary directory | `path.resolve` + assert starts with `/home/forge` |
+| `shell: true` in execFile for scripts | Bypasses execFile's shell bypass protection | Never use `shell: true` |
+| Serving hook log without access control | Leaks internal agent state and operations | Already IP-whitelisted at server level; sufficient for single-operator tool |
+| No size limit on hook log tail | Memory exhaustion if log is gigabytes | Limit: read last 500 lines maximum, or last 100KB |
+| `menu-driver.sh type <text>` with unsanitized text | Keystroke injection into Claude TUI | Validate `text` parameter: max 500 chars, no null bytes, restrict to printable ASCII |
 
 ## UX Pitfalls
 
 | Pitfall | User Impact | Better Approach |
 |---------|-------------|-----------------|
-| Mobile terminal input without keyboard detection | iOS keyboard covers input field, unusable | Use visual viewport API, shift UI above keyboard |
-| Activity timeline without real-time updates | User must refresh to see new events | Socket.IO for live updates + optimistic UI |
-| No loading state for timeline queries | User unsure if data is loading or empty | Skeleton UI or spinner during queries |
-| Desktop UI breaking when adding mobile | Desktop users frustrated by giant buttons, lost information density | Mobile-first CSS, viewport-specific component variants |
-| Timeline shows raw ANSI codes | Unreadable `\x1b[31mText\x1b[0m` in UI | Strip ANSI, optionally preserve as `<span style="color:red">` |
-| No visual indication of timeline gaps | User doesn't know events are missing after reconnect | Show "Reconnected - some events may be missing" banner |
-| Plugin panels without error boundaries | One plugin crash takes down entire dashboard | Wrap each plugin in React error boundary |
-| Mobile: bottom sheet without swipe-to-dismiss | User can't close panel intuitively on mobile | Implement swipe gesture for bottom sheet |
+| Spawn returns 200 after 15+ seconds | Browser times out, user unclear if spawn worked | Return 202 immediately with session name; let InstanceTracker discover and surface the new session |
+| "Command sent" on menu-driver dispatch | User thinks command was executed, may resend causing double-command | Show "Command dispatched" + terminal tab for visual confirmation |
+| Toggle enabled/disabled with no feedback on mismatch | Operator changes registry but hooks still fire | Show live session cross-reference warning when names diverge |
+| Hook log shows raw log format without parsing | Operator must parse `[timestamp] [script] message` manually | Parse log lines into structured entries (timestamp, script, message) |
+| No loading state on registry toggle | Double-click causes two PATCH requests | Disable toggle for 2s after click, show spinner |
+| State shown as "unknown" when STATE.md missing | Confusing during agent initialization | Show "Starting..." during spawn window, transition to parsed state once file appears |
 
 ## "Looks Done But Isn't" Checklist
 
-- [ ] **ANSI stripping:** Often missing — verify activity timeline shows clean text, no `\x1b[` sequences
-- [ ] **Mobile terminal touch:** Often broken — verify typing works on real iOS/Android, or verify read-only state
-- [ ] **Timeline reconnection backfill:** Often missing — verify network interruption doesn't lose events (check `socket.recovered` handling)
-- [ ] **Plugin error boundaries:** Often missing — verify throwing error in one plugin doesn't crash dashboard
-- [ ] **SQLite retention policy:** Often missing — verify `DELETE FROM activity_events WHERE timestamp < DATE('now', '-7 days')` runs daily
-- [ ] **WAL checkpoint on shutdown:** Often missing — verify `db.pragma('wal_checkpoint(TRUNCATE)')` in shutdown handler
-- [ ] **Timeline query pagination:** Often missing — verify queries use LIMIT/OFFSET, not full table scans
-- [ ] **Mobile keyboard handling:** Often broken — verify iOS virtual keyboard doesn't cover input fields
-- [ ] **Desktop regression testing:** Often skipped — verify desktop experience wasn't degraded by mobile CSS
-- [ ] **ANSI security testing:** Often skipped — verify malicious ANSI codes in terminal output don't execute or corrupt UI
+- [ ] **spawn.sh security:** Often missing validation — verify `agentName` regex, `workdir` boundary check, and `firstCommand` allowlist exist before first request
+- [ ] **execFile timeout:** Often missing — verify `execFile` calls for spawn.sh have `timeout: 30_000` parameter
+- [ ] **Per-session mutex:** Often missing — verify double-clicking Spawn button doesn't create two sessions
+- [ ] **Registry lock on writes:** Often missing — verify concurrent spawn.sh + API write doesn't corrupt registry (test: run spawn.sh while PATCH fires)
+- [ ] **SSE watcher cleanup:** Often missing — verify watching connections > 0 after all clients disconnect is impossible (check watcher count)
+- [ ] **ENOENT handling:** Often missing — verify `/api/gsd/sessions/:session/state` returns 200 with `state: 'unknown'` when STATE.md doesn't exist
+- [ ] **menu-driver action enum:** Often missing — verify sending action `"foo"` to command endpoint returns 400, not 500
+- [ ] **202 vs 200 on command dispatch:** Often wrong — verify command endpoints return 202 Accepted, not 200 OK
+- [ ] **Session name mismatch warning:** Often missing — verify registry viewer shows warning when `registry.tmux_session_name` != live session name
 
 ## Recovery Strategies
 
 | Pitfall | Recovery Cost | Recovery Steps |
 |---------|---------------|----------------|
-| Over-engineered plugin system | HIGH | Rip out plugin infrastructure; replace with simple module imports; rebuild type manifest |
-| xterm.js mobile touch broken | MEDIUM | Make mobile terminal read-only; add "Use desktop for terminal" message; or budget 2 weeks for touch debugging |
-| Database growth from no retention | LOW | Run cleanup: `DELETE FROM activity_events WHERE timestamp < DATE('now', '-7 days')`; add cron job |
-| WAL checkpoint starvation | MEDIUM | Restart server; add `wal_checkpoint(TRUNCATE)` to shutdown; paginate queries |
-| ANSI security vulnerability | HIGH | Add `strip-ansi` to pipeline; migration to clean existing data; security audit |
-| Desktop UX regression | HIGH | Rewrite CSS mobile-first; test desktop at every breakpoint; may require component restructure |
-| Socket.IO event loss | MEDIUM | Add REST backfill logic; implement sequence numbers; test with network interruption |
-| Memory leak from listeners | MEDIUM | Add `removeListener()` to cleanup; restart server; add memory monitoring |
-| Plugin type safety lost | LOW | Switch to build-time registration; generate type manifest; requires plugin refactor |
-| Terminal output parsing CPU spike | MEDIUM | Switch to selective parsing; add pattern allowlist; process in background worker |
+| Shell injection via firstCommand | HIGH | Audit all tmux send-keys payloads; add allowlist validation; review tmux sessions for injected commands |
+| Path traversal in workdir | HIGH | Add boundary check; audit any Claude Code sessions started in unexpected directories |
+| Registry corruption from concurrent writes | MEDIUM | Validate registry JSON (`validate_registry_json` in spawn.sh handles this); restore from `.corrupt-*` backup |
+| Memory leak from dangling watchers | MEDIUM | Restart server; add `response.on('close')` cleanup; verify with connection count monitoring |
+| Double-spawn sessions accumulating | LOW | `tmux kill-session` for duplicate sessions; add spawn mutex; clean up registry entries |
+| Event loop blocked by execFileSync | HIGH | Replace with execFileAsync; restart server; no data loss but live sessions may have missed sync ticks |
+| menu-driver race condition corrupting TUI | MEDIUM | `C-u` + Enter in the affected tmux session clears partial input; session resumes normally |
 
 ## Pitfall-to-Phase Mapping
 
 | Pitfall | Prevention Phase | Verification |
 |---------|------------------|--------------|
-| Over-engineered plugin system | Phase 1: Plugin Foundation | Plugin system <200 LOC; new plugin added in <1 hour |
-| xterm.js mobile touch broken | Phase 0: Research/Scoping | Test on real iOS/Android; decide read-only vs interactive |
-| Terminal output parsing performance | Phase 2: Activity Timeline | Load test: 1000 lines/min output; verify CPU <50%, DB <100MB/day |
-| ANSI security vulnerability | Phase 2: Activity Timeline | Inject malicious ANSI; verify stripped before storage and display |
-| Desktop UX regression | Phase 3: Mobile UI | Test desktop after every mobile commit; verify no giant buttons |
-| Socket.IO event loss | Phase 2: Activity Timeline | Disconnect network during activity; verify backfill fetches missing events |
-| Memory leak from listeners | Phase 1 & 2 | 100 connect/disconnect cycles; verify stable memory |
-| WAL checkpoint starvation | Phase 2: Activity Timeline | Run long query + concurrent writes; verify WAL size stays <50MB |
-| Plugin error boundary missing | Phase 1: Plugin Foundation | Throw error in plugin; verify dashboard still renders |
-| Mobile keyboard covering input | Phase 3: Mobile UI | Test on real iOS Safari; verify input visible when keyboard opens |
-
-## Phase-Specific Recommendations
-
-### Phase 1: Plugin Foundation
-**Primary risks:** Over-engineering, type safety loss, error isolation
-**Must-haves:**
-- Simple build-time registration (not runtime loading)
-- TypeScript plugin interface with strict types
-- React error boundary per plugin
-- Plugin system <200 LOC total
-
-### Phase 2: Activity Timeline
-**Primary risks:** Storage growth, parsing performance, ANSI security, WAL checkpoint starvation
-**Must-haves:**
-- ANSI stripping before storage (`strip-ansi` library)
-- Selective parsing (pattern allowlist, not everything)
-- Retention policy (7-day max, daily cleanup job)
-- Indexed queries with pagination
-- REST API backfill for Socket.IO gaps
-- WAL checkpoint on graceful shutdown
-
-### Phase 3: Mobile UI
-**Primary risks:** xterm.js touch broken, desktop regression, keyboard covering input
-**Must-haves:**
-- Mobile-first CSS (`min-width` media queries)
-- Real device testing (iOS Safari + Android Chrome)
-- Decision: mobile terminal read-only OR 2-week touch debugging budget
-- Visual viewport API for keyboard detection
-- Desktop regression testing after every mobile change
+| Shell injection via args | Phase 1: gsdRoutes.ts | Send malicious firstCommand; verify 400 returned, no tmux keystrokes sent |
+| Path traversal in workdir | Phase 1: gsdRoutes.ts | Send `../../../etc` as workdir; verify 400 returned |
+| Registry race condition | Phase 1: registry PATCH | Run spawn.sh + PATCH concurrently 10 times; verify registry not corrupted |
+| Log tail memory leak | Phase 2: hook feed | Open 10 SSE connections, close all; verify watcher count drops to 0 |
+| Double-spawn race condition | Phase 1: spawn endpoint | Rapid double-click simulation; verify single session created |
+| execFileSync event loop block | Phase 1: spawn endpoint | Code review: no execFileSync in gsdRoutes.ts |
+| STATE.md ENOENT crash | Phase 2: agent state grid | Stop a session; verify state endpoint returns gracefully |
+| Session name mismatch | Phase 1: registry viewer | Spawn externally via CLI; verify UI shows mismatch warning |
+| menu-driver timing assumption | Phase 1: command API | Verify 202 returned; verify UI shows "dispatched not confirmed" language |
 
 ## Sources
 
-**Confidence: HIGH** — All findings verified with 2025-2026 sources.
+**Confidence: HIGH** — All findings verified against actual spawn.sh and menu-driver.sh source code (read in full), existing TmuxSessionManager.ts patterns, and 2025-2026 Node.js security documentation.
 
-### Plugin Systems & Over-Engineering
-- [Common Mistakes in Software Development](https://www.securitycompass.com/blog/common-mistakes-in-software-development/) — adding unnecessary complexity
-- [Trillions spent and big software projects are still failing | Hacker News](https://news.ycombinator.com/item?id=46045085)
+### Shell Injection & execFile Security
+- [Prevent Command Injection Node.js Child_Process: Safer Execution with execFile](https://securecodingpractices.com/prevent-command-injection-node-js-child-process/) — execFile vs exec safety model
+- [NodeJS Command Injection Guide: Examples and Prevention](https://www.stackhawk.com/blog/nodejs-command-injection-examples-and-prevention/)
+- [eslint-plugin-security: avoid-command-injection-node](https://github.com/eslint-community/eslint-plugin-security/blob/main/docs/avoid-command-injection-node.md)
 
-### xterm.js Mobile Issues
-- [Limited touch support on mobile devices impacts terminal usability · Issue #5377](https://github.com/xtermjs/xterm.js/issues/5377) — July 2025
-- [Support mobile platforms · Issue #1101](https://github.com/xtermjs/xterm.js/issues/1101)
-- [Copy and paste do not work on touch devices · Issue #3727](https://github.com/xtermjs/xterm.js/issues/3727)
-- [Erratic text output from typing into xterm console on Chrome on Android devices · Issue #3600](https://github.com/xtermjs/xterm.js/issues/3600)
+### Path Traversal in Node.js
+- [Node.js Path Traversal Guide](https://www.stackhawk.com/blog/node-js-path-traversal-guide-examples-and-prevention/)
+- [CVE-2025-27210: Node.js path traversal via device names](https://zeropath.com/blog/cve-2025-27210-nodejs-path-traversal-windows) — 2025 CVE showing path.normalize is insufficient
+- [Secure Coding Practices: path traversal](https://www.nodejs-security.com/blog/secure-coding-practices-nodejs-path-traversal-vulnerabilities)
 
-### ANSI Security Vulnerabilities
-- [Don't Trust This Title: Abusing Terminal Emulators with ANSI Escape Characters](https://www.cyberark.com/resources/threat-research-blog/dont-trust-this-title-abusing-terminal-emulators-with-ansi-escape-characters)
-- ["\\u001b[31m"?! ANSI Terminal security in 2023 and finding 10 CVEs](https://dgl.cx/2023/09/ansi-terminal-security)
-- [Deceiving users with ANSI terminal codes in MCP](https://blog.trailofbits.com/2025/04/29/deceiving-users-with-ansi-terminal-codes-in-mcp/) — 2025 AI tools
-- [Terminal Emulator Security](https://etbe.coker.com.au/2026/01/11/terminal-emulator-security/) — 2026 overview
+### Concurrent File Writes & Locking
+- [proper-lockfile npm](https://www.npmjs.com/package/proper-lockfile) — mkdir-strategy advisory locking compatible with multi-process access
+- [Node.js race conditions](https://nodejsdesignpatterns.com/blog/node-js-race-conditions/)
+- spawn.sh source: `flock -x 200` around `jq` transform (lines 103-140) — verified
 
-### SQLite Performance & WAL
-- [SQLite performance tuning](https://phiresky.github.io/blog/2020/sqlite-performance-tuning/)
-- [Write-Ahead Logging](https://sqlite.org/wal.html) — official documentation
-- [How SQLite Scales Read Concurrency](https://fly.io/blog/sqlite-internals-wal/)
-- [SQLite concurrent writes and "database is locked" errors](https://tenthousandmeters.com/blog/sqlite-concurrent-writes-and-database-is-locked-errors/)
+### fs.watch and Log Tailing
+- [node-tailfd: tail through rotation and truncation](https://github.com/soldair/node-tailfd)
+- [Node.js fs.watch issues: fs.watch memory leak on Windows](https://github.com/nodejs/node/issues/52769) — confirmed leak if not closed
+- [chokidar: normalizes fs.watch events](https://github.com/paulmillr/chokidar) — alternative if fs.watch proves unreliable
 
-### Node.js Memory Leaks
-- [Node.js Patches Memory Leak and Permission Bypasses](https://securityonline.info/node-js-patches-memory-leak-and-permission-bypasses/)
-- [High memory consumption when piping between streams · Issue #50762](https://github.com/nodejs/node/issues/50762)
-- [How to Profile Node.js Applications for Memory Leaks](https://oneuptime.com/blog/post/2026-01-26-nodejs-memory-leak-profiling/view)
+### tmux Race Conditions
+- [Agent teams tmux send-keys race condition](https://github.com/anthropics/claude-code/issues/23615) — confirmed concurrent send-keys corruption in 2025
+- menu-driver.sh source: `sleep 0.8` fixed heuristic (line 49) — verified
 
-### Socket.IO Connection State Recovery
-- [Connection state recovery](https://socket.io/docs/v4/connection-state-recovery)
-- [ConnectionStateRecovery not working when switching from wifi to 4g](https://github.com/socketio/socket.io/discussions/5248)
-- [Connection State Recovery fails for long-lived connections](https://github.com/socketio/socket.io/issues/5282)
+### Zombie Processes & Async Execution
+- [Node.js child_process documentation](https://nodejs.org/api/child_process.html) — timeout parameter, SIGTERM behavior
+- [Zombie processes in Node.js child_process](https://saturncloud.io/blog/what-is-a-zombie-process-and-how-to-avoid-it-when-spawning-nodejs-child-processes-on-cloud-foundry/)
 
-### Mobile-First Responsive Design
-- [Why Responsive Design Still Fails In 2025](https://blog.imagine.bo/responsive-design-still-fails/)
-- [Responsive design best practices for 2025: Mobile-first imperative](https://www.adicator.com/post/responsive-design-best-practices)
-- [Mobile First CSS Design Principles](https://allthingsprogramming.com/mobile-first-css-design-principles/)
-- [Responsive Design Breakpoints in 2025](https://www.browserstack.com/guide/responsive-design-breakpoints)
-
-### Terminal Parsing & tmux
-- [tmux: Input Processing](https://deepwiki.com/tmux/tmux/3.1-input-processing)
-- [VT100.net: A parser for DEC's ANSI-compatible video terminals](https://vt100.net/emu/dec_ansi_parser)
+### SSE vs Polling for Log Streaming
+- [WebSockets vs SSE vs Long Polling comparison](https://rxdb.info/articles/websockets-sse-polling-webrtc-webtransport.html)
+- [SSE comeback in 2025](https://portalzine.de/sses-glorious-comeback-why-2025-is-the-year-of-server-sent-events/)
+- [Server-Sent Events in Node.js](https://techsimple.in/blog/server-sent-events-in-nodejs)
 
 ---
-*Pitfalls research for: Warden v2.0 Mission Control (plugin registry, activity timeline, mobile UI)*
-*Researched: 2026-02-16*
-*Confidence: HIGH (2025-2026 verified sources)*
+*Pitfalls research for: Warden v2.1 GSD Manager Plugin (shell-proxying, process spawning, config editing, log tailing)*
+*Researched: 2026-02-18*
+*Confidence: HIGH (verified against actual scripts + 2025-2026 sources)*

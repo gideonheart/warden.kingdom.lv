@@ -1,1103 +1,822 @@
-# Architecture Research: v2.0 Mission Control Extensions
+# Architecture Research: GSD Manager Plugin Integration
 
-**Domain:** Plugin Registry, Activity Timeline & Mobile-First UI for Terminal Dashboard
-**Researched:** 2026-02-16
-**Confidence:** HIGH (verified with official docs, multiple sources, WebSearch)
-
-## Executive Summary
-
-This research focuses ONLY on the NEW architectural components needed for v2.0 Mission Control features:
-
-1. **Plugin/Tool Registry** — Dynamic module system for extending UI with panels and capabilities
-2. **Activity Timeline** — Structured event capture from terminal streams + audit logging
-3. **Mobile-First UI** — Responsive component hierarchy restructure for <480px primary experience
-
-The existing Warden architecture (Express + Socket.IO + React + SQLite + xterm.js) is well-suited for these extensions. All three features integrate cleanly without major refactoring.
-
-## Feature 1: Plugin/Tool Registry Architecture
-
-### System Overview
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    CLIENT (React SPA)                        │
-├─────────────────────────────────────────────────────────────┤
-│  ┌──────────────────────────────────────────────────────┐   │
-│  │         PluginRegistry (singleton)                   │   │
-│  │  - Map<pluginId, PluginMetadata>                     │   │
-│  │  - discover(), load(), unload()                      │   │
-│  └─────────────────────┬────────────────────────────────┘   │
-│                        │                                     │
-│  ┌─────────────────────▼──────────────────────────────┐     │
-│  │    DynamicPanelRenderer (Component)                │     │
-│  │  - Lookup component by pluginId                    │     │
-│  │  - React.createElement() at runtime                │     │
-│  │  - Fallback for missing/errored plugins            │     │
-│  └─────────────────────┬──────────────────────────────┘     │
-│                        │                                     │
-│  ┌────────┬────────────▼────────┬────────────────────┐      │
-│  │ Panel  │ Panel │ Panel │ Panel │ ...built-in +    │      │
-│  │ Slot 1 │ Slot 2│ Slot 3│ Slot 4│  plugin panels   │      │
-│  └────────┴───────────────┴─────────────────────────┘      │
-├─────────────────────────────────────────────────────────────┤
-│                    SERVER (Express)                          │
-├─────────────────────────────────────────────────────────────┤
-│  GET /api/plugins          → List available plugins          │
-│  POST /api/plugins/:id/enable  → Update plugin state        │
-│  POST /api/plugins/:id/disable → Update plugin state        │
-├─────────────────────────────────────────────────────────────┤
-│                    DATABASE (SQLite)                         │
-├─────────────────────────────────────────────────────────────┤
-│  plugins table:                                              │
-│    id, name, version, enabled, manifest_json, installed_at   │
-└─────────────────────────────────────────────────────────────┘
-```
-
-### Plugin Metadata Schema
-
-Based on [registry pattern research](https://www.geeksforgeeks.org/system-design/registry-pattern/) and [plugin architecture patterns](https://medium.com/omarelgabrys-blog/plug-in-architecture-dec207291800), the metadata schema should include:
-
-```typescript
-interface PluginMetadata {
-  id: string;                    // Unique identifier (e.g., 'terminal-stats')
-  name: string;                  // Display name (e.g., 'Terminal Statistics')
-  version: string;               // Semver (e.g., '1.0.0')
-  author: string;
-  description: string;
-
-  // Capability declarations
-  capabilities: {
-    panels?: PanelCapability[];  // UI panel slots this plugin provides
-    hooks?: HookCapability[];    // Lifecycle hooks it listens to
-    routes?: RouteCapability[];  // API routes it exposes
-  };
-
-  // Runtime requirements
-  requires: {
-    wardenVersion: string;       // Minimum Warden version
-    dependencies?: string[];     // Other plugin IDs
-  };
-
-  // Entry points
-  entry: {
-    client?: string;             // Path to client component bundle
-    server?: string;             // Path to server-side module
-  };
-
-  // State
-  enabled: boolean;
-  installedAt: string;
-}
-
-interface PanelCapability {
-  slotId: string;                // Where to render: 'sidebar', 'bottom', 'modal'
-  component: string;             // Component export name
-  label: string;                 // Tab/button label
-  icon?: string;                 // Icon identifier
-  defaultVisible?: boolean;
-}
-
-interface HookCapability {
-  event: string;                 // E.g., 'terminal:output', 'session:start'
-  handler: string;               // Function export name
-}
-
-interface RouteCapability {
-  method: 'GET' | 'POST' | 'PUT' | 'DELETE';
-  path: string;                  // E.g., '/api/plugins/my-plugin/action'
-  handler: string;               // Function export name
-}
-```
-
-### Component Registry Pattern
-
-Following [React dynamic component rendering patterns](https://www.storyblok.com/tp/react-dynamic-component-from-json), use an object map registry:
-
-```typescript
-// PluginRegistry.ts (client)
-class PluginRegistry {
-  private components: Map<string, React.ComponentType<any>> = new Map();
-  private metadata: Map<string, PluginMetadata> = new Map();
-
-  register(plugin: PluginMetadata, component: React.ComponentType<any>): void {
-    this.metadata.set(plugin.id, plugin);
-    if (component) {
-      this.components.set(plugin.id, component);
-    }
-  }
-
-  unregister(pluginId: string): void {
-    this.metadata.delete(pluginId);
-    this.components.delete(pluginId);
-  }
-
-  getComponent(pluginId: string): React.ComponentType<any> | null {
-    return this.components.get(pluginId) ?? null;
-  }
-
-  listPlugins(filters?: { slotId?: string; enabled?: boolean }): PluginMetadata[] {
-    let plugins = Array.from(this.metadata.values());
-    if (filters?.enabled !== undefined) {
-      plugins = plugins.filter(p => p.enabled === filters.enabled);
-    }
-    if (filters?.slotId) {
-      plugins = plugins.filter(p =>
-        p.capabilities.panels?.some(panel => panel.slotId === filters.slotId)
-      );
-    }
-    return plugins;
-  }
-}
-
-export const pluginRegistry = new PluginRegistry();
-```
-
-### Dynamic Panel Renderer
-
-```typescript
-// DynamicPanelRenderer.tsx
-interface Props {
-  slotId: string;
-  pluginId: string;
-  context?: Record<string, any>;
-}
-
-export function DynamicPanelRenderer({ slotId, pluginId, context }: Props) {
-  const Component = pluginRegistry.getComponent(pluginId);
-
-  if (!Component) {
-    return (
-      <div className="text-warden-error p-4">
-        Plugin "{pluginId}" not found or failed to load.
-      </div>
-    );
-  }
-
-  return (
-    <ErrorBoundary fallback={<PluginErrorFallback pluginId={pluginId} />}>
-      <Component slotId={slotId} {...context} />
-    </ErrorBoundary>
-  );
-}
-```
-
-### Server-Side Plugin Manager
-
-```typescript
-// src/server/services/PluginManager.ts
-class PluginManager {
-  private database: DatabaseConnection;
-
-  async listPlugins(): Promise<PluginMetadata[]> {
-    return this.database.prepare(`
-      SELECT id, name, version, enabled, manifest_json as manifestJson,
-             installed_at as installedAt
-      FROM plugins
-      ORDER BY name
-    `).all().map(row => ({
-      ...JSON.parse(row.manifestJson),
-      enabled: Boolean(row.enabled),
-      installedAt: row.installedAt,
-    }));
-  }
-
-  async enablePlugin(pluginId: string): Promise<void> {
-    this.database.prepare('UPDATE plugins SET enabled = 1 WHERE id = ?').run(pluginId);
-  }
-
-  async disablePlugin(pluginId: string): Promise<void> {
-    this.database.prepare('UPDATE plugins SET enabled = 0 WHERE id = ?').run(pluginId);
-  }
-
-  async installPlugin(manifest: PluginMetadata): Promise<void> {
-    this.database.prepare(`
-      INSERT INTO plugins (id, name, version, enabled, manifest_json)
-      VALUES (?, ?, ?, ?, ?)
-    `).run(
-      manifest.id,
-      manifest.name,
-      manifest.version,
-      1,
-      JSON.stringify(manifest)
-    );
-  }
-}
-```
-
-### Panel Slot Architecture
-
-Recommended slot IDs for Warden Dashboard:
-
-| Slot ID | Location | Use Case | Example Plugins |
-|---------|----------|----------|-----------------|
-| `sidebar-top` | AgentSidebar top section | Agent-scoped actions | "Quick Deploy", "Agent Stats" |
-| `sidebar-bottom` | AgentSidebar bottom section | Global tools | "System Monitor", "Logs" |
-| `terminal-overlay` | Floating over TerminalView | Real-time annotations | "Error Highlighter", "AI Assist" |
-| `bottom-panel` | Below terminal tabs | Secondary info | "Git Status", "File Watcher" |
-| `modal` | Full-screen modal | Complex interactions | "Plugin Settings", "Debugger" |
-
-### Integration Points
-
-**New components:**
-- `src/client/services/PluginRegistry.ts` — Client-side registry singleton
-- `src/client/components/DynamicPanelRenderer.tsx` — Runtime component loader
-- `src/client/components/PluginSlot.tsx` — Declarative slot container
-- `src/server/services/PluginManager.ts` — Server-side CRUD
-- `src/server/routes/pluginRoutes.ts` — REST API (`GET /api/plugins`, `POST /api/plugins/:id/enable`)
-
-**Modified components:**
-- `src/client/App.tsx` — Add `<PluginSlot slotId="bottom-panel" />` to layout
-- `src/client/components/AgentSidebar.tsx` — Add `<PluginSlot slotId="sidebar-top" />` and `<PluginSlot slotId="sidebar-bottom" />`
-- `src/server/database/DatabaseConnection.ts` — Add `plugins` table migration
-
-**Database schema addition:**
-```sql
-CREATE TABLE IF NOT EXISTS plugins (
-  id TEXT PRIMARY KEY,
-  name TEXT NOT NULL,
-  version TEXT NOT NULL,
-  enabled INTEGER DEFAULT 1,
-  manifest_json TEXT NOT NULL,
-  installed_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);
-CREATE INDEX IF NOT EXISTS idx_plugins_enabled ON plugins(enabled);
-```
-
-### Anti-Patterns
-
-**Anti-Pattern 1: Global Registry Without Isolation**
-- **What people do:** Share single global registry with no sandboxing
-- **Why it's wrong:** Plugin errors crash the entire app; plugin A can corrupt plugin B's state
-- **Do this instead:** Use React ErrorBoundary around each plugin render, isolate plugin contexts
-
-**Anti-Pattern 2: Runtime Eval/Dynamic Imports Without Validation**
-- **What people do:** `eval(pluginCode)` or `import(untrustedUrl)`
-- **Why it's wrong:** XSS vulnerability, arbitrary code execution
-- **Do this instead:** For v2.0, bundle plugins at build time only; for v3.0+, implement CSP + allowlist validation
-
-**Anti-Pattern 3: Monolithic Plugin Contract**
-- **What people do:** Force every plugin to implement 50 methods
-- **Why it's wrong:** Complexity bloat, most plugins only need 1-2 capabilities
-- **Do this instead:** Capability-based declaration (plugins only declare what they provide)
+**Domain:** Warden Dashboard — GSD Manager Control Center plugin
+**Researched:** 2026-02-18
+**Confidence:** HIGH (based on direct codebase inspection)
 
 ---
 
-## Feature 2: Activity Timeline & Audit Log Architecture
-
-### System Overview
+## System Overview
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                  TERMINAL OUTPUT STREAM                      │
-├─────────────────────────────────────────────────────────────┤
-│  xterm.js Terminal                                           │
-│       ↓                                                      │
-│  Raw ANSI bytes → TerminalView component                    │
-│       ↓                                                      │
-│  [NEW] EventExtractor (client-side)                         │
-│       ↓                                                      │
-│  Socket.IO emit → 'activity:event' + 'terminal:output'     │
-├─────────────────────────────────────────────────────────────┤
-│                  SERVER PROCESSING                           │
-├─────────────────────────────────────────────────────────────┤
-│  [NEW] ActivityEventHandler (Socket.IO listener)            │
-│       ↓                                                      │
-│  [NEW] EventEnricher                                        │
-│    - Add timestamp, sessionId, agentId                      │
-│    - Parse ANSI escape sequences                            │
-│    - Extract structured data (errors, commands)             │
-│       ↓                                                      │
-│  [NEW] AuditLogger                                          │
-│    - Write to activity_events table (SQLite)                │
-│    - Enforce retention policy                               │
-├─────────────────────────────────────────────────────────────┤
-│                  STORAGE (SQLite)                            │
-├─────────────────────────────────────────────────────────────┤
-│  activity_events:                                            │
-│    id, instance_id, timestamp, event_type, severity,        │
-│    raw_text, structured_data, sequence_num                  │
-│  activity_snapshots (optional):                             │
-│    id, instance_id, timestamp, terminal_state               │
-├─────────────────────────────────────────────────────────────┤
-│                  QUERY API                                   │
-├─────────────────────────────────────────────────────────────┤
-│  GET /api/activity/timeline?instanceId=X&from=Y&to=Z        │
-│  GET /api/activity/events?type=error&severity=high          │
-│  GET /api/activity/search?query=git+commit                  │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         BROWSER CLIENT (React 19 SPA)                   │
+├──────────────────┬──────────────────────────────────────────────────────┤
+│  Plugin Slot:    │  Plugin Slot:    │  Plugin Slot:   │  Plugin Slot:    │
+│  sidebar-top     │  sidebar-bottom  │  bottom-panel   │terminal-overlay  │
+│                  │                  │                 │                  │
+│                  │ [example-plugin] │ [gsd-manager-   │                  │
+│                  │                  │  plugin] <- NEW │                  │
+├──────────────────┴──────────────────┴─────────────────┴──────────────────┤
+│  PluginSlotRenderer (ErrorBoundary per plugin, Vite glob auto-discovery) │
+│  usePluginRegistry (localStorage persistence, enable/disable toggle)     │
+├─────────────────────────────────────────────────────────────────────────┤
+│                   App.tsx renders bottom-panel slot under terminals view  │
+└───────────────────────────────┬─────────────────────────────────────────┘
+                                │  HTTP /api/gsd/*     Socket.IO /gsd-hooks
+                                │  (REST polling)      (real-time streaming)
+┌───────────────────────────────▼─────────────────────────────────────────┐
+│                       EXPRESS 5 SERVER (src/server/)                     │
+├──────────────────┬──────────────────┬───────────────────────────────────┤
+│  instanceRoutes  │  agentRoutes     │  historyRoutes  │  activityRoutes  │
+│  (existing)      │  (existing)      │  (existing)     │  (existing)      │
+│                  │                  │                 │                  │
+│            gsdRoutes <- NEW (mount at /api/gsd/)                        │
+├──────────────────┴──────────────────┴───────────────────────────────────┤
+│  GsdService <- NEW          │  GsdHookLogWatcher <- NEW                  │
+│  (spawn.sh, menu-driver.sh  │  (fs.watch on /tmp/gsd-hooks.log,          │
+│   wrapper, registry I/O,    │   emits via Socket.IO /gsd-hooks ns)       │
+│   STATE.md reader)          │                                            │
+├──────────────────────────────┬──────────────────────────────────────────┤
+│  TmuxSessionManager          │  OpenClawConfigReader  │  DatabaseConn.   │
+│  (existing -- reused)        │  (existing -- reused)  │  (existing)      │
+└──────────────────────────────┴────────────────────────┴──────────────────┘
+         │ execFile                              │ fs.readFile
+         ▼                                       ▼
+  [tmux / spawn.sh /              [recovery-registry.json]
+   menu-driver.sh]                [.planning/STATE.md per workdir]
+                                  [/tmp/gsd-hooks.log]
 ```
 
-### Event Types & Schema
+---
 
-Based on [audit logging patterns](https://microservices.io/patterns/observability/audit-logging.html) and [activity log design](https://alguidelines.dev/docs/navpatterns/patterns/activity-log/):
+## Component Responsibilities
 
+| Component | File | Responsibility | Status |
+|-----------|------|----------------|--------|
+| `gsdRoutes` | `src/server/routes/gsdRoutes.ts` | HTTP endpoints at `/api/gsd/*` | NEW |
+| `GsdService` | `src/server/services/GsdService.ts` | Shell command execution, registry I/O, STATE.md reads | NEW |
+| `GsdHookLogWatcher` | `src/server/services/GsdHookLogWatcher.ts` | Tail `/tmp/gsd-hooks.log`, emit events via Socket.IO | NEW |
+| `gsd-manager-plugin` | `src/client/plugins/gsd-manager-plugin.tsx` | Bottom-panel UI: agent grid, quick actions, hook feed, registry view | NEW |
+| `useGsdManager` | `src/client/hooks/useGsdManager.ts` | REST fetch + Socket.IO `/gsd-hooks` consumer for plugin | NEW |
+| `src/server/index.ts` | (existing) | Mount `gsdRoutes`, init `GsdHookLogWatcher` | MODIFIED (3 lines) |
+| `src/shared/gsdTypes.ts` | `src/shared/gsdTypes.ts` | TypeScript types shared between client and server for GSD domain | NEW |
+
+---
+
+## New vs Modified Files (Explicit)
+
+### New Files
+
+```
+src/
+├── shared/
+│   └── gsdTypes.ts                    # RegistryAgent, GsdSessionState, HookLogEntry, API shapes
+├── server/
+│   ├── routes/
+│   │   └── gsdRoutes.ts               # Express Router, mounted at /api/gsd/
+│   └── services/
+│       ├── GsdService.ts              # spawn.sh/menu-driver.sh wrapper, registry/STATE.md I/O
+│       └── GsdHookLogWatcher.ts       # fs.watch + tail of /tmp/gsd-hooks.log -> Socket.IO
+└── client/
+    ├── hooks/
+    │   └── useGsdManager.ts           # Fetch hook + Socket.IO /gsd-hooks consumer
+    └── plugins/
+        └── gsd-manager-plugin.tsx     # Plugin manifest (bottom-panel) + PanelComponent
+```
+
+### Modified Files
+
+```
+src/server/index.ts      # Add: import gsdRoutes, import gsdHookLogWatcher,
+                         #      app.use(gsdRoutes),
+                         #      gsdHookLogWatcher.setupSocketNamespace(socketServer) in startup,
+                         #      gsdHookLogWatcher.start() in startup,
+                         #      gsdHookLogWatcher.stop() in handleShutdown
+```
+
+No other existing files need modification. The plugin auto-discovers via Vite glob import in `src/client/plugins/index.ts` — that file uses `import.meta.glob('./*.tsx', { eager: true, import: 'default' })` which picks up any new `.tsx` file dropped in the directory automatically.
+
+---
+
+## Architectural Patterns
+
+### Pattern 1: Route Module Pattern (gsdRoutes.ts)
+
+**What:** Named export of an Express `Router`. Imports service singletons. Mounted in `index.ts` with `app.use(gsdRoutes)`.
+
+**Matches exactly:** `instanceRoutes.ts`, `agentRoutes.ts`, `historyRoutes.ts`, `activityRoutes.ts`.
+
+**Example:**
 ```typescript
-interface ActivityEvent {
-  id: number;
-  instanceId: number;           // FK to instances table
-  timestamp: string;             // ISO 8601
-  sequenceNum: number;           // Monotonic counter per instance
+// src/server/routes/gsdRoutes.ts
+import { Router } from 'express';
+import { gsdService } from '../services/GsdService.js';
 
-  eventType: ActivityEventType;
-  severity: 'info' | 'warning' | 'error' | 'critical';
+const router = Router();
 
-  rawText: string;               // Original terminal output chunk
-  structuredData: Record<string, any> | null;  // Parsed metadata
-
-  // Audit trail fields
-  userId?: string;               // If operator injected prompt
-  sourceIp?: string;             // If remote session
-}
-
-type ActivityEventType =
-  | 'terminal_output'            // Raw terminal data
-  | 'command_executed'           // Detected shell command
-  | 'error_occurred'             // Detected error pattern
-  | 'session_started'            // Session lifecycle
-  | 'session_stopped'
-  | 'prompt_injected'            // Operator action
-  | 'file_modified'              // Detected git/file changes
-  | 'api_called'                 // Detected HTTP request
-  | 'tool_invoked';              // Detected tool usage
-```
-
-### ANSI Escape Sequence Parser Integration
-
-Based on [ANSI parser research](https://github.com/netzkolchose/node-ansiparser), integrate structured parsing:
-
-```typescript
-// src/server/services/AnsiParser.ts
-import { AnsiParser } from 'node-ansiparser';
-
-interface ParsedChunk {
-  plainText: string;
-  containsError: boolean;
-  containsSuccess: boolean;
-  detectedCommand: string | null;
-}
-
-export class TerminalOutputParser {
-  private parser: AnsiParser;
-
-  constructor() {
-    this.parser = new AnsiParser();
+router.get('/api/gsd/registry', async (_request, response) => {
+  try {
+    const registry = await gsdService.readRegistry();
+    response.json({ registry });
+  } catch (error) {
+    console.error('[GSD] Failed to read registry:', error);
+    response.status(500).json({ error: 'Failed to read recovery registry' });
   }
-
-  parse(rawAnsi: string): ParsedChunk {
-    let plainText = '';
-    let containsError = false;
-    let containsSuccess = false;
-
-    this.parser.parse(rawAnsi, {
-      onText: (text: string) => { plainText += text; },
-      onSGR: (params: number[]) => {
-        // SGR = Select Graphic Rendition (colors)
-        // Red text (31) often indicates errors
-        if (params.includes(31)) containsError = true;
-        // Green text (32) often indicates success
-        if (params.includes(32)) containsSuccess = true;
-      },
-    });
-
-    const detectedCommand = this.detectCommand(plainText);
-
-    return { plainText, containsError, containsSuccess, detectedCommand };
-  }
-
-  private detectCommand(text: string): string | null {
-    // Heuristic: look for common shell prompt patterns
-    const promptMatch = text.match(/[\$#>]\s+(.+?)[\r\n]/);
-    return promptMatch ? promptMatch[1].trim() : null;
-  }
-}
-```
-
-### Event Enrichment Pipeline
-
-Following [event-driven architecture patterns](https://newsletter.simpleaws.dev/p/event-driven-architecture-patterns):
-
-```typescript
-// src/server/services/ActivityEnricher.ts
-export class ActivityEnricher {
-  private parser: TerminalOutputParser;
-
-  async enrich(
-    rawChunk: string,
-    context: { instanceId: number; agentId: string }
-  ): Promise<ActivityEvent[]> {
-    const parsed = this.parser.parse(rawChunk);
-    const events: ActivityEvent[] = [];
-
-    // Always create a terminal_output event
-    events.push({
-      instanceId: context.instanceId,
-      timestamp: new Date().toISOString(),
-      eventType: 'terminal_output',
-      severity: 'info',
-      rawText: rawChunk,
-      structuredData: {
-        plainText: parsed.plainText,
-        length: rawChunk.length,
-      },
-    });
-
-    // Create derived events
-    if (parsed.containsError) {
-      events.push({
-        instanceId: context.instanceId,
-        timestamp: new Date().toISOString(),
-        eventType: 'error_occurred',
-        severity: 'error',
-        rawText: parsed.plainText,
-        structuredData: {
-          errorPattern: 'ansi-red-detected',
-        },
-      });
-    }
-
-    if (parsed.detectedCommand) {
-      events.push({
-        instanceId: context.instanceId,
-        timestamp: new Date().toISOString(),
-        eventType: 'command_executed',
-        severity: 'info',
-        rawText: parsed.detectedCommand,
-        structuredData: {
-          command: parsed.detectedCommand,
-          detectionMethod: 'prompt-pattern',
-        },
-      });
-    }
-
-    return events;
-  }
-}
-```
-
-### Audit Logger Service
-
-Following [transactional outbox pattern](https://microservices.io/patterns/observability/audit-logging.html):
-
-```typescript
-// src/server/services/AuditLogger.ts
-export class AuditLogger {
-  private database: DatabaseConnection;
-  private sequenceCounters: Map<number, number> = new Map();
-
-  async logEvents(events: ActivityEvent[]): Promise<void> {
-    const statement = this.database.prepare(`
-      INSERT INTO activity_events
-        (instance_id, timestamp, sequence_num, event_type, severity, raw_text, structured_data)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `);
-
-    for (const event of events) {
-      const seqNum = this.getNextSequence(event.instanceId);
-      statement.run(
-        event.instanceId,
-        event.timestamp,
-        seqNum,
-        event.eventType,
-        event.severity,
-        event.rawText,
-        event.structuredData ? JSON.stringify(event.structuredData) : null
-      );
-    }
-  }
-
-  private getNextSequence(instanceId: number): number {
-    const current = this.sequenceCounters.get(instanceId) ?? 0;
-    const next = current + 1;
-    this.sequenceCounters.set(instanceId, next);
-    return next;
-  }
-
-  async pruneOldEvents(retentionDays: number): Promise<number> {
-    const cutoff = new Date();
-    cutoff.setDate(cutoff.getDate() - retentionDays);
-
-    const result = this.database.prepare(`
-      DELETE FROM activity_events
-      WHERE timestamp < ?
-    `).run(cutoff.toISOString());
-
-    return result.changes;
-  }
-}
-```
-
-### Timeline Query API
-
-```typescript
-// src/server/routes/activityRoutes.ts
-router.get('/api/activity/timeline', (req, res) => {
-  const { instanceId, from, to, eventType, severity, limit = 100 } = req.query;
-
-  const filters: string[] = [];
-  const params: any[] = [];
-
-  if (instanceId) {
-    filters.push('instance_id = ?');
-    params.push(parseInt(instanceId as string, 10));
-  }
-  if (from) {
-    filters.push('timestamp >= ?');
-    params.push(from);
-  }
-  if (to) {
-    filters.push('timestamp <= ?');
-    params.push(to);
-  }
-  if (eventType) {
-    filters.push('event_type = ?');
-    params.push(eventType);
-  }
-  if (severity) {
-    filters.push('severity = ?');
-    params.push(severity);
-  }
-
-  const whereClause = filters.length > 0 ? `WHERE ${filters.join(' AND ')}` : '';
-
-  const events = database.prepare(`
-    SELECT
-      id, instance_id as instanceId, timestamp, sequence_num as sequenceNum,
-      event_type as eventType, severity, raw_text as rawText,
-      structured_data as structuredData
-    FROM activity_events
-    ${whereClause}
-    ORDER BY timestamp DESC, sequence_num DESC
-    LIMIT ?
-  `).all(...params, parseInt(limit as string, 10));
-
-  res.json({ events });
 });
+
+router.patch('/api/gsd/registry/agents/:agentId', async (request, response) => {
+  const { agentId } = request.params;
+  const patch = request.body as Partial<RegistryAgent>;
+  try {
+    await gsdService.patchRegistryAgent(agentId, patch);
+    response.json({ success: true });
+  } catch (error) {
+    response.status(500).json({ error: 'Failed to update agent in registry' });
+  }
+});
+
+router.post('/api/gsd/spawn', async (request, response) => {
+  const { agentName, workingDirectory, firstCommand } = request.body;
+  // Validate inputs, then fire-and-forget spawn (see anti-pattern note below)
+  try {
+    await gsdService.validateSpawnInputs(agentName, workingDirectory);
+    gsdService.spawnAgentBackground(agentName, workingDirectory, firstCommand);
+    response.status(202).json({ success: true, message: 'Spawning agent...' });
+  } catch (error) {
+    response.status(400).json({ error: String(error) });
+  }
+});
+
+router.post('/api/gsd/sessions/:session/command', async (request, response) => {
+  const { session } = request.params;
+  const { action, args } = request.body as GsdCommandRequest;
+  try {
+    await gsdService.runMenuDriverCommand(session, action, args);
+    response.json({ success: true });
+  } catch (error) {
+    response.status(500).json({ error: 'Failed to run menu-driver command' });
+  }
+});
+
+router.get('/api/gsd/sessions/:session/state', async (request, response) => {
+  const { session } = request.params;
+  try {
+    const content = await gsdService.readSessionState(session);
+    response.json({ content });
+  } catch (error) {
+    response.status(404).json({ error: 'STATE.md not found for this session' });
+  }
+});
+
+router.get('/api/gsd/hooks/log', async (_request, response) => {
+  try {
+    const lines = await gsdService.tailHookLog(100);
+    response.json({ lines });
+  } catch (error) {
+    response.status(500).json({ error: 'Failed to read hook log' });
+  }
+});
+
+export { router as gsdRoutes };
 ```
 
-### Client-Side Timeline Component
+### Pattern 2: Service Class Singleton (GsdService.ts)
 
+**What:** A class with private helpers, exported as a module-level singleton. Mirrors `TmuxSessionManager` (execFile wrapper) and `OpenClawConfigReader` (file reader with TTL cache).
+
+**Key decisions:**
+- `spawn.sh` blocks for ~15-25s waiting for Claude TUI. Use `execFile` without blocking the response (see anti-pattern below). The session auto-appears in `/api/instances` via `InstanceTracker.startPeriodicSync()` within 10s.
+- `menu-driver.sh` is fast (tmux send-keys). Await it fully, 5s timeout.
+- Registry reads use 30s TTL cache (same as `OpenClawConfigReader`).
+- Registry writes (toggle enabled) invalidate cache immediately.
+- `STATE.md` path derived from registry agent's `working_directory` field.
+
+**Example structure:**
 ```typescript
-// src/client/components/ActivityTimeline.tsx
-export function ActivityTimeline({ instanceId }: { instanceId: number }) {
-  const [events, setEvents] = useState<ActivityEvent[]>([]);
-  const [filters, setFilters] = useState({ eventType: 'all', severity: 'all' });
+// src/server/services/GsdService.ts
+import { execFile } from 'child_process';
+import { promisify } from 'util';
+import { readFile, writeFile } from 'fs/promises';
+import path from 'path';
+import type { RecoveryRegistry, RegistryAgent, GsdCommandRequest } from '../../shared/gsdTypes.js';
 
-  useEffect(() => {
-    const params = new URLSearchParams({
-      instanceId: instanceId.toString(),
-      limit: '500',
-    });
-    if (filters.eventType !== 'all') params.set('eventType', filters.eventType);
-    if (filters.severity !== 'all') params.set('severity', filters.severity);
+const execFileAsync = promisify(execFile);
 
-    fetch(`/api/activity/timeline?${params}`)
-      .then(r => r.json())
-      .then(data => setEvents(data.events));
-  }, [instanceId, filters]);
-
-  return (
-    <div className="activity-timeline">
-      <TimelineFilters filters={filters} onChange={setFilters} />
-      <VirtualizedEventList events={events} />
-    </div>
-  );
-}
-```
-
-### Integration Points
-
-**New components:**
-- `src/server/services/TerminalOutputParser.ts` — ANSI escape sequence parser
-- `src/server/services/ActivityEnricher.ts` — Event extraction pipeline
-- `src/server/services/AuditLogger.ts` — Event persistence
-- `src/server/routes/activityRoutes.ts` — Timeline query API
-- `src/client/components/ActivityTimeline.tsx` — Timeline UI
-- `src/client/components/ActivityEventCard.tsx` — Single event display
-
-**Modified components:**
-- `src/server/services/TerminalStreamService.ts` — Emit parsed events alongside raw output
-- `src/client/components/TerminalView.tsx` — Optional: capture client-side events (operator actions)
-- `src/client/App.tsx` — Add Activity view route
-
-**Database schema addition:**
-```sql
-CREATE TABLE IF NOT EXISTS activity_events (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  instance_id INTEGER NOT NULL REFERENCES instances(id),
-  timestamp DATETIME NOT NULL,
-  sequence_num INTEGER NOT NULL,
-  event_type TEXT NOT NULL,
-  severity TEXT NOT NULL,
-  raw_text TEXT NOT NULL,
-  structured_data TEXT,
-  user_id TEXT,
-  source_ip TEXT,
-  UNIQUE(instance_id, sequence_num)
+const GSD_SKILL_ROOT = path.resolve(
+  process.env.HOME ?? '/home/forge',
+  '.openclaw/workspace/skills/gsd-code-skill'
 );
+const SPAWN_SCRIPT_PATH = path.join(GSD_SKILL_ROOT, 'scripts/spawn.sh');
+const MENU_DRIVER_SCRIPT_PATH = path.join(GSD_SKILL_ROOT, 'scripts/menu-driver.sh');
+export const REGISTRY_PATH = path.join(GSD_SKILL_ROOT, 'config/recovery-registry.json');
+export const HOOK_LOG_PATH = process.env.GSD_HOOK_LOG ?? '/tmp/gsd-hooks.log';
 
-CREATE INDEX IF NOT EXISTS idx_activity_instance ON activity_events(instance_id, timestamp);
-CREATE INDEX IF NOT EXISTS idx_activity_type ON activity_events(event_type);
-CREATE INDEX IF NOT EXISTS idx_activity_severity ON activity_events(severity);
-CREATE INDEX IF NOT EXISTS idx_activity_timestamp ON activity_events(timestamp);
-```
+const REGISTRY_CACHE_TTL_MS = 30_000;
 
-### Storage Considerations
+class GsdService {
+  private cachedRegistry: RecoveryRegistry | null = null;
+  private registryCachedAt = 0;
 
-Following [audit log retention patterns](https://www.sonarsource.com/resources/library/audit-logging/):
+  async readRegistry(): Promise<RecoveryRegistry> {
+    const now = Date.now();
+    if (this.cachedRegistry && now - this.registryCachedAt < REGISTRY_CACHE_TTL_MS) {
+      return this.cachedRegistry;
+    }
+    const raw = await readFile(REGISTRY_PATH, 'utf-8');
+    this.cachedRegistry = JSON.parse(raw) as RecoveryRegistry;
+    this.registryCachedAt = now;
+    return this.cachedRegistry;
+  }
 
-- **Retention:** 90 days for `activity_events`, 7 days for `terminal_output` type (high volume)
-- **Partitioning:** SQLite doesn't support table partitioning; for >1M events, consider rotating to monthly tables
-- **Write-Once:** Use `UNIQUE(instance_id, sequence_num)` to prevent duplicate/tampered events
-- **Backup:** SQLite WAL already enabled; periodic `PRAGMA wal_checkpoint(TRUNCATE)` sufficient
+  async patchRegistryAgent(agentId: string, patch: Partial<RegistryAgent>): Promise<void> {
+    const registry = await this.readRegistry();
+    const index = registry.agents.findIndex(agent => agent.agent_id === agentId);
+    if (index === -1) throw new Error(`Agent not found in registry: ${agentId}`);
+    registry.agents[index] = { ...registry.agents[index], ...patch };
+    await writeFile(REGISTRY_PATH, JSON.stringify(registry, null, 2), 'utf-8');
+    this.cachedRegistry = registry;
+    this.registryCachedAt = Date.now();
+  }
 
-### Anti-Patterns
+  async validateSpawnInputs(agentName: string, workingDirectory: string): Promise<void> {
+    if (!agentName || typeof agentName !== 'string') throw new Error('agentName required');
+    if (!workingDirectory || typeof workingDirectory !== 'string') throw new Error('workingDirectory required');
+    // Check workdir exists
+    const { stat } = await import('fs/promises');
+    const stats = await stat(workingDirectory);
+    if (!stats.isDirectory()) throw new Error(`workingDirectory is not a directory: ${workingDirectory}`);
+  }
 
-**Anti-Pattern 1: Logging Every Keystroke**
-- **What people do:** Log every single byte of terminal output as separate event
-- **Why it's wrong:** 1000s of events/second, database bloat, query performance death
-- **Do this instead:** Batch terminal output into 1-second chunks; only extract structured events (errors, commands)
+  spawnAgentBackground(agentName: string, workingDirectory: string, firstCommand?: string): void {
+    const spawnArgs = [agentName, workingDirectory];
+    if (firstCommand) spawnArgs.push(firstCommand);
+    // Fire and forget — spawn.sh blocks ~20s waiting for TUI readiness
+    execFile(SPAWN_SCRIPT_PATH, spawnArgs, { timeout: 120_000 }, (error) => {
+      if (error) console.error(`[GsdService] spawn.sh failed for ${agentName}:`, error.message);
+      else console.log(`[GsdService] spawn.sh completed for ${agentName}`);
+    });
+  }
 
-**Anti-Pattern 2: Synchronous Logging Blocking Terminal**
-- **What people do:** `await auditLogger.log()` in Socket.IO output handler
-- **Why it's wrong:** Slow disk I/O causes terminal lag
-- **Do this instead:** Queue events in memory, flush batch every 1s or 100 events
+  async runMenuDriverCommand(sessionName: string, action: string, args?: string[]): Promise<void> {
+    const cmdArgs = [sessionName, action, ...(args ?? [])];
+    await execFileAsync(MENU_DRIVER_SCRIPT_PATH, cmdArgs, { timeout: 5_000 });
+  }
 
-**Anti-Pattern 3: No Retention Policy**
-- **What people do:** Keep all events forever
-- **Why it's wrong:** Database grows to gigabytes, query slows to crawl
-- **Do this instead:** Cron job runs `pruneOldEvents(90)` daily
+  async readSessionState(sessionName: string): Promise<string | null> {
+    const registry = await this.readRegistry();
+    const agent = registry.agents.find(a => a.tmux_session_name === sessionName);
+    if (!agent?.working_directory) return null;
+    const statePath = path.join(agent.working_directory, '.planning', 'STATE.md');
+    try {
+      return await readFile(statePath, 'utf-8');
+    } catch {
+      return null;
+    }
+  }
 
----
-
-## Feature 3: Mobile-First UI Architecture
-
-### Responsive Breakpoint Strategy
-
-Following [2026 React responsive patterns](https://www.dhiwise.com/post/the-ultimate-guide-to-achieving-react-mobile-responsiveness) and [breakpoint best practices](https://www.framer.com/blog/responsive-breakpoints/):
-
-**Standard breakpoints:**
-```typescript
-// src/client/styles/breakpoints.ts
-export const breakpoints = {
-  mobile: 0,        // 0-480px (mobile-first baseline)
-  tablet: 481,      // 481-768px
-  desktop: 769,     // 769-1200px
-  largeDesktop: 1201, // 1201px+
-} as const;
-
-export const mediaQueries = {
-  mobile: `(max-width: ${breakpoints.tablet - 1}px)`,
-  tablet: `(min-width: ${breakpoints.tablet}px) and (max-width: ${breakpoints.desktop - 1}px)`,
-  desktop: `(min-width: ${breakpoints.desktop}px)`,
-  largeDesktop: `(min-width: ${breakpoints.largeDesktop}px)`,
-} as const;
-```
-
-### useMediaQuery Hook Pattern
-
-Following [React media query hook pattern](https://react.wiki/hooks/custom-use-media-query/):
-
-```typescript
-// src/client/hooks/useMediaQuery.ts
-import { useState, useEffect } from 'react';
-
-export function useMediaQuery(query: string): boolean {
-  const [matches, setMatches] = useState(() => {
-    if (typeof window === 'undefined') return false;
-    return window.matchMedia(query).matches;
-  });
-
-  useEffect(() => {
-    const mediaQuery = window.matchMedia(query);
-    const handler = (e: MediaQueryListEvent) => setMatches(e.matches);
-
-    mediaQuery.addEventListener('change', handler);
-    return () => mediaQuery.removeEventListener('change', handler);
-  }, [query]);
-
-  return matches;
+  async tailHookLog(lineCount: number): Promise<string[]> {
+    try {
+      const content = await readFile(HOOK_LOG_PATH, 'utf-8');
+      return content.split('\n').filter(line => line.trim()).slice(-lineCount);
+    } catch {
+      return [];
+    }
+  }
 }
 
-// Convenience hooks
-export const useIsMobile = () => useMediaQuery(mediaQueries.mobile);
-export const useIsTablet = () => useMediaQuery(mediaQueries.tablet);
-export const useIsDesktop = () => useMediaQuery(mediaQueries.desktop);
+export const gsdService = new GsdService();
 ```
 
-### Container Query Pattern (2026 Best Practice)
+### Pattern 3: Socket.IO Namespace (GsdHookLogWatcher.ts)
 
-Following [container query patterns](https://copyprogramming.com/howto/react-testing-library-rtl-test-a-responsive-design):
+**What:** A service class that receives the `SocketIOServer` instance and creates a new namespace `/gsd-hooks`. Uses `fs.watch` on the hook log file to stream new lines to all connected clients.
 
+**Matches:** `TerminalStreamService.setupSocketNamespace()` pattern. The new namespace `/gsd-hooks` is independent of `/terminal`.
+
+**Why a separate namespace:** `/terminal` is tightly coupled to PTY session lifecycle. Hook log streaming is session-agnostic, always-on, and read-only.
+
+**Socket.IO event emitted:** `gsd:hook-event` with payload `GsdHookEvent`.
+
+**Example structure:**
 ```typescript
-// Instead of viewport-based queries, use container-based sizing
-// Tailwind CSS 4 supports @container by default
+// src/server/services/GsdHookLogWatcher.ts
+import { watch, type FSWatcher } from 'fs';
+import { open } from 'fs/promises';
+import type { Server as SocketIOServer } from 'socket.io';
+import { HOOK_LOG_PATH } from './GsdService.js';
+import type { GsdHookEvent } from '../../shared/gsdTypes.js';
 
-// Example: AgentSidebar adapts to its container, not viewport
-<div className="@container">
-  <div className="@sm:flex-row @lg:flex-col flex-col">
-    {/* Layout changes based on container width, not screen width */}
-  </div>
-</div>
+class GsdHookLogWatcher {
+  private watcher: FSWatcher | null = null;
+  private socketServer: SocketIOServer | null = null;
+  private lastReadPosition = 0;
+
+  setupSocketNamespace(socketServer: SocketIOServer): void {
+    this.socketServer = socketServer;
+    const hookNamespace = socketServer.of('/gsd-hooks');
+    hookNamespace.on('connection', async (socket) => {
+      console.log(`[GsdHookLog] Client ${socket.id} connected`);
+      // Backfill last 20 lines on connect
+      const recentLines = await this.readRecentLines(20);
+      for (const event of recentLines) {
+        socket.emit('gsd:hook-event', event);
+      }
+    });
+  }
+
+  start(): void {
+    this.initializeReadPosition().then(() => {
+      try {
+        this.watcher = watch(HOOK_LOG_PATH, () => this.onFileChange());
+        console.log(`[GsdHookLog] Watching ${HOOK_LOG_PATH}`);
+      } catch {
+        // Log file may not exist yet; poll for it
+        console.log(`[GsdHookLog] ${HOOK_LOG_PATH} not found, will retry`);
+        setTimeout(() => this.start(), 5_000);
+      }
+    });
+  }
+
+  stop(): void {
+    this.watcher?.close();
+    this.watcher = null;
+  }
+
+  private async initializeReadPosition(): Promise<void> {
+    try {
+      const fileHandle = await open(HOOK_LOG_PATH, 'r');
+      const stats = await fileHandle.stat();
+      this.lastReadPosition = stats.size;
+      await fileHandle.close();
+    } catch {
+      this.lastReadPosition = 0;
+    }
+  }
+
+  private async onFileChange(): Promise<void> {
+    const fileHandle = await open(HOOK_LOG_PATH, 'r');
+    const stats = await fileHandle.stat();
+    if (stats.size <= this.lastReadPosition) {
+      await fileHandle.close();
+      return; // File truncated or no new content
+    }
+    const newBytes = stats.size - this.lastReadPosition;
+    const buffer = Buffer.alloc(newBytes);
+    await fileHandle.read(buffer, 0, newBytes, this.lastReadPosition);
+    await fileHandle.close();
+    this.lastReadPosition = stats.size;
+    const newLines = buffer.toString('utf-8').split('\n').filter(line => line.trim());
+    const namespace = this.socketServer?.of('/gsd-hooks');
+    if (!namespace) return;
+    for (const line of newLines) {
+      const event = this.parseLine(line);
+      if (event) namespace.emit('gsd:hook-event', event);
+    }
+  }
+
+  private async readRecentLines(count: number): Promise<GsdHookEvent[]> {
+    const { readFile } = await import('fs/promises');
+    try {
+      const content = await readFile(HOOK_LOG_PATH, 'utf-8');
+      return content.split('\n')
+        .filter(line => line.trim())
+        .slice(-count)
+        .map(line => this.parseLine(line))
+        .filter((event): event is GsdHookEvent => event !== null);
+    } catch {
+      return [];
+    }
+  }
+
+  private parseLine(raw: string): GsdHookEvent | null {
+    // Format: [2026-02-17T22:21:21Z] [stop-hook.sh] message text here
+    const match = raw.match(/^\[([^\]]+)\]\s+\[([^\]]+)\]\s+(.+)$/);
+    if (!match) return null;
+    return {
+      timestamp: match[1],
+      script: match[2],
+      message: match[3],
+      raw,
+    };
+  }
+}
+
+export const gsdHookLogWatcher = new GsdHookLogWatcher();
 ```
 
-### Component Hierarchy Restructure
+### Pattern 4: Plugin Component (gsd-manager-plugin.tsx)
 
-Current desktop-first hierarchy:
-```
-App
-├── Header (fixed)
-├── InstanceTabBar (always visible)
-├── Main (flex-1)
-│   ├── TerminalView (flex-1)
-│   └── AgentSidebar (fixed 320px, desktop only)
-└── PromptPanel (fixed height)
-```
+**What:** A single `.tsx` file in `src/client/plugins/` exporting `{ manifest, PanelComponent }` satisfying `PluginModule`. No setup needed — Vite glob auto-discovers it.
 
-Recommended mobile-first hierarchy:
-```
-App
-├── MobileHeader (sticky, <768px only)
-│   ├── Menu toggle → opens drawer
-│   └── Active session badge
-├── TabletDesktopHeader (>=768px only)
-│   ├── Logo + session count
-│   └── View toggle + Agents button
-├── ViewStack (mobile: full-screen stack; desktop: flex row)
-│   ├── TerminalView
-│   │   ├── SessionDrawer (mobile: slide-over; desktop: tabs)
-│   │   └── Terminal (always full viewport)
-│   ├── HistoryView (mobile: full-screen; desktop: replaces terminal)
-│   └── ActivityView (mobile: full-screen; desktop: replaces terminal)
-├── AgentDrawer (mobile: slide-over; desktop: sidebar)
-│   ├── AgentList
-│   └── PromptPanel (mobile: modal; desktop: inline)
-└── BottomNav (mobile <768px only)
-    ├── Terminals button
-    ├── History button
-    ├── Activity button
-    └── Agents button
-```
+**Slot:** `bottom-panel`. Rendered in `App.tsx` line 318: `<PluginSlotRenderer slot="bottom-panel" enabledPlugins={enabledPlugins} />`.
 
-### Responsive Layout Components
+**Critical constraint:** `PanelComponent` is typed as `ComponentType` (no props). The plugin must be fully self-contained — all data fetched via the `useGsdManager` hook internally.
 
+**Example structure:**
 ```typescript
-// src/client/components/ResponsiveLayout.tsx
-export function ResponsiveLayout({ children }: { children: React.ReactNode }) {
-  const isMobile = useIsMobile();
-  const isDesktop = useIsDesktop();
+// src/client/plugins/gsd-manager-plugin.tsx
+import type { PluginManifest, PluginModule } from '@shared/pluginTypes.js';
+import { useGsdManager } from '../hooks/useGsdManager.js';
 
+const manifest = {
+  id: 'gsd-manager',
+  name: 'GSD Control Center',
+  version: '1.0.0',
+  description: 'Spawn agents, send GSD commands, monitor hook activity',
+  slot: 'bottom-panel',
+  capabilities: ['gsd-management', 'agent-control', 'session-monitoring'],
+} as const satisfies PluginManifest;
+
+function GsdControlCenterPanel() {
+  const { registry, hookEvents, sessionStates, spawnAgent, sendCommand } = useGsdManager();
+  // Render: AgentGrid | QuickActions | HookFeed | ManualCommandRef sections
   return (
-    <div className="flex flex-col h-screen">
-      {isMobile ? <MobileHeader /> : <TabletDesktopHeader />}
-
-      <main className="flex-1 min-h-0">
-        {children}
-      </main>
-
-      {isMobile && <BottomNav />}
+    <div className="bg-warden-panel border-t border-warden-border p-3">
+      {/* ... */}
     </div>
   );
 }
 
-// Mobile-specific components
-function MobileHeader() {
-  const [drawerOpen, setDrawerOpen] = useState(false);
-
-  return (
-    <>
-      <header className="sticky top-0 z-40 bg-warden-panel border-b border-warden-border">
-        <div className="flex items-center justify-between px-4 py-3">
-          <button
-            onClick={() => setDrawerOpen(true)}
-            className="min-w-[44px] min-h-[44px]"  // Touch-friendly 44px tap target
-          >
-            ☰ Menu
-          </button>
-          <div className="text-sm text-warden-text-dim">
-            {/* Active session indicator */}
-          </div>
-        </div>
-      </header>
-
-      <SessionDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
-    </>
-  );
-}
-
-function BottomNav() {
-  const [currentView, setCurrentView] = useRouterView();
-
-  return (
-    <nav className="sticky bottom-0 z-40 bg-warden-panel border-t border-warden-border">
-      <div className="flex justify-around py-2">
-        {['terminals', 'history', 'activity', 'agents'].map(view => (
-          <button
-            key={view}
-            onClick={() => setCurrentView(view)}
-            className={`flex flex-col items-center min-w-[64px] min-h-[44px] ${
-              currentView === view ? 'text-warden-accent' : 'text-warden-text-dim'
-            }`}
-          >
-            {/* Icon + label */}
-          </button>
-        ))}
-      </div>
-    </nav>
-  );
-}
+export default { manifest, PanelComponent: GsdControlCenterPanel } satisfies PluginModule;
 ```
 
-### Touch-Friendly Interaction Patterns
+### Pattern 5: Data-Fetching Hook (useGsdManager.ts)
 
-Following [mobile-first design principles](https://blog.pixelfreestudio.com/how-to-implement-mobile-first-design-in-react/):
+**What:** A custom hook that polls REST endpoints and subscribes to Socket.IO `/gsd-hooks` namespace. Encapsulates all GSD-related state for the plugin.
 
+**Polling strategy:** Registry and session states poll every 30s (low-frequency, file-based data). Hook events are pushed via Socket.IO (no polling).
+
+**Example structure:**
 ```typescript
-// Minimum tap target size: 44x44px (iOS) / 48x48px (Android)
-// Tailwind config adjustment:
+// src/client/hooks/useGsdManager.ts
+import { useState, useEffect, useCallback } from 'react';
+import { io, type Socket } from 'socket.io-client';
+import type { RecoveryRegistry, GsdHookEvent, GsdSessionState } from '@shared/gsdTypes.js';
 
-// tailwind.config.js
-module.exports = {
-  theme: {
-    extend: {
-      minWidth: {
-        'touch': '44px',
-      },
-      minHeight: {
-        'touch': '44px',
-      },
-    },
-  },
-};
+const REGISTRY_POLL_INTERVAL_MS = 30_000;
 
-// Usage:
-<button className="min-w-touch min-h-touch flex items-center justify-center">
-  {/* Icon or text */}
-</button>
-```
+export function useGsdManager() {
+  const [registry, setRegistry] = useState<RecoveryRegistry | null>(null);
+  const [hookEvents, setHookEvents] = useState<GsdHookEvent[]>([]);
+  const [sessionStates, setSessionStates] = useState<Record<string, GsdSessionState>>({});
 
-### Visual Viewport Height (iOS Keyboard Fix)
+  // Fetch registry
+  const fetchRegistry = useCallback(async () => {
+    const response = await fetch('/api/gsd/registry');
+    if (!response.ok) return;
+    const data = await response.json();
+    setRegistry(data.registry);
+  }, []);
 
-Already implemented in App.tsx (lines 40-58), continue using:
+  useEffect(() => {
+    fetchRegistry();
+    const interval = setInterval(fetchRegistry, REGISTRY_POLL_INTERVAL_MS);
+    return () => clearInterval(interval);
+  }, [fetchRegistry]);
 
-```typescript
-// App.tsx already has this:
-useEffect(() => {
-  const viewport = window.visualViewport;
-  if (!viewport) return;
+  // Socket.IO hook event subscription
+  useEffect(() => {
+    const socket: Socket = io('/gsd-hooks');
+    socket.on('gsd:hook-event', (event: GsdHookEvent) => {
+      setHookEvents(previous => [event, ...previous].slice(0, 20)); // keep last 20
+    });
+    return () => { socket.disconnect(); };
+  }, []);
 
-  const updateHeight = () => {
-    document.documentElement.style.setProperty(
-      '--visual-viewport-height',
-      `${viewport.height}px`
-    );
-  };
+  const spawnAgent = useCallback(async (agentName: string, workingDirectory: string, firstCommand?: string) => {
+    await fetch('/api/gsd/spawn', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ agentName, workingDirectory, firstCommand }),
+    });
+  }, []);
 
-  updateHeight();
-  viewport.addEventListener('resize', updateHeight);
-  viewport.addEventListener('scroll', updateHeight);
-  return () => {
-    viewport.removeEventListener('resize', updateHeight);
-    viewport.removeEventListener('scroll', updateHeight);
-  };
-}, []);
+  const sendCommand = useCallback(async (session: string, action: string, args?: string[]) => {
+    await fetch(`/api/gsd/sessions/${encodeURIComponent(session)}/command`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, args }),
+    });
+  }, []);
 
-// CSS usage:
-.app-height {
-  height: var(--visual-viewport-height, 100vh);
+  return { registry, hookEvents, sessionStates, spawnAgent, sendCommand };
 }
 ```
-
-### Progressive Enhancement Strategy
-
-Following [progressive enhancement principle](https://www.keitaro.com/insights/2024/01/30/building-responsive-and-user-friendly-web-applications-with-react/):
-
-1. **Mobile baseline (0-480px):**
-   - Single-column layout
-   - Full-screen views (no split panes)
-   - Bottom navigation
-   - Slide-over drawers
-   - Touch-optimized controls (44px min)
-
-2. **Tablet enhancement (481-768px):**
-   - Two-column layout possible
-   - Side-by-side terminal + sidebar (landscape)
-   - Tabs instead of bottom nav
-   - Slide-over drawers (portrait) or inline panels (landscape)
-
-3. **Desktop enhancement (769px+):**
-   - Multi-column layout
-   - Fixed sidebar (no drawer)
-   - Inline panels
-   - Hover states
-   - Keyboard shortcuts
-
-### Component Conditional Rendering
-
-```typescript
-// Mobile: full-screen drawer
-{isMobile && (
-  <SessionDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)}>
-    <SessionList sessions={sessions} onSelect={handleSelect} />
-  </SessionDrawer>
-)}
-
-// Desktop: inline tabs
-{isDesktop && (
-  <InstanceTabBar
-    instances={instances}
-    selectedSessionName={selectedSessionName}
-    onSelectSession={handleSelectSession}
-  />
-)}
-```
-
-### Integration Points
-
-**New components:**
-- `src/client/styles/breakpoints.ts` — Breakpoint constants
-- `src/client/hooks/useMediaQuery.ts` — Media query hook
-- `src/client/hooks/useIsMobile.ts`, `useIsDesktop.ts` — Convenience hooks
-- `src/client/components/MobileHeader.tsx` — Mobile-specific header
-- `src/client/components/BottomNav.tsx` — Mobile bottom navigation
-- `src/client/components/SessionDrawer.tsx` — Mobile session switcher
-- `src/client/components/AgentDrawer.tsx` — Mobile agent panel
-
-**Modified components:**
-- `src/client/App.tsx` — Conditional layout based on viewport
-- `src/client/components/InstanceTabBar.tsx` — Hide on mobile, show on desktop
-- `src/client/components/AgentSidebar.tsx` — Convert to drawer on mobile
-- `src/client/components/PromptPanel.tsx` — Convert to modal on mobile
-
-**Tailwind config:**
-```javascript
-// tailwind.config.js
-module.exports = {
-  theme: {
-    extend: {
-      minWidth: { touch: '44px' },
-      minHeight: { touch: '44px' },
-      screens: {
-        'mobile': '0px',
-        'tablet': '481px',
-        'desktop': '769px',
-        'large-desktop': '1201px',
-      },
-    },
-  },
-};
-```
-
-### Anti-Patterns
-
-**Anti-Pattern 1: Desktop Layout with `display: none` on Mobile**
-- **What people do:** Build desktop version, then hide elements with CSS on mobile
-- **Why it's wrong:** Ships unused code, degrades performance, accessibility issues
-- **Do this instead:** Component-level conditional rendering with `useMediaQuery`
-
-**Anti-Pattern 2: Fixed Pixel Widths**
-- **What people do:** `width: 320px` everywhere
-- **Why it's wrong:** Breaks on 375px iPhones, 393px Android, 412px large phones
-- **Do this instead:** Relative units (`rem`, `%`, `vw`) or Tailwind's responsive classes
-
-**Anti-Pattern 3: Viewport-Only Breakpoints**
-- **What people do:** All responsive logic based on `window.innerWidth`
-- **Why it's wrong:** Doesn't account for sidebar/panel size, container context
-- **Do this instead:** Mix viewport breakpoints with container queries (Tailwind `@container`)
 
 ---
 
-## Build Order Recommendations
+## Shared Types (gsdTypes.ts)
 
-Based on feature dependencies and integration complexity:
+Follows `src/shared/types.ts` and `src/shared/openclawTypes.ts` pattern. Imported with `@shared` alias.
 
-### Phase A: Plugin Registry Foundation (Week 1-2)
-1. Database migration: `plugins` table
-2. Server: `PluginManager` service + `pluginRoutes` API
-3. Client: `PluginRegistry` singleton
-4. Client: `DynamicPanelRenderer` component
-5. Client: `PluginSlot` component
-6. Integration: Add 1-2 built-in "plugins" as proof-of-concept (e.g., "System Stats")
+```typescript
+// src/shared/gsdTypes.ts
 
-**Why first:** Lowest risk, foundational for other features
+export interface RegistryAgent {
+  agent_id: string;
+  enabled: boolean;
+  auto_wake: boolean;
+  topic_id: number;
+  openclaw_session_id: string;
+  working_directory: string;
+  tmux_session_name: string;
+  claude_resume_target: string;
+  claude_launch_command: string;
+  claude_post_launch_mode: string;
+  system_prompt: string;
+  hook_settings: Record<string, unknown>;
+}
 
-### Phase B: Mobile-First UI Restructure (Week 2-3)
-1. Styles: Breakpoint constants + Tailwind config
-2. Hooks: `useMediaQuery`, `useIsMobile`, `useIsDesktop`
-3. Components: `MobileHeader`, `BottomNav`, `SessionDrawer`, `AgentDrawer`
-4. Refactor: `App.tsx` conditional layout
-5. Testing: Playwright tests at 375px, 768px, 1440px viewports
+export interface RecoveryRegistry {
+  global_status_openclaw_session_id: string;
+  global_status_openclaw_session_key: string;
+  agents: RegistryAgent[];
+}
 
-**Why second:** UI foundation needed before Activity view (which benefits from mobile layout)
+export interface GsdHookEvent {
+  timestamp: string;    // e.g. "2026-02-17T22:21:21Z"
+  script: string;       // e.g. "stop-hook.sh"
+  message: string;      // e.g. "state=idle"
+  raw: string;          // full log line
+}
 
-### Phase C: Activity Timeline & Audit Log (Week 3-5)
-1. Database migration: `activity_events` table
-2. Server: `TerminalOutputParser` (integrate `node-ansiparser`)
-3. Server: `ActivityEnricher` service
-4. Server: `AuditLogger` service
-5. Server: `activityRoutes` API
-6. Server: Modify `TerminalStreamService` to emit events
-7. Client: `ActivityTimeline` component
-8. Client: Add "Activity" view to main navigation
-9. Testing: E2E flow for event capture + timeline display
+export interface GsdSessionState {
+  sessionName: string;
+  agentId: string;
+  stateMdContent: string | null;
+  lastFetchedAt: string;
+}
 
-**Why last:** Most complex, depends on parser library integration, benefits from plugin system (for custom event renderers)
+export interface GsdSpawnRequest {
+  agentName: string;
+  workingDirectory: string;
+  firstCommand?: string;
+}
+
+export interface GsdCommandRequest {
+  action: 'snapshot' | 'enter' | 'esc' | 'clear_then' | 'choose' | 'type' | 'submit';
+  args?: string[];
+}
+```
+
+---
+
+## Data Flow Diagrams
+
+### Spawn Agent Flow
+
+```
+User clicks "Spawn" in gsd-manager-plugin
+    |
+    v
+POST /api/gsd/spawn { agentName, workingDirectory, firstCommand }
+    |
+    v
+gsdRoutes validates inputs -> gsdService.validateSpawnInputs()
+    |
+    v
+gsdService.spawnAgentBackground() [fire and forget]
+    |                                         |
+    v                                         v (background)
+202 Accepted returned to client        spawn.sh creates tmux session,
+    |                                  launches Claude Code,
+    v                                  waits for TUI (~15-20s),
+Plugin shows "Spawning..." status      sends firstCommand
+                                              |
+                                             10s later
+                                              |
+                                              v
+                                    InstanceTracker.syncWithTmux()
+                                    discovers new session
+                                              |
+                                              v
+                                    /api/instances updated
+                                    -> new TerminalView tab appears
+```
+
+### Send GSD Command Flow
+
+```
+User clicks "/gsd:resume-work" preset in plugin
+    |
+    v
+POST /api/gsd/sessions/warden-main/command
+     { action: "clear_then", args: ["/gsd:resume-work"] }
+    |
+    v
+gsdRoutes -> gsdService.runMenuDriverCommand("warden-main", "clear_then", ["/gsd:resume-work"])
+    |
+    v
+execFileAsync(menu-driver.sh, ["warden-main", "clear_then", "/gsd:resume-work"], timeout: 5s)
+    |
+    v
+tmux send-keys executes in session
+    |
+    v
+200 OK { success: true }
+```
+
+### Hook Log Streaming Flow
+
+```
+Hook script (stop-hook.sh, pre-tool-use-hook.sh) fires
+    |
+    v
+Appends to /tmp/gsd-hooks.log:
+"[2026-02-18T10:00:00Z] [stop-hook.sh] state=idle"
+    |
+    v
+GsdHookLogWatcher.onFileChange() triggered by fs.watch
+    |
+    v
+Reads new bytes since lastReadPosition
+Parses lines -> GsdHookEvent[]
+    |
+    v
+socketServer.of('/gsd-hooks').emit('gsd:hook-event', event)
+    |
+    v
+useGsdManager hook receives event via socket.on('gsd:hook-event', ...)
+    |
+    v
+setHookEvents(previous => [event, ...previous].slice(0, 20))
+    |
+    v
+HookFeed section in gsd-manager-plugin re-renders with new event prepended
+```
+
+### Registry + STATE.md Data Flow
+
+```
+Plugin mounts -> useGsdManager initializes
+    |
+    v
+GET /api/gsd/registry
+    |
+    v
+gsdService.readRegistry()
+  -> fs.readFile(REGISTRY_PATH)
+  -> JSON.parse -> cached for 30s
+    |
+    v
+{ registry: RecoveryRegistry } stored in hook state
+    |
+    v (per agent with working_directory)
+GET /api/gsd/sessions/:session/state
+    |
+    v
+gsdService.readSessionState(session)
+  -> registry lookup by tmux_session_name
+  -> fs.readFile(workdir + '/.planning/STATE.md')
+  -> return raw string content (or null if missing)
+    |
+    v
+Plugin renders STATE.md as preformatted text
+Best-effort phase extraction with regex fallback to "unknown"
+```
+
+---
+
+## Integration Points: New vs Existing
+
+| New Component | Integrates With | How |
+|---------------|-----------------|-----|
+| `gsdRoutes` | `src/server/index.ts` | `app.use(gsdRoutes)` — 1 line, same as existing route mounts |
+| `GsdHookLogWatcher` | `src/server/index.ts` | `setupSocketNamespace(socketServer)` + `start()`/`stop()` — mirrors `terminalStreamService` pattern |
+| `GsdService` | `TmuxSessionManager` | No coupling. `spawn.sh` handles tmux internally. `InstanceTracker` discovers the result. |
+| `GsdService` | `OpenClawConfigReader` | No coupling. Both read independent JSON files with their own caches. |
+| `gsd-manager-plugin.tsx` | Plugin system | Drop file in `src/client/plugins/`. Vite glob in `index.ts` auto-discovers. Zero other changes. |
+| `useGsdManager` | Socket.IO | Connects to `/gsd-hooks` (new namespace). Uses same `socket.io-client` already in dependencies. |
+
+---
+
+## Suggested Build Order
+
+Build order respects: types first, then server infrastructure, then server routes, then client.
+
+### Step 1: Shared Types (No Dependencies)
+**File:** `src/shared/gsdTypes.ts`
+
+Create all TypeScript interfaces: `RegistryAgent`, `RecoveryRegistry`, `GsdHookEvent`, `GsdSessionState`, `GsdSpawnRequest`, `GsdCommandRequest`.
+
+**Verify:** Types compile cleanly, `@shared` alias resolves.
+
+### Step 2: GsdService (Depends on: gsdTypes)
+**File:** `src/server/services/GsdService.ts`
+
+Implement registry read/cache, `patchRegistryAgent`, `validateSpawnInputs`, `spawnAgentBackground`, `runMenuDriverCommand`, `readSessionState`, `tailHookLog`.
+
+**Verify:** Smoke-test each method manually: `readRegistry()` returns parsed JSON, `runMenuDriverCommand` calls correct script path, `readSessionState` returns null gracefully for unknown sessions.
+
+### Step 3: gsdRoutes + index.ts mount (Depends on: GsdService)
+**Files:** `src/server/routes/gsdRoutes.ts` + 1-line change in `src/server/index.ts`
+
+Implement all 6 REST endpoints. Add `app.use(gsdRoutes)` to `index.ts`.
+
+**Verify:** `curl http://localhost:3001/api/gsd/registry` returns registry JSON.
+
+### Step 4: GsdHookLogWatcher + index.ts (Depends on: gsdTypes, Socket.IO server)
+**File:** `src/server/services/GsdHookLogWatcher.ts`
+
+Implement `setupSocketNamespace`, `start`, `stop`, `onFileChange`, `parseLine`, `readRecentLines`. Add to `index.ts` startup/shutdown (3 lines, mirrors `terminalStreamService`).
+
+**Verify:** Connect a `socket.io-client` test to `/gsd-hooks` namespace; append a line to `/tmp/gsd-hooks.log`; receive `gsd:hook-event`.
+
+### Step 5: useGsdManager Hook (Depends on: gsdTypes, Steps 3-4 server routes live)
+**File:** `src/client/hooks/useGsdManager.ts`
+
+Implement registry polling, Socket.IO subscription, `spawnAgent`, `sendCommand` mutations.
+
+**Verify:** Hook renders without error when wrapped in a test component; registry state populates from `/api/gsd/registry`.
+
+### Step 6: gsd-manager-plugin.tsx (Depends on: useGsdManager, gsdTypes)
+**File:** `src/client/plugins/gsd-manager-plugin.tsx`
+
+Implement manifest (`bottom-panel` slot), `GsdControlCenterPanel` with four sections: AgentGrid, QuickActions, HookFeed, ManualCommandRef.
+
+**Verify:** Plugin appears in Plugins registry view. Enables and renders in bottom panel on Terminals view.
+
+---
+
+## Anti-Patterns to Avoid
+
+### Anti-Pattern 1: Blocking the HTTP Request on spawn.sh
+
+**What people do:** `await execFileAsync(spawn.sh, ...)` in the route handler, making the client wait 20+ seconds.
+
+**Why it's wrong:** `spawn.sh` blocks for ~15-25s waiting for the Claude TUI readiness check (`wait_for_claude_tui_readiness`). The HTTP request will timeout in browsers and proxies at their default timeouts.
+
+**Do this instead:** Validate inputs synchronously, start `execFile` without awaiting, return `202 Accepted` immediately. The session will appear in `/api/instances` within 10s via `InstanceTracker.startPeriodicSync()`.
+
+### Anti-Pattern 2: Writing registry-registry.json Without Awareness of spawn.sh Locking
+
+**What people do:** `readFile` -> modify in memory -> `writeFile` in a Node.js async function.
+
+**Why it's wrong:** `spawn.sh` uses `flock -x` for all registry writes. If a Node.js write occurs concurrently with a spawn, the JSON can be corrupted (partial write).
+
+**Do this instead:** For simple field patches (toggling `enabled`), the risk is low since spawns are rare. However, document the known race and keep writes minimal. Never do batch/structural writes from Node.js.
+
+### Anti-Pattern 3: Polling the Hook Log from the Client
+
+**What people do:** Client calls `GET /api/gsd/hooks/log` every few seconds.
+
+**Why it's wrong:** Each poll reads the entire tail of a growing file. Creates O(n) work per poll. Duplicate events on each response unless client tracks what it has seen.
+
+**Do this instead:** `GsdHookLogWatcher` tails server-side and pushes only new lines via Socket.IO. Client receives exactly one event per hook log line appended.
+
+### Anti-Pattern 4: Injecting Props into PanelComponent
+
+**What people do:** Try to pass `instances` or `selectedSession` as props to `GsdControlCenterPanel`.
+
+**Why it's wrong:** `PluginSlotRenderer` calls `<PanelComponent />` with no props — `ComponentType` in `pluginTypes.ts` accepts none. Adding props requires changing the plugin type contract, which breaks all existing plugins.
+
+**Do this instead:** `GsdControlCenterPanel` sources all data through `useGsdManager`. If it needs the currently selected tmux session, it calls `GET /api/instances` itself.
+
+### Anti-Pattern 5: Complex STATE.md Parsing in the Service Layer
+
+**What people do:** Attempt to extract structured phase numbers and progress percentages from STATE.md using multi-regex pipelines in `GsdService`.
+
+**Why it's wrong:** STATE.md is human-written markdown with no stable schema across projects. Complex parsing breaks silently as the format drifts.
+
+**Do this instead:** Return raw STATE.md content to the client. The plugin performs best-effort first-heading extraction for the summary row and displays the full content as preformatted text. Graceful fallback to "unknown" when parsing fails.
 
 ---
 
 ## Scaling Considerations
 
-| Scale | Adjustments |
-|-------|-------------|
-| **0-10 sessions** | Current architecture sufficient; SQLite handles well |
-| **10-100 sessions** | Plugin registry: implement lazy loading; Activity: batch event writes (100 events or 1s) |
-| **100+ sessions** | Activity: consider PostgreSQL for full-text search; Plugin: implement allowlist/signature validation |
+This is a single-operator local dashboard. The only multi-connection scenario is multiple browser tabs.
 
-**First bottleneck:** Activity event writes (high volume terminal output)
-- **Fix:** Batch writes, reduce `terminal_output` retention to 7 days
-
-**Second bottleneck:** Plugin component re-renders
-- **Fix:** React.memo() on `DynamicPanelRenderer`, plugin context isolation
+| Concern | Approach |
+|---------|----------|
+| Multiple browser tabs on `/gsd-hooks` | Socket.IO namespace fan-out handles this natively |
+| Concurrent spawn requests | `validateSpawnInputs` rejects if session name already exists via tmux check |
+| Registry write contention (Node.js vs spawn.sh) | Low-frequency writes; document as known race; acceptable for operator tooling |
+| Hook log file unbounded growth | `GsdHookLogWatcher` tracks byte position; never loads full file into memory |
+| `GsdService` registry cache stale after spawn | Cache TTL 30s; spawn completion visible in `/api/instances` before cache expires |
 
 ---
 
 ## Sources
 
-**Plugin Architecture:**
-- [Plugin Architecture Pattern (Medium)](https://medium.com/omarelgabrys-blog/plug-in-architecture-dec207291800)
-- [Registry Pattern (GeeksforGeeks)](https://www.geeksforgeeks.org/system-design/registry-pattern/)
-- [dotCMS Plugin Architecture](https://www.dotcms.com/blog/plugin-achitecture)
-- [ArjanCodes Plugin Best Practices](https://arjancodes.com/blog/best-practices-for-decoupling-software-using-plugins/)
+All findings from direct codebase inspection (HIGH confidence):
 
-**React Dynamic Components:**
-- [Storyblok Dynamic Component Rendering](https://www.storyblok.com/tp/react-dynamic-component-from-json)
-- [Kyle Shevlin: Dynamic React Components](https://kyleshevlin.com/how-to-dynamically-render-react-components/)
-- [Tambo 1.0: React Component Rendering Agents](https://aitoolly.com/ai-news/article/2026-02-11-tambo-10-open-source-toolkit-for-agents-rendering-react-components-launched)
-
-**Audit Logging & Activity Timeline:**
-- [Microservices Audit Logging Pattern](https://microservices.io/patterns/observability/audit-logging.html)
-- [Martin Fowler: Audit Log](https://martinfowler.com/eaaDev/AuditLog.html)
-- [Confluent: Real-Time Audit Logging with Kafka](https://www.confluent.io/blog/build-real-time-compliance-audit-logging-kafka/)
-- [Activity Logs Pattern (Business Central)](https://alguidelines.dev/docs/navpatterns/patterns/activity-log/)
-- [Sonar: Audit Logging Best Practices](https://www.sonarsource.com/resources/library/audit-logging/)
-
-**ANSI Parsing:**
-- [VT100.net ANSI Parser](https://vt100.net/emu/dec_ansi_parser)
-- [node-ansiparser (GitHub)](https://github.com/netzkolchose/node-ansiparser)
-- [ANSI Escape Code (Wikipedia)](https://en.wikipedia.org/wiki/ANSI_escape_code)
-
-**Mobile-First & Responsive Design:**
-- [Keitaro: Responsive React Apps](https://www.keitaro.com/insights/2024/01/30/building-responsive-and-user-friendly-web-applications-with-react/)
-- [DhiWise: React Mobile Responsiveness](https://www.dhiwise.com/post/the-ultimate-guide-to-achieving-react-mobile-responsiveness/)
-- [PixelFreeStudio: Mobile-First Design in React](https://blog.pixelfreestudio.com/how-to-implement-mobile-first-design-in-react/)
-- [React Testing Library: Responsive Design Testing](https://copyprogramming.com/howto/react-testing-library-rtl-test-a-responsive-design)
-- [Framer: Breakpoints Guide 2026](https://www.framer.com/blog/responsive-breakpoints/)
-- [React Wiki: useMediaQuery Hook](https://react.wiki/hooks/custom-use-media-query/)
-
-**Event-Driven Architecture:**
-- [Event-Driven Patterns (SimpleAWS)](https://newsletter.simpleaws.dev/p/event-driven-architecture-patterns)
-- [Event-Driven Cloud Security Architecture](https://www.cy5.io/blog/event-driven-cloud-security-architecture/)
+- `src/server/index.ts` — Route mounting pattern, service initialization, shutdown pattern
+- `src/server/routes/instanceRoutes.ts`, `agentRoutes.ts`, `historyRoutes.ts`, `activityRoutes.ts` — Confirmed route module pattern (Router export, singleton import, error handling shape)
+- `src/server/services/TmuxSessionManager.ts` — `execFileAsync` wrapper pattern, singleton export
+- `src/server/services/OpenClawConfigReader.ts` — TTL cache pattern (30s), `readFile` + JSON parse
+- `src/server/services/TerminalStreamService.ts` — Socket.IO namespace setup, `setSocketServer`/`setupSocketNamespace` integration with `index.ts`
+- `src/client/plugins/example-plugin.tsx` — Confirmed plugin contract: `{ manifest, PanelComponent }` satisfies `PluginModule`, no props on `PanelComponent`
+- `src/shared/pluginTypes.ts` — Confirmed `ComponentType` (no props), `PluginSlot` enum includes `'bottom-panel'`
+- `src/client/plugins/index.ts` — Confirmed `import.meta.glob('./*.tsx', { eager: true, import: 'default' })` for auto-discovery
+- `src/client/App.tsx` line 318 — Confirmed `bottom-panel` slot rendered under terminals view
+- `src/client/hooks/useActiveInstances.ts` — Polling pattern (5s interval, `useCallback`+`useEffect`)
+- `/home/forge/.openclaw/workspace/skills/gsd-code-skill/scripts/spawn.sh` — Confirmed 15-25s blocking (`wait_for_claude_tui_readiness`), `flock` on registry writes, session naming (`{agent}-main`)
+- `/home/forge/.openclaw/workspace/skills/gsd-code-skill/scripts/menu-driver.sh` — Confirmed actions: `snapshot`, `enter`, `esc`, `clear_then`, `choose`, `type`, `submit`
+- `/home/forge/.openclaw/workspace/skills/gsd-code-skill/config/recovery-registry.json` — Live schema confirmed: `agent_id`, `enabled`, `working_directory`, `tmux_session_name` fields
+- `/tmp/gsd-hooks.log` — Live log format confirmed: `[ISO-timestamp] [script-name.sh] message`
 
 ---
 
-*Architecture research for: Warden Dashboard v2.0 Mission Control Extensions*
-*Researched: 2026-02-16*
+*Architecture research for: GSD Manager Plugin integration into Warden Dashboard*
+*Researched: 2026-02-18*
