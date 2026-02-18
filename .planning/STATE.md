@@ -13,7 +13,7 @@ See: .planning/PROJECT.md (updated 2026-02-18)
 Phase: 14 — Enhanced Agent Visibility
 Plan: 01 complete (of 1)
 Status: Phase complete — v2.1 complete
-Last activity: 2026-02-18 - Completed quick task 6: Agent visibility as separate nav page
+Last activity: 2026-02-18 - Completed quick task 7: GSD Control Center as full-page nav view
 
 Progress: [███████░░░] 70%
 
@@ -102,6 +102,7 @@ Key decisions from v2.1 research (apply from Phase 12 onwards):
 - [Phase 14]: Promise.allSettled for live-status: parallel tmux captures with per-agent error isolation — dead sessions return nulls
 - [Phase 14]: extractContextPressure reads last 5 non-empty pane lines to capture Claude Code status bar percentage
 - [Phase 14]: sessionNames.join(',') as stable useEffect dependency key in useAgentStateFiles — avoids re-registering intervals on every render
+- [Quick-7]: GSD bottom-panel plugin disabled via DisabledPanel returning null — keeps file for code reference, avoids renaming/deletion
 
 ### Quick Tasks Completed
 
@@ -112,6 +113,7 @@ Key decisions from v2.1 research (apply from Phase 12 onwards):
 | 4 | iOS keyboard toolbar visibility & 3x scroll-down escape | 2026-02-15 | `c2d7756` |
 | 5 | Move PromptPanel to sidebar for maximum terminal vertical space | 2026-02-16 | `8fc0c66` |
 | 6 | Agents full-page nav view with responsive card grid (state, context, phase) | 2026-02-18 | `d45a5ed` |
+| 7 | GSD Control Center as full-page 4-tab nav view (replaces bottom-panel plugin) | 2026-02-18 | `fc76d8b` |
 
 ### Roadmap Evolution
 
@@ -134,5 +136,5 @@ Phase 14 complete. No active blockers.
 ## Session Continuity
 
 Last session: 2026-02-18
-Stopped at: Completed quick-6 — Agents full-page nav view
+Stopped at: Completed quick-7 — GSD Control Center as full-page nav view
 Next step: v2.1 complete — plan next features or ship
