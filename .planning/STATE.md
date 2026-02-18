@@ -111,6 +111,7 @@ Key decisions from v2.1 research (apply from Phase 12 onwards):
 | 3 | Mobile responsiveness, PTY dedup, URL hash routing, Alt+click, long-press copy | 2026-02-15 | `3c5e961` |
 | 4 | iOS keyboard toolbar visibility & 3x scroll-down escape | 2026-02-15 | `c2d7756` |
 | 5 | Move PromptPanel to sidebar for maximum terminal vertical space | 2026-02-16 | `8fc0c66` |
+| 6 | Agents full-page nav view with responsive card grid (state, context, phase) | 2026-02-18 | `d45a5ed` |
 
 ### Roadmap Evolution
 
@@ -133,5 +134,5 @@ Phase 14 complete. No active blockers.
 ## Session Continuity
 
 Last session: 2026-02-18
-Stopped at: Completed 14-01-PLAN.md — Phase 14 Enhanced Agent Visibility complete
+Stopped at: Completed quick-6 — Agents full-page nav view
 Next step: v2.1 complete — plan next features or ship
