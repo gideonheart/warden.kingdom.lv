@@ -5,6 +5,7 @@ import { useActiveInstances } from '../hooks/useActiveInstances.js';
 import { useAgentLiveStatus } from '../hooks/useAgentLiveStatus.js';
 import { useAgentStateFiles } from '../hooks/useAgentStateFiles.js';
 import type { AgentStateHint, PressureLevel } from '../hooks/useAgentLiveStatus.js';
+import { SearchableSelect } from './SearchableSelect.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Color maps
@@ -38,6 +39,29 @@ const PRESSURE_COLORS: Record<PressureLevel, string> = {
   warning: 'text-warden-warning',
   critical: 'text-warden-error',
 };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GSD slash commands for searchable dropdowns
+// ─────────────────────────────────────────────────────────────────────────────
+
+const GSD_COMMANDS: string[] = [
+  '/gsd:quick',
+  '/gsd:resume-work',
+  '/gsd:progress',
+  '/gsd:plan-phase',
+  '/gsd:execute-phase',
+  '/gsd:verify-work',
+  '/gsd:debug',
+  '/gsd:new-milestone',
+  '/gsd:discuss-phase',
+  '/gsd:help',
+  '/gsd:settings',
+  '/gsd:check-todos',
+  '/gsd:pause-work',
+  '/gsd:health',
+  '/gsd:status',
+  '/gsd:research-phase',
+];
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helper components
@@ -370,12 +394,18 @@ export function GsdView() {
               <div className="flex flex-wrap gap-3 items-end">
                 <div className="flex flex-col gap-1">
                   <label className="text-sm text-warden-text-dim">Agent Name</label>
-                  <input
-                    type="text"
+                  <SearchableSelect
                     value={agentName}
-                    onChange={(event) => setAgentName(event.target.value)}
+                    onChange={setAgentName}
+                    options={agents.map((a) => a.agent_id)}
                     placeholder="e.g. forge"
                     className="bg-warden-bg border border-warden-border text-warden-text text-sm px-3 py-1.5 rounded w-40"
+                    onSelect={(selectedAgentId) => {
+                      const agent = agents.find((a) => a.agent_id === selectedAgentId);
+                      if (agent?.working_directory) {
+                        setWorkdir(agent.working_directory);
+                      }
+                    }}
                   />
                 </div>
                 <div className="flex flex-col gap-1">
@@ -390,10 +420,10 @@ export function GsdView() {
                 </div>
                 <div className="flex flex-col gap-1">
                   <label className="text-sm text-warden-text-dim">First Command</label>
-                  <input
-                    type="text"
+                  <SearchableSelect
                     value={firstCommand}
-                    onChange={(event) => setFirstCommand(event.target.value)}
+                    onChange={setFirstCommand}
+                    options={GSD_COMMANDS}
                     placeholder="Optional first command"
                     className="bg-warden-bg border border-warden-border text-warden-text text-sm px-3 py-1.5 rounded w-56"
                   />
@@ -437,10 +467,10 @@ export function GsdView() {
                 </div>
                 <div className="flex flex-col gap-1">
                   <label className="text-sm text-warden-text-dim">Command</label>
-                  <input
-                    type="text"
+                  <SearchableSelect
                     value={commandText}
-                    onChange={(event) => setCommandText(event.target.value)}
+                    onChange={setCommandText}
+                    options={GSD_COMMANDS}
                     placeholder="e.g. /gsd:status"
                     className="bg-warden-bg border border-warden-border text-warden-text text-sm px-3 py-1.5 rounded w-72"
                   />
