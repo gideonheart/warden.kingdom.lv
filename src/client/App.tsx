@@ -8,7 +8,7 @@ import { HistoryView } from './components/HistoryView.js';
 import { PluginRegistryView } from './components/PluginRegistryView.js';
 import { PluginSlotRenderer } from './components/PluginSlotRenderer.js';
 import { MobilePromptSheet } from './components/MobilePromptSheet.js';
-import { AgentsView } from './components/AgentsView.js';
+import { GsdView } from './components/GsdView.js';
 import { useActiveInstances } from './hooks/useActiveInstances.js';
 import { useAgentConfig } from './hooks/useAgentConfig.js';
 import { usePluginRegistry } from './hooks/usePluginRegistry.js';
@@ -196,7 +196,7 @@ export function App() {
             onClick={() => handleViewChange('agents')}
             className={`px-2 py-1 min-h-[44px] text-xs transition-colors flex items-center ${currentView === 'agents' ? 'text-warden-accent' : 'text-warden-text-dim hover:text-warden-text'}`}
           >
-            Agents
+            GSD
           </button>
           <button
             onClick={() => handleViewChange('plugins')}
@@ -221,7 +221,7 @@ export function App() {
 
         {/* Mobile: active view label + hamburger */}
         <div className="flex sm:hidden items-center gap-2" ref={mobileMenuRef}>
-          <span className="text-xs text-warden-accent capitalize">{currentView}</span>
+          <span className="text-xs text-warden-accent capitalize">{currentView === 'agents' ? 'GSD' : currentView}</span>
           <button
             onClick={() => setShowMobileMenu(!showMobileMenu)}
             className="min-h-[44px] min-w-[44px] flex items-center justify-center text-warden-text-dim hover:text-warden-text transition-colors"
@@ -254,7 +254,7 @@ export function App() {
                 onClick={() => { handleViewChange('agents'); setShowMobileMenu(false); }}
                 className={`w-full text-left px-4 py-3 min-h-[44px] text-sm transition-colors ${currentView === 'agents' ? 'text-warden-accent bg-warden-accent/10' : 'text-warden-text-dim hover:text-warden-text hover:bg-warden-border/30'}`}
               >
-                Agents
+                GSD
               </button>
               <button
                 onClick={() => { handleViewChange('plugins'); setShowMobileMenu(false); }}
@@ -323,7 +323,7 @@ export function App() {
               </div>
             </div>
           ) : currentView === 'agents' ? (
-            <AgentsView />
+            <GsdView />
           ) : currentView === 'plugins' ? (
             <PluginRegistryView plugins={plugins} enabledState={enabledState} onToggle={togglePlugin} />
           ) : (

@@ -527,28 +527,12 @@ function GsdManagerPanelExpanded() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Panel component (receives zero props — PanelComponent contract)
+// DISABLED: GSD content moved to dedicated GSD nav page (GsdView.tsx)
+// Panel component returns null so the bottom-panel slot renders nothing.
 // ─────────────────────────────────────────────────────────────────────────────
 
-function GsdManagerPanel() {
-  const [isExpanded, setIsExpanded] = useState(false);
-
-  return (
-    <div className="bg-warden-panel border-t border-warden-border">
-      {/* Collapsed / always-visible header */}
-      <button
-        onClick={() => setIsExpanded((prev) => !prev)}
-        className="w-full flex items-center justify-between px-3 h-8 text-xs text-warden-text-dim hover:text-warden-text transition-colors"
-        aria-expanded={isExpanded}
-      >
-        <span className="font-medium">GSD Control Center</span>
-        <span className="text-warden-text-dim">{isExpanded ? '▾' : '▸'}</span>
-      </button>
-
-      {/* Expanded content — hooks mount only when expanded */}
-      {isExpanded && <GsdManagerPanelExpanded />}
-    </div>
-  );
+function DisabledPanel() {
+  return null;
 }
 
-export default { manifest, PanelComponent: GsdManagerPanel } satisfies PluginModule;
+export default { manifest, PanelComponent: DisabledPanel } satisfies PluginModule;
