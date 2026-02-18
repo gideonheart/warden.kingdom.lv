@@ -146,25 +146,25 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| DEAD-01 | — | Pending |
-| DEAD-02 | — | Pending |
-| DRY-01 | — | Pending |
-| DRY-02 | — | Pending |
-| DRY-03 | — | Pending |
-| SRP-01 | — | Pending |
-| SRP-02 | — | Pending |
-| SRP-03 | — | Pending |
-| SRP-04 | — | Pending |
-| SRP-05 | — | Pending |
-| TYPE-01 | — | Pending |
-| TYPE-02 | — | Pending |
-| TYPE-03 | — | Pending |
-| PERF-01 | — | Pending |
-| PERF-02 | — | Pending |
-| FIX-01 | — | Pending |
-| FIX-02 | — | Pending |
-| FIX-03 | — | Pending |
-| FIX-04 | — | Pending |
+| DEAD-01 | Phase 15 | Pending |
+| DEAD-02 | Phase 15 | Pending |
+| TYPE-01 | Phase 15 | Pending |
+| TYPE-02 | Phase 15 | Pending |
+| TYPE-03 | Phase 15 | Pending |
+| DRY-01 | Phase 16 | Pending |
+| DRY-02 | Phase 16 | Pending |
+| DRY-03 | Phase 16 | Pending |
+| SRP-01 | Phase 16 | Pending |
+| SRP-02 | Phase 16 | Pending |
+| SRP-03 | Phase 16 | Pending |
+| SRP-04 | Phase 16 | Pending |
+| SRP-05 | Phase 16 | Pending |
+| PERF-01 | Phase 17 | Pending |
+| PERF-02 | Phase 17 | Pending |
+| FIX-01 | Phase 17 | Pending |
+| FIX-02 | Phase 17 | Pending |
+| FIX-03 | Phase 17 | Pending |
+| FIX-04 | Phase 17 | Pending |
 | GRID-01 | Phase 13 | Complete |
 | GRID-02 | Phase 13 | Complete |
 | GRID-03 | Phase 14 | Complete |
@@ -191,9 +191,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 **Coverage:**
 - v2.2 requirements: 19 total
-- Mapped to phases: 0 ⚠️
-- Unmapped: 19 ⚠️
+- Mapped to phases: 19 ✓
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-02-16*
-*Last updated: 2026-02-18 — v2.2 Code Hygiene requirements defined*
+*Last updated: 2026-02-18 — v2.2 traceability populated (Phases 15-17)*

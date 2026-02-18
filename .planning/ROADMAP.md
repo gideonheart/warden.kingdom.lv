@@ -5,7 +5,8 @@
 - ✅ **v1.0 MVP** — Phases 1-6 (shipped 2026-02-12)
 - ✅ **v1.1 UX Fixes & Prompt Panel** — Phases 7-8 (shipped 2026-02-12)
 - ✅ **v2.0 Mission Control** — Phases 9-11 (shipped 2026-02-18)
-- 📋 **v2.1 GSD Manager Plugin** — Phases 12-14 (in progress)
+- ✅ **v2.1 GSD Manager Plugin** — Phases 12-14 (shipped 2026-02-18)
+- 📋 **v2.2 Code Hygiene** — Phases 15-17 (in progress)
 
 ## Phases
 
@@ -38,13 +39,22 @@
 
 </details>
 
-### 📋 v2.1 GSD Manager Plugin (In Progress)
-
-**Milestone Goal:** Add a GSD Control Center plugin that lets the operator spawn agents, send commands, view session state, and monitor hook activity — all from the browser.
+<details>
+<summary>✅ v2.1 GSD Manager Plugin (Phases 12-14) — SHIPPED 2026-02-18</summary>
 
 - [x] **Phase 12: Backend Foundation** - Types, services, REST API, and Socket.IO namespace for GSD operations with full input validation (completed 2026-02-18)
 - [x] **Phase 13: Client Plugin** - Self-registering gsd-manager-plugin with agent grid, spawn form, command dispatch, registry viewer, hook feed, and inline bash reference (completed 2026-02-18)
 - [x] **Phase 14: Enhanced Agent Visibility** - State hint badges, context pressure indicators, and STATE.md phase/progress per agent (completed 2026-02-18)
+
+</details>
+
+### 📋 v2.2 Code Hygiene (In Progress)
+
+**Milestone Goal:** Eliminate dead code, extract shared components, unify types, decompose monolithic views, and add lazy tab mounting — pure refactor, net-negative ~500 LOC, no behavior changes.
+
+- [ ] **Phase 15: Foundation** - Delete ~750 lines of dead code and create unified shared GSD types
+- [ ] **Phase 16: DRY + SRP** - Extract duplicated constants/components into shared module and decompose GsdView into tab sub-components
+- [ ] **Phase 17: Polish** - Lazy-mount GSD tabs and fix four minor bugs (fd leak, setTimeout cleanup, Map re-creation, regex fragility)
 
 ## Phase Details
 
@@ -105,7 +115,8 @@ See `.planning/milestones/v1.1-ROADMAP.md`
 
 </details>
 
----
+<details>
+<summary>✅ v2.1 Phase Details (Phases 12-14)</summary>
 
 ### Phase 12: Backend Foundation
 
@@ -123,8 +134,8 @@ See `.planning/milestones/v1.1-ROADMAP.md`
   5. Requests with path traversal attempts in `workdir` or disallowed characters in `firstCommand` are rejected with 400 before reaching any shell
 
 **Plans**: 2 plans
-- [ ] 12-01-PLAN.md — GsdRegistryService and GsdHookLogWatcher services
-- [ ] 12-02-PLAN.md — GSD REST routes with validation and server wiring
+- [x] 12-01-PLAN.md — GsdRegistryService and GsdHookLogWatcher services
+- [x] 12-02-PLAN.md — GSD REST routes with validation and server wiring
 
 ---
 
@@ -145,7 +156,7 @@ See `.planning/milestones/v1.1-ROADMAP.md`
   6. Every UI action (spawn, command, toggle) displays the equivalent manual bash command with a one-click copy-to-clipboard button that shows "Copied!" confirmation
 
 **Plans**: 1 plan
-- [ ] 13-01-PLAN.md — Data hooks (useGsdRegistry, useGsdHookFeed) and GSD Manager plugin with 4-tab panel UI
+- [x] 13-01-PLAN.md — Data hooks (useGsdRegistry, useGsdHookFeed) and GSD Manager plugin with 4-tab panel UI
 
 ---
 
@@ -163,7 +174,67 @@ See `.planning/milestones/v1.1-ROADMAP.md`
   3. Each agent in the grid shows the current GSD phase number and progress percentage parsed from the agent's STATE.md, falling back to "—" gracefully when STATE.md is absent or unparseable
 
 **Plans**: 1 plan
-- [ ] 14-01-PLAN.md — Live-status endpoint, polling hooks, and enhanced Agents grid with State/Ctx/Phase columns
+- [x] 14-01-PLAN.md — Live-status endpoint, polling hooks, and enhanced Agents grid with State/Ctx/Phase columns
+
+</details>
+
+---
+
+### Phase 15: Foundation
+
+**Goal**: Codebase is free of dead code and has a single source of truth for GSD types shared across client and server
+
+**Depends on**: Phase 14
+
+**Requirements**: DEAD-01, DEAD-02, TYPE-01, TYPE-02, TYPE-03
+
+**Success Criteria** (what must be TRUE):
+  1. `gsd-manager-plugin.tsx` exports only `DisabledPanel` — the dead `GsdManagerPanelExpanded` body is gone and `npm run typecheck` passes cleanly
+  2. `AgentsView.tsx` no longer exists in the codebase — all references removed, no import errors
+  3. `src/shared/gsdTypes.ts` exists and exports `RegistryAgent`, `GsdRegistry`, `AgentStateHint`, and `PressureLevel`
+  4. Server files (`gsdRoutes.ts`, `GsdRegistryService.ts`) import GSD types exclusively from `src/shared/gsdTypes.ts` — no local type redefinitions
+  5. Client hooks and views import GSD types exclusively from `src/shared/gsdTypes.ts` — no duplicate type declarations
+
+**Plans**: TBD
+
+---
+
+### Phase 16: DRY + SRP
+
+**Goal**: Duplicated UI constants and components exist in exactly one place, and GsdView.tsx is a thin tab router under 100 lines with each tab in its own file
+
+**Depends on**: Phase 15
+
+**Requirements**: DRY-01, DRY-02, DRY-03, SRP-01, SRP-02, SRP-03, SRP-04, SRP-05
+
+**Success Criteria** (what must be TRUE):
+  1. A shared GSD status module (e.g., `src/client/gsdShared.ts` or similar) exports `STATUS_COLORS`, `STATE_BADGE_COLORS`, `STATE_LABELS`, `PRESSURE_COLORS`, `StateBadge`, `PressureIndicator`, `PhaseProgress`, `CopyButton`, and `BashHint` — with no duplicate definitions elsewhere
+  2. `AgentsTab.tsx`, `ControlsTab.tsx`, `RegistryTab.tsx`, and `HooksTab.tsx` each exist as standalone component files
+  3. `GsdView.tsx` contains only tab state management and tab routing — it is under 100 lines
+  4. All existing GSD UI behaviors (badges, indicators, progress bars, copy buttons) continue to work identically after extraction — no visual regressions
+  5. `npm run typecheck` and `npm run build` pass with zero errors after all import paths are updated
+
+**Plans**: TBD
+
+---
+
+### Phase 17: Polish
+
+**Goal**: GSD tabs only consume server resources when visible, and four known minor defects are eliminated
+
+**Depends on**: Phase 16
+
+**Requirements**: PERF-01, PERF-02, FIX-01, FIX-02, FIX-03, FIX-04
+
+**Success Criteria** (what must be TRUE):
+  1. Switching away from the Agents tab stops all polling to `/api/gsd/agents/live-status` — no HTTP requests fire while another tab is active
+  2. Switching away from the Controls tab stops all polling associated with that tab's hooks — confirmed by observing zero GSD-related network requests in DevTools while on a non-GSD tab
+  3. The spawn handler's `openSync`/`closeSync` calls are wrapped in `try/finally` so file descriptors are released even when an exception occurs
+  4. Form handler `setTimeout` callbacks are cancelled via `clearTimeout` on component unmount — no "state update on unmounted component" warnings in console
+  5. `useAgentLiveStatus` produces a stable Map reference across renders when the underlying data has not changed — no unnecessary child re-renders triggered by Map identity changes
+  6. `extractContextPressure()` anchors its regex to the Claude Code status bar format, reducing false positives when other terminal output matches the percentage pattern
+
+**Plans**: TBD
 
 ---
 
@@ -182,6 +253,9 @@ See `.planning/milestones/v1.1-ROADMAP.md`
 | 9. Plugin Registry Foundation | v2.0 | 2/2 | Complete | 2026-02-17 |
 | 10. Mobile-First UI Restructure | v2.0 | 2/2 | Complete | 2026-02-18 |
 | 11. Activity Timeline & Audit Log | v2.0 | 2/2 | Complete | 2026-02-18 |
-| 12. Backend Foundation | 2/2 | Complete    | 2026-02-18 | - |
-| 13. Client Plugin | 1/1 | Complete    | 2026-02-18 | - |
-| 14. Enhanced Agent Visibility | 1/1 | Complete    | 2026-02-18 | - |
+| 12. Backend Foundation | v2.1 | 2/2 | Complete | 2026-02-18 |
+| 13. Client Plugin | v2.1 | 1/1 | Complete | 2026-02-18 |
+| 14. Enhanced Agent Visibility | v2.1 | 1/1 | Complete | 2026-02-18 |
+| 15. Foundation | v2.2 | 0/? | Not started | - |
+| 16. DRY + SRP | v2.2 | 0/? | Not started | - |
+| 17. Polish | v2.2 | 0/? | Not started | - |

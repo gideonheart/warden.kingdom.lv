@@ -6,14 +6,14 @@ See: .planning/PROJECT.md (updated 2026-02-18)
 
 **Core value:** Real-time visibility into all active Claude Code agent sessions from a single browser tab
 
-**Current focus:** v2.2 Code Hygiene — Not started (defining requirements)
+**Current focus:** v2.2 Code Hygiene — Phase 15: Foundation (ready to plan)
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 15 — Foundation
 Plan: —
-Status: Defining requirements
-Last activity: 2026-02-18 — Milestone v2.2 started
+Status: Roadmap created, ready for planning
+Last activity: 2026-02-18 — v2.2 roadmap created (Phases 15-17)
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -40,6 +40,11 @@ Progress: [░░░░░░░░░░] 0%
 - Phases: 3 (9-11)
 - Plans: 5 (+ 1 decimal phase 11.1)
 - Timeline: 2026-02-17 to 2026-02-18
+
+**v2.1 GSD Manager Plugin:**
+- Phases: 3 (12-14)
+- Plans: 4
+- Timeline: 2026-02-18
 
 **Completed Phases:**
 
@@ -106,6 +111,13 @@ Key decisions from v2.1 research (apply from Phase 12 onwards):
 - [Quick-8]: onMouseDown (not onClick) on SearchableSelect dropdown options — fires before blur timeout closes dropdown
 - [Quick-8]: GSD_COMMANDS as static module-level constant — commands are stable, no server API needed
 
+Key decisions for v2.2:
+- TYPE-01 must land before DRY/SRP work: shared types are the dependency anchor for all import path updates
+- DEAD code deleted first: removes noise before extraction work begins, shrinks diff surface area
+- SRP tab extraction happens after DRY extraction: tab sub-components import from shared module, so shared module must exist first
+- PERF lazy-mount implemented after SRP decomposition: only makes sense when tabs are standalone components with their own hook lifecycle
+- FIX bugs addressed in Phase 17 alongside PERF: same pass through the codebase, low risk changes
+
 ### Quick Tasks Completed
 
 | # | Description | Date | Commit |
@@ -122,6 +134,7 @@ Key decisions from v2.1 research (apply from Phase 12 onwards):
 
 - Phase 11.1 inserted after Phase 11: Fix tmux visibility when mobile keyboard opens (URGENT)
 - v2.1 roadmap created 2026-02-18: Phases 12-14 for GSD Manager Plugin
+- v2.2 roadmap created 2026-02-18: Phases 15-17 for Code Hygiene
 
 ### Pending Todos
 
@@ -134,10 +147,10 @@ None
 - Options: (1) read-only mobile terminal, (2) budget 2-3 weeks debugging, (3) defer mobile terminal
 - Research flag: Needs testing on real iOS/Android devices before implementation
 
-Phase 14 complete. No active blockers.
+No active blockers for v2.2.
 
 ## Session Continuity
 
 Last session: 2026-02-18
-Stopped at: Starting milestone v2.2 Code Hygiene
-Next step: Define requirements and create roadmap
+Stopped at: v2.2 roadmap created — Phases 15-17 defined
+Next step: `/gsd:plan-phase 15`
