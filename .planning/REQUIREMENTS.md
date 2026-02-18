@@ -3,9 +3,48 @@
 **Defined:** 2026-02-16
 **Core Value:** Real-time visibility into all active Claude Code agent sessions from a single browser tab
 
-## v2.1 Requirements
+## v2.2 Requirements
 
-Requirements for GSD Manager Plugin milestone. Each maps to roadmap phases.
+Requirements for Code Hygiene milestone. Pure refactor — zero feature changes, net-negative LOC.
+
+### Dead Code Removal
+
+- [ ] **DEAD-01**: Delete dead `GsdManagerPanelExpanded` component body from `gsd-manager-plugin.tsx` (keep only `DisabledPanel` export)
+- [ ] **DEAD-02**: Delete orphaned `AgentsView.tsx` (superseded by Agents tab in `GsdView.tsx`)
+
+### DRY — Shared Component Extraction
+
+- [ ] **DRY-01**: Extract `STATUS_COLORS`, `STATE_BADGE_COLORS`, `STATE_LABELS`, `PRESSURE_COLORS` constants to shared module
+- [ ] **DRY-02**: Extract `StateBadge`, `PressureIndicator`, `PhaseProgress`, `CopyButton`, `BashHint` components to shared module
+- [ ] **DRY-03**: Update all consumers (`GsdView.tsx`, remaining plugin code) to import from shared module
+
+### SRP — View Decomposition
+
+- [ ] **SRP-01**: Extract `AgentsTab` from `GsdView.tsx` into own component file
+- [ ] **SRP-02**: Extract `ControlsTab` from `GsdView.tsx` into own component file
+- [ ] **SRP-03**: Extract `RegistryTab` from `GsdView.tsx` into own component file
+- [ ] **SRP-04**: Extract `HooksTab` from `GsdView.tsx` into own component file
+- [ ] **SRP-05**: `GsdView.tsx` becomes thin shell: tab state + router, under 100 LOC
+
+### Types — Shared Type Unification
+
+- [ ] **TYPE-01**: Create `src/shared/gsdTypes.ts` with `RegistryAgent`, `GsdRegistry`, `AgentStateHint`, `PressureLevel`
+- [ ] **TYPE-02**: Update server imports (`gsdRoutes.ts`, `GsdRegistryService.ts`) to use shared types
+- [ ] **TYPE-03**: Update client imports (hooks, views) to use shared types
+
+### Performance — Lazy Tab Mounting
+
+- [ ] **PERF-01**: Conditionally render only the active GSD tab (lazy mount), so hooks only run when tab is visible
+- [ ] **PERF-02**: Verify polling stops when switching away from Agents/Controls tabs
+
+### Bug Fixes
+
+- [ ] **FIX-01**: Wrap `openSync`/`closeSync` in spawn handler with `try/finally` for fd safety
+- [ ] **FIX-02**: Clean up `setTimeout` calls in form handlers on component unmount
+- [ ] **FIX-03**: Stabilize `useAgentLiveStatus` Map reference to prevent unnecessary re-renders
+- [ ] **FIX-04**: Improve `extractContextPressure()` to reduce false positives (anchor to Claude status bar format)
+
+## v2.1 Requirements (Complete)
 
 ### Agent Grid
 
@@ -53,25 +92,8 @@ Requirements for GSD Manager Plugin milestone. Each maps to roadmap phases.
 ### Activity Timeline
 
 - [x] **ACTV-01**: System captures structured events (session start/stop, prompt injections, operator terminal input) in SQLite
-- [ ] **ACTV-02**: Operator can view chronological event list (newest first) in dedicated Activity view
-- [ ] **ACTV-03**: Operator can view event detail panel with full metadata
-- [ ] **ACTV-04**: Operator can filter activity by agent
-- [ ] **ACTV-05**: Operator can filter activity by date range
-- [ ] **ACTV-06**: Operator can filter activity by event type
-- [ ] **ACTV-07**: Operator can export activity events to CSV or JSON
 - [x] **ACTV-08**: System parses terminal output to extract structured events (tool calls, file edits, commands)
 - [x] **ACTV-09**: Events show success/failure indicators (parsed from exit codes, error patterns)
-- [ ] **ACTV-10**: Operator can click an event to jump to the terminal session at that timestamp
-
-### Mobile UI
-
-- [ ] **MOBI-01**: Dashboard renders full-width responsive layout from 375px to 1920px
-- [ ] **MOBI-02**: Agent details, session logs, and token usage render as collapsible accordion panels
-- [ ] **MOBI-03**: Prompt panel renders as bottom sheet on mobile (thumb-reachable)
-- [ ] **MOBI-04**: Terminal supports touch scrolling on mobile
-- [ ] **MOBI-05**: Layout uses mobile-first CSS with progressive enhancement via min-width breakpoints
-- [ ] **MOBI-06**: Operator can swipe between session tabs and pinch-to-zoom terminal on mobile
-- [ ] **MOBI-07**: All touch targets meet 44x44px minimum with safe area insets
 
 ## Future Requirements
 
@@ -115,10 +137,8 @@ Explicitly excluded. Documented to prevent scope creep.
 | Kill session button in plugin | Already exists in InstanceTabBar; duplication creates confusion |
 | Agent auto-wake toggle editing | Show as read-only; risk of accidentally disabling recovery |
 | Hook log SSE streaming | 5-second polling sufficient for single-operator scale |
-| Plugin auto-install from public registry | Security risk, scope creep — single-user internal tool |
-| Plugin marketplace | Requires hosting, moderation, legal complexity |
-| AI event summarization | API costs, unreliable for audit purposes |
-| Separate native mobile app | 3x dev cost, App Store distribution overhead |
+| Any new features | v2.2 is strictly refactor — no behavior changes |
+| detectAgentState() rewrite | Regex heuristics are fragile but functional; full rewrite deferred |
 
 ## Traceability
 
@@ -126,6 +146,25 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
+| DEAD-01 | — | Pending |
+| DEAD-02 | — | Pending |
+| DRY-01 | — | Pending |
+| DRY-02 | — | Pending |
+| DRY-03 | — | Pending |
+| SRP-01 | — | Pending |
+| SRP-02 | — | Pending |
+| SRP-03 | — | Pending |
+| SRP-04 | — | Pending |
+| SRP-05 | — | Pending |
+| TYPE-01 | — | Pending |
+| TYPE-02 | — | Pending |
+| TYPE-03 | — | Pending |
+| PERF-01 | — | Pending |
+| PERF-02 | — | Pending |
+| FIX-01 | — | Pending |
+| FIX-02 | — | Pending |
+| FIX-03 | — | Pending |
+| FIX-04 | — | Pending |
 | GRID-01 | Phase 13 | Complete |
 | GRID-02 | Phase 13 | Complete |
 | GRID-03 | Phase 14 | Complete |
@@ -151,10 +190,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | ACTV-09 | Phase 11 | Complete |
 
 **Coverage:**
-- v2.1 requirements: 14 total
-- Mapped to phases: 14
-- Unmapped: 0 ✓
+- v2.2 requirements: 19 total
+- Mapped to phases: 0 ⚠️
+- Unmapped: 19 ⚠️
 
 ---
 *Requirements defined: 2026-02-16*
-*Last updated: 2026-02-18 — v2.1 roadmap created, all 14 requirements mapped to phases 12-14*
+*Last updated: 2026-02-18 — v2.2 Code Hygiene requirements defined*
