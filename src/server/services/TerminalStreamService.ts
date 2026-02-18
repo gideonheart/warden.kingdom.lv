@@ -2,16 +2,17 @@ import * as pty from 'node-pty';
 import type { Server as SocketIOServer, Socket } from 'socket.io';
 import { activityEventService } from './ActivityEventService.js';
 
-interface ActiveTerminalStream {
+interface SharedPtySession {
   ptyProcess: pty.IPty;
-  socketId: string;
   sessionName: string;
   isAlive: boolean;
+  subscribers: Set<string>; // socket IDs viewing this session
 }
 
 export class TerminalStreamService {
-  private activeStreams: Map<string, ActiveTerminalStream> = new Map();
-  private sessionStreams: Map<string, Set<string>> = new Map();
+  private sessions: Map<string, SharedPtySession> = new Map(); // sessionName → shared PTY
+  private socketToSession: Map<string, string> = new Map(); // socketId → sessionName
+  private socketServer: SocketIOServer | null = null;
 
   setupSocketNamespace(socketServer: SocketIOServer): void {
     const terminalNamespace = socketServer.of('/terminal');
@@ -36,15 +37,24 @@ export class TerminalStreamService {
   }
 
   attachSocketToSession(socket: Socket, sessionName: string): void {
-    // Dedup: kill any existing PTY attachments for this tmux session
-    const existingSocketIds = this.sessionStreams.get(sessionName);
-    if (existingSocketIds) {
-      for (const existingSocketId of existingSocketIds) {
-        console.log(`[TerminalStream] Killing existing PTY for session ${sessionName} (was socket ${existingSocketId})`);
-        this.detachSocket(existingSocketId);
-      }
+    const existing = this.sessions.get(sessionName);
+
+    if (existing && existing.isAlive) {
+      // Reuse existing PTY — just add this socket as a subscriber
+      console.log(`[TerminalStream] Reusing existing PTY for session ${sessionName} (now ${existing.subscribers.size + 1} viewers)`);
+      existing.subscribers.add(socket.id);
+      this.socketToSession.set(socket.id, sessionName);
+
+      this.setupSocketInputHandlers(socket, existing);
+      return;
     }
 
+    // Clean up dead session if it exists
+    if (existing) {
+      this.cleanupSession(sessionName);
+    }
+
+    // Spawn new PTY for this tmux session
     const ptyProcess = pty.spawn('tmux', ['attach-session', '-t', sessionName], {
       name: 'xterm-256color',
       cols: 120,
@@ -52,8 +62,24 @@ export class TerminalStreamService {
       env: process.env as Record<string, string>,
     });
 
+    const session: SharedPtySession = {
+      ptyProcess,
+      sessionName,
+      isAlive: true,
+      subscribers: new Set([socket.id]),
+    };
+
+    this.sessions.set(sessionName, session);
+    this.socketToSession.set(socket.id, sessionName);
+
+    // Broadcast PTY output to ALL subscribers
     ptyProcess.onData((terminalOutput: string) => {
-      socket.emit('terminal:output', terminalOutput);
+      for (const subscriberId of session.subscribers) {
+        const subscriberSocket = this.findSocketById(subscriberId);
+        if (subscriberSocket) {
+          subscriberSocket.emit('terminal:output', terminalOutput);
+        }
+      }
       // Non-blocking side-channel tap for activity event parsing
       const agentId = sessionName.split('-')[0];
       setImmediate(() => {
@@ -62,108 +88,109 @@ export class TerminalStreamService {
     });
 
     ptyProcess.onExit(({ exitCode }) => {
-      const stream = this.activeStreams.get(socket.id);
-      if (stream) {
-        stream.isAlive = false;
-      }
-      socket.emit('terminal:exit', { sessionName, exitCode });
-      this.activeStreams.delete(socket.id);
+      session.isAlive = false;
 
-      // Flush and clear activity event buffers for this session
-      activityEventService.clearSessionBuffer(sessionName);
-
-      // Clean up session index on PTY exit
-      const socketIds = this.sessionStreams.get(sessionName);
-      if (socketIds) {
-        socketIds.delete(socket.id);
-        if (socketIds.size === 0) {
-          this.sessionStreams.delete(sessionName);
+      // Notify all subscribers
+      for (const subscriberId of session.subscribers) {
+        const subscriberSocket = this.findSocketById(subscriberId);
+        if (subscriberSocket) {
+          subscriberSocket.emit('terminal:exit', { sessionName, exitCode });
         }
       }
+
+      // Flush activity event buffers
+      activityEventService.clearSessionBuffer(sessionName);
+
+      // Clean up
+      for (const subscriberId of session.subscribers) {
+        this.socketToSession.delete(subscriberId);
+      }
+      this.sessions.delete(sessionName);
     });
 
+    this.setupSocketInputHandlers(socket, session);
+  }
+
+  private setupSocketInputHandlers(socket: Socket, session: SharedPtySession): void {
     socket.on('terminal:input', (userInput: string) => {
-      ptyProcess.write(userInput);
+      if (!session.isAlive) return;
+      session.ptyProcess.write(userInput);
       // Capture operator input as batched activity events
-      const agentId = sessionName.split('-')[0];
-      activityEventService.captureOperatorInput(sessionName, agentId, userInput);
+      const agentId = session.sessionName.split('-')[0];
+      activityEventService.captureOperatorInput(session.sessionName, agentId, userInput);
     });
 
     socket.on('terminal:resize', ({ cols, rows }: { cols: number; rows: number }) => {
-      const stream = this.activeStreams.get(socket.id);
-      if (!stream || !stream.isAlive) {
-        return;
-      }
+      if (!session.isAlive) return;
       try {
-        stream.ptyProcess.resize(cols, rows);
+        session.ptyProcess.resize(cols, rows);
       } catch (error: unknown) {
         const code = (error as NodeJS.ErrnoException).code;
         if (code === 'EBADF' || code === 'EINVAL' || code === 'EIO') {
           console.warn(`[TerminalStream] Ignoring resize error (${code}) for ${socket.id} — PTY likely exited`);
-          stream.isAlive = false;
+          session.isAlive = false;
         } else {
           console.error(`[TerminalStream] Unexpected resize error for ${socket.id}:`, error);
         }
       }
     });
-
-    this.activeStreams.set(socket.id, {
-      ptyProcess,
-      socketId: socket.id,
-      sessionName,
-      isAlive: true,
-    });
-
-    // Track socket in session index
-    if (!this.sessionStreams.has(sessionName)) {
-      this.sessionStreams.set(sessionName, new Set());
-    }
-    this.sessionStreams.get(sessionName)!.add(socket.id);
   }
 
   detachSocket(socketId: string): void {
-    const stream = this.activeStreams.get(socketId);
-    if (stream) {
-      stream.ptyProcess.kill();
-      this.activeStreams.delete(socketId);
+    const sessionName = this.socketToSession.get(socketId);
+    if (!sessionName) return;
 
-      // Flush and clear activity event buffers for this session
-      activityEventService.clearSessionBuffer(stream.sessionName);
+    this.socketToSession.delete(socketId);
 
-      // Clean up session index
-      const socketIds = this.sessionStreams.get(stream.sessionName);
-      if (socketIds) {
-        socketIds.delete(socketId);
-        if (socketIds.size === 0) {
-          this.sessionStreams.delete(stream.sessionName);
-        }
-      }
+    const session = this.sessions.get(sessionName);
+    if (!session) return;
+
+    session.subscribers.delete(socketId);
+
+    if (session.subscribers.size === 0) {
+      // Last viewer disconnected — kill the PTY
+      console.log(`[TerminalStream] Last viewer left session ${sessionName}, killing PTY`);
+      this.cleanupSession(sessionName);
+    } else {
+      console.log(`[TerminalStream] Viewer left session ${sessionName} (${session.subscribers.size} remaining)`);
     }
+  }
+
+  private cleanupSession(sessionName: string): void {
+    const session = this.sessions.get(sessionName);
+    if (!session) return;
+
+    if (session.isAlive) {
+      session.ptyProcess.kill();
+    }
+
+    activityEventService.clearSessionBuffer(sessionName);
+
+    for (const subscriberId of session.subscribers) {
+      this.socketToSession.delete(subscriberId);
+    }
+    this.sessions.delete(sessionName);
   }
 
   getActiveStreamCount(): number {
-    return this.activeStreams.size;
+    return this.sessions.size;
   }
 
   killAllPtyProcesses(): void {
-    console.log(`[TerminalStream] Killing ${this.activeStreams.size} active PTY processes`);
-    for (const [socketId, stream] of this.activeStreams.entries()) {
-      stream.ptyProcess.kill();
-      this.activeStreams.delete(socketId);
+    console.log(`[TerminalStream] Killing ${this.sessions.size} active PTY sessions`);
+    for (const [sessionName] of this.sessions) {
+      this.cleanupSession(sessionName);
     }
-    this.sessionStreams.clear();
   }
 
-  private socketServer: SocketIOServer | null = null;
+  setSocketServer(server: SocketIOServer): void {
+    this.socketServer = server;
+  }
 
   private findSocketById(socketId: string): Socket | undefined {
     if (!this.socketServer) return undefined;
     const namespace = this.socketServer.of('/terminal');
     return namespace.sockets.get(socketId);
-  }
-
-  setSocketServer(server: SocketIOServer): void {
-    this.socketServer = server;
   }
 }
 
