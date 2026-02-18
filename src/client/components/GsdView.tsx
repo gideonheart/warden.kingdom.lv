@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useGsdRegistry } from '../hooks/useGsdRegistry.js';
 import { useGsdHookFeed } from '../hooks/useGsdHookFeed.js';
 import { useActiveInstances } from '../hooks/useActiveInstances.js';
@@ -202,6 +202,13 @@ export function GsdView() {
   const [commandText, setCommandText] = useState('');
   const [isDispatching, setIsDispatching] = useState(false);
   const [dispatchStatus, setDispatchStatus] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Default target session to first active instance
+  useEffect(() => {
+    if (!targetSession && activeInstances.length > 0) {
+      setTargetSession(activeInstances[0].tmuxSessionName);
+    }
+  }, [targetSession, activeInstances]);
 
   const handleSpawn = useCallback(async () => {
     if (!agentName || !workdir) return;
@@ -452,18 +459,13 @@ export function GsdView() {
               <div className="flex flex-wrap gap-3 items-end">
                 <div className="flex flex-col gap-1">
                   <label className="text-sm text-warden-text-dim">Target Session</label>
-                  <select
+                  <SearchableSelect
                     value={targetSession}
-                    onChange={(event) => setTargetSession(event.target.value)}
+                    onChange={setTargetSession}
+                    options={activeInstances.map((instance) => instance.tmuxSessionName)}
+                    placeholder="Select session"
                     className="bg-warden-bg border border-warden-border text-warden-text text-sm px-3 py-1.5 rounded w-52"
-                  >
-                    <option value="">-- select session --</option>
-                    {activeInstances.map((instance) => (
-                      <option key={instance.tmuxSessionName} value={instance.tmuxSessionName}>
-                        {instance.tmuxSessionName}
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </div>
                 <div className="flex flex-col gap-1">
                   <label className="text-sm text-warden-text-dim">Command</label>
