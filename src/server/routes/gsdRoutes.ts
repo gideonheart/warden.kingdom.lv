@@ -21,6 +21,94 @@ const WORKDIR_PREFIX = '/home/forge/';
 
 const router = Router();
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Live-status types and helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+type AgentStateHint = 'working' | 'idle' | 'menu' | 'permission_prompt' | 'error';
+type PressureLevel = 'ok' | 'warning' | 'critical';
+
+function detectAgentState(pane: string): AgentStateHint {
+  if (/enter to select|numbered.*option/i.test(pane)) return 'menu';
+  if (/permission|allow|dangerous/i.test(pane)) return 'permission_prompt';
+  if (/what can i help|waiting for/i.test(pane)) return 'idle';
+  const lines = pane.split('\n');
+  for (const line of lines) {
+    if (/error|failed|exception/i.test(line) && !/error handling/i.test(line)) {
+      return 'error';
+    }
+  }
+  return 'working';
+}
+
+function extractContextPressure(pane: string): { contextPressure: number | null; contextPressureLevel: PressureLevel | null } {
+  const nonEmptyLines = pane.split('\n').filter((line) => line.trim().length > 0);
+  const lastFiveLines = nonEmptyLines.slice(-5).join('\n');
+  const match = /(\d{1,3})%/.exec(lastFiveLines);
+  if (!match) {
+    return { contextPressure: null, contextPressureLevel: null };
+  }
+  const percentage = parseInt(match[1], 10);
+  const level: PressureLevel = percentage >= 80 ? 'critical' : percentage >= 50 ? 'warning' : 'ok';
+  return { contextPressure: percentage, contextPressureLevel: level };
+}
+
+// GET /api/gsd/agents/live-status — capture tmux pane and return agent state + context pressure
+router.get('/api/gsd/agents/live-status', async (_request, response) => {
+  try {
+    const registry = await gsdRegistryService.getRegistry();
+
+    const results = await Promise.allSettled(
+      registry.agents.map(async (agent) => {
+        if (!agent.tmux_session_name) {
+          return {
+            agentId: agent.agent_id,
+            sessionName: agent.tmux_session_name,
+            state: null as AgentStateHint | null,
+            contextPressure: null as number | null,
+            contextPressureLevel: null as PressureLevel | null,
+          };
+        }
+
+        try {
+          const { stdout } = await execFileAsync('tmux', [
+            'capture-pane', '-pt', `${agent.tmux_session_name}:0.0`, '-S', '-5',
+          ]);
+          const state = detectAgentState(stdout);
+          const { contextPressure, contextPressureLevel } = extractContextPressure(stdout);
+          return {
+            agentId: agent.agent_id,
+            sessionName: agent.tmux_session_name,
+            state,
+            contextPressure,
+            contextPressureLevel,
+          };
+        } catch {
+          // Dead session — return nulls
+          return {
+            agentId: agent.agent_id,
+            sessionName: agent.tmux_session_name,
+            state: null as AgentStateHint | null,
+            contextPressure: null as number | null,
+            contextPressureLevel: null as PressureLevel | null,
+          };
+        }
+      }),
+    );
+
+    const agents = results.map((result) =>
+      result.status === 'fulfilled'
+        ? result.value
+        : { agentId: '', sessionName: null, state: null, contextPressure: null, contextPressureLevel: null },
+    );
+
+    response.json({ agents });
+  } catch (error) {
+    console.error('[GsdRoutes] Failed to get live status:', error);
+    response.status(500).json({ error: 'Failed to get live status' });
+  }
+});
+
 // GET /api/gsd/registry — return full registry JSON
 router.get('/api/gsd/registry', async (_request, response) => {
   try {
