@@ -104,9 +104,19 @@ export function ActivityView({ onNavigateToSession }: ActivityViewProps) {
   // Fetch event types once on mount
   useEffect(() => {
     fetch('/api/activity/event-types')
-      .then((res) => (res.ok ? res.json() : { types: [] }))
-      .then((data: { types: string[] }) => setEventTypes(data.types))
-      .catch((err) => console.error('Failed to fetch event types:', err));
+      .then((res) => (res.ok ? res.json() : { eventTypes: [] }))
+      .then((data: { eventTypes?: string[]; types?: string[] }) => {
+        const normalizedEventTypes = Array.isArray(data.eventTypes)
+          ? data.eventTypes
+          : Array.isArray(data.types)
+            ? data.types
+            : [];
+        setEventTypes(normalizedEventTypes);
+      })
+      .catch((err) => {
+        console.error('Failed to fetch event types:', err);
+        setEventTypes([]);
+      });
   }, []);
 
   useEffect(() => {
