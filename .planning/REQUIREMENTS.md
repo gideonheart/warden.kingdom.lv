@@ -1,11 +1,45 @@
-# Requirements: Warden Dashboard v2.0
+# Requirements: Warden Dashboard
 
 **Defined:** 2026-02-16
 **Core Value:** Real-time visibility into all active Claude Code agent sessions from a single browser tab
 
-## v2.0 Requirements
+## v2.1 Requirements
 
-Requirements for v2.0 Mission Control milestone. Each maps to roadmap phases.
+Requirements for GSD Manager Plugin milestone. Each maps to roadmap phases.
+
+### Agent Grid
+
+- [ ] **GRID-01**: Operator can view all managed agents in a grid showing session status (active/idle/stopped)
+- [ ] **GRID-02**: Operator can see each agent's working directory in the grid
+- [ ] **GRID-03**: Operator can see a state hint badge per agent (idle/menu/working/error) derived from hook activity
+- [ ] **GRID-04**: Operator can see a context pressure level per agent (percentage)
+- [ ] **GRID-05**: Operator can see current phase number and progress percentage from STATE.md per agent
+
+### Agent Control
+
+- [ ] **CTRL-01**: Operator can spawn a new GSD agent session from the UI with agent name, working directory, and optional first command
+- [ ] **CTRL-02**: Operator can send any custom command to a running agent's tmux session
+
+### Registry Management
+
+- [ ] **REG-01**: Operator can view all agents in the recovery registry with their configuration
+- [ ] **REG-02**: Operator can toggle an agent's enabled/disabled status from the UI
+
+### Hook Activity
+
+- [ ] **HOOK-01**: Operator can see a live feed of the last 20 hook events streamed via Socket.IO
+
+### Developer Experience
+
+- [ ] **DX-01**: Every UI action displays the equivalent manual bash command with copy-to-clipboard
+
+### Infrastructure
+
+- [ ] **INFRA-01**: Server exposes REST endpoints for registry, spawn, command dispatch, state, and hook log operations
+- [ ] **INFRA-02**: Server exposes a Socket.IO namespace for real-time hook event push
+- [ ] **INFRA-03**: All endpoints validate input to prevent shell injection and path traversal
+
+## v2.0 Requirements (Complete)
 
 ### Plugin Registry
 
@@ -43,6 +77,20 @@ Requirements for v2.0 Mission Control milestone. Each maps to roadmap phases.
 
 Deferred to future release. Tracked but not in current roadmap.
 
+### Agent Control
+
+- **CTRL-03**: Preset GSD slash commands with one-click dispatch (resume-work, quick, new-milestone, execute-phase, plan-phase, progress)
+- **CTRL-04**: Command success/error feedback inline in the UI
+- **CTRL-05**: Spawn auto-detects first command based on project state (mirrors spawn.sh choose_first_cmd logic)
+
+### Agent Monitoring
+
+- **GRID-06**: Session selector pre-loads from active terminal tab to reduce wrong-agent friction
+
+### Hook Activity
+
+- **HOOK-02**: Per-agent hook feed filtering (client-side filter on log lines by session name)
+
 ### Plugin Ecosystem
 
 - **PLUG-F01**: Auto-install plugins from a registry URL
@@ -57,14 +105,20 @@ Deferred to future release. Tracked but not in current roadmap.
 
 ## Out of Scope
 
+Explicitly excluded. Documented to prevent scope creep.
+
 | Feature | Reason |
 |---------|--------|
+| Inline JSON editing of recovery-registry.json | Fragile; concurrent writes dangerous; PATCH for discrete fields only |
+| Editing STATE.md or PROJECT.md from UI | PRD non-goal; breaks GSD tracking assumptions |
+| Real-time terminal pane in plugin panel | Duplicates terminal view; doubles PTY resources |
+| Kill session button in plugin | Already exists in InstanceTabBar; duplication creates confusion |
+| Agent auto-wake toggle editing | Show as read-only; risk of accidentally disabling recovery |
+| Hook log SSE streaming | 5-second polling sufficient for single-operator scale |
 | Plugin auto-install from public registry | Security risk, scope creep — single-user internal tool |
 | Plugin marketplace | Requires hosting, moderation, legal complexity |
 | AI event summarization | API costs, unreliable for audit purposes |
 | Separate native mobile app | 3x dev cost, App Store distribution overhead |
-| Predictive touch input (Mosh pattern) | High complexity, conflicts with Socket.IO transport |
-| Blockchain-backed immutable logs | Massive overkill for single-user tool |
 
 ## Traceability
 
@@ -72,35 +126,35 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| PLUG-01 | Phase 9 | Done |
-| PLUG-02 | Phase 9 | Done |
-| PLUG-03 | Phase 9 | Done |
-| PLUG-04 | Phase 9 | Done |
-| PLUG-05 | Phase 9 | Done |
-| PLUG-06 | Phase 9 | Done |
-| MOBI-01 | Phase 10 | Pending |
-| MOBI-02 | Phase 10 | Pending |
-| MOBI-03 | Phase 10 | Pending |
-| MOBI-04 | Phase 10 | Pending |
-| MOBI-05 | Phase 10 | Pending |
-| MOBI-06 | Phase 10 | Pending |
-| MOBI-07 | Phase 10 | Pending |
+| GRID-01 | — | Pending |
+| GRID-02 | — | Pending |
+| GRID-03 | — | Pending |
+| GRID-04 | — | Pending |
+| GRID-05 | — | Pending |
+| CTRL-01 | — | Pending |
+| CTRL-02 | — | Pending |
+| REG-01 | — | Pending |
+| REG-02 | — | Pending |
+| HOOK-01 | — | Pending |
+| DX-01 | — | Pending |
+| INFRA-01 | — | Pending |
+| INFRA-02 | — | Pending |
+| INFRA-03 | — | Pending |
+| PLUG-01 | Phase 9 | Complete |
+| PLUG-02 | Phase 9 | Complete |
+| PLUG-03 | Phase 9 | Complete |
+| PLUG-04 | Phase 9 | Complete |
+| PLUG-05 | Phase 9 | Complete |
+| PLUG-06 | Phase 9 | Complete |
 | ACTV-01 | Phase 11 | Complete |
-| ACTV-02 | Phase 11 | Pending |
-| ACTV-03 | Phase 11 | Pending |
-| ACTV-04 | Phase 11 | Pending |
-| ACTV-05 | Phase 11 | Pending |
-| ACTV-06 | Phase 11 | Pending |
-| ACTV-07 | Phase 11 | Pending |
 | ACTV-08 | Phase 11 | Complete |
 | ACTV-09 | Phase 11 | Complete |
-| ACTV-10 | Phase 11 | Pending |
 
 **Coverage:**
-- v2.0 requirements: 23 total
-- Mapped to phases: 23/23 (100%)
-- Unmapped: 0
+- v2.1 requirements: 14 total
+- Mapped to phases: 0
+- Unmapped: 14 ⚠️
 
 ---
 *Requirements defined: 2026-02-16*
-*Last updated: 2026-02-17 after Phase 9 completion*
+*Last updated: 2026-02-18 after v2.1 milestone requirements definition*
