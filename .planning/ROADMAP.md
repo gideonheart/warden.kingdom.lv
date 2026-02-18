@@ -184,4 +184,4 @@ See `.planning/milestones/v1.1-ROADMAP.md`
 | 11. Activity Timeline & Audit Log | v2.0 | 2/2 | Complete | 2026-02-18 |
 | 12. Backend Foundation | 2/2 | Complete    | 2026-02-18 | - |
 | 13. Client Plugin | 1/1 | Complete    | 2026-02-18 | - |
-| 14. Enhanced Agent Visibility | 1/1 | Complete   | 2026-02-18 | - |
+| 14. Enhanced Agent Visibility | 1/1 | Complete    | 2026-02-18 | - |
