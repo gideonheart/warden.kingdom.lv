@@ -1,8 +1,11 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import type { PluginManifest, PluginModule } from '@shared/pluginTypes.js';
 import { useGsdRegistry } from '../hooks/useGsdRegistry.js';
 import { useGsdHookFeed } from '../hooks/useGsdHookFeed.js';
 import { useActiveInstances } from '../hooks/useActiveInstances.js';
+import { useAgentLiveStatus } from '../hooks/useAgentLiveStatus.js';
+import { useAgentStateFiles } from '../hooks/useAgentStateFiles.js';
+import type { AgentStateHint, PressureLevel } from '../hooks/useAgentLiveStatus.js';
 
 const manifest = {
   id: 'gsd-manager',
@@ -63,6 +66,62 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Live-status helper components
+// ─────────────────────────────────────────────────────────────────────────────
+
+const STATE_BADGE_COLORS: Record<AgentStateHint, string> = {
+  working: 'bg-warden-accent text-white',
+  idle: 'bg-warden-idle text-white',
+  menu: 'bg-warden-warning text-warden-bg',
+  permission_prompt: 'bg-warden-warning text-warden-bg',
+  error: 'bg-warden-error text-white',
+};
+
+const STATE_LABELS: Record<AgentStateHint, string> = {
+  working: 'working',
+  idle: 'idle',
+  menu: 'menu',
+  permission_prompt: 'perm',
+  error: 'error',
+};
+
+function StateBadge({ state }: { state: AgentStateHint | null }) {
+  if (state === null) {
+    return <span className="text-warden-text-dim">—</span>;
+  }
+  const colorClass = STATE_BADGE_COLORS[state];
+  const label = STATE_LABELS[state];
+  return (
+    <span className={`px-1.5 py-0.5 rounded text-xs font-mono ${colorClass}`}>{label}</span>
+  );
+}
+
+const PRESSURE_COLORS: Record<PressureLevel, string> = {
+  ok: 'text-warden-success',
+  warning: 'text-warden-warning',
+  critical: 'text-warden-error',
+};
+
+function PressureIndicator({ percentage, level }: { percentage: number | null; level: PressureLevel | null }) {
+  if (percentage === null) {
+    return <span className="text-warden-text-dim">—</span>;
+  }
+  const colorClass = level ? PRESSURE_COLORS[level] : 'text-warden-text-dim';
+  return <span className={`font-mono ${colorClass}`}>{percentage}%</span>;
+}
+
+function PhaseProgress({ phase, progress }: { phase: string | null; progress: number | null }) {
+  if (phase === null && progress === null) {
+    return <span className="text-warden-text-dim">—</span>;
+  }
+  return (
+    <span className="font-mono text-warden-text-dim">
+      P{phase}{progress !== null ? ` ${progress}%` : ''}
+    </span>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Tab definitions
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -84,6 +143,12 @@ function GsdManagerPanelExpanded() {
   const { registry, isLoading: registryLoading, error: registryError, toggleEnabled, getEffectiveEnabled } = useGsdRegistry();
   const { hookEvents } = useGsdHookFeed();
   const { instances } = useActiveInstances();
+  const liveStatus = useAgentLiveStatus();
+  const sessionNames = useMemo(
+    () => (registry?.agents ?? []).filter((a) => a.tmux_session_name).map((a) => a.tmux_session_name),
+    [registry],
+  );
+  const stateFiles = useAgentStateFiles(sessionNames);
 
   // Spawn form state
   const [agentName, setAgentName] = useState('');
@@ -194,7 +259,9 @@ function GsdManagerPanelExpanded() {
                     <th className="text-left py-1 pr-3 font-normal">Status</th>
                     <th className="text-left py-1 pr-3 font-normal">Agent ID</th>
                     <th className="text-left py-1 pr-3 font-normal">Session</th>
-                    <th className="text-left py-1 pr-3 font-normal">Working Dir</th>
+                    <th className="text-left py-1 pr-3 font-normal">State</th>
+                    <th className="text-left py-1 pr-3 font-normal">Ctx</th>
+                    <th className="text-left py-1 pr-3 font-normal">Phase</th>
                     <th className="text-left py-1 font-normal">Enabled</th>
                   </tr>
                 </thead>
@@ -207,10 +274,8 @@ function GsdManagerPanelExpanded() {
                     const statusColor = STATUS_COLORS[status] ?? 'bg-warden-error';
                     const effectiveEnabled = getEffectiveEnabled(agent.agent_id, agent.enabled);
                     const workingDir = agent.working_directory;
-                    const displayDir =
-                      workingDir.length > 30
-                        ? '...' + workingDir.slice(-30)
-                        : workingDir;
+                    const agentStatus = liveStatus.get(agent.agent_id);
+                    const stateInfo = agent.tmux_session_name ? stateFiles.get(agent.tmux_session_name) : undefined;
 
                     return (
                       <tr key={agent.agent_id} className="border-b border-warden-border/40 hover:bg-warden-panel/50">
@@ -222,7 +287,15 @@ function GsdManagerPanelExpanded() {
                         </td>
                         <td className="py-1 pr-3 font-mono">{agent.agent_id}</td>
                         <td className="py-1 pr-3 font-mono text-warden-text-dim">{agent.tmux_session_name || '—'}</td>
-                        <td className="py-1 pr-3 font-mono text-warden-text-dim" title={workingDir}>{displayDir}</td>
+                        <td className="py-1 pr-3">
+                          <StateBadge state={agentStatus?.state ?? null} />
+                        </td>
+                        <td className="py-1 pr-3">
+                          <PressureIndicator percentage={agentStatus?.contextPressure ?? null} level={agentStatus?.contextPressureLevel ?? null} />
+                        </td>
+                        <td className="py-1 pr-3" title={workingDir}>
+                          <PhaseProgress phase={stateInfo?.phase ?? null} progress={stateInfo?.progress ?? null} />
+                        </td>
                         <td className="py-1">
                           <button
                             onClick={() => toggleEnabled(agent.agent_id, effectiveEnabled)}
