@@ -18,16 +18,54 @@ function stripAnsi(input: string): string {
 //  - OSC color responses: "gb:e2e2/e8e8/f0f0\gb:..." (kitty/sixel color queries)
 //  - Mode query responses: "?1;2$y", "?2004;2$y"
 //  - Orphaned ESC+backslash (OSC String Terminators): \x1b\x5c
-const TERMINAL_NOISE_RE = /(?:\d+;\d+;\d+[Mm])+|(?:>?\d+;\d+;\d+c)|gb:[0-9a-f/\\]+|(?:\?\d+(?:;\d+)*\$y)|\x1b\\/g;
+//  - Partial mouse report fragments: trailing "65;1" or ";1M" after batch split
+//  - Device status report prefix: "is" before device attribute response
+const TERMINAL_NOISE_RE = /(?:\d+;\d+;\d+[Mm])+|(?:>?\d+;\d+;\d+c)|gb:[0-9a-f/\\]+|(?:\?\d+(?:;\d+)*\$y)|\x1b\\|\[lost tty\]/g;
 
 function stripTerminalNoise(input: string): string {
-  return input.replace(TERMINAL_NOISE_RE, '');
+  let result = input.replace(TERMINAL_NOISE_RE, '');
+  // Second pass: clean up partial mouse/device fragments left by batch splitting.
+  // After stripping complete patterns, residual fragments like "65;1", ";1M", "0c" may remain.
+  // Only match sequences containing semicolons (to avoid stripping standalone numbers).
+  result = result.replace(/(?:^|(?<=\s))(?:\d+;)+\d*[Mm]?|(?:^|(?<=\s))\d+(?:;\d+)+[Mm]?/g, '');
+  result = result.replace(/^[;Mm\d]+$/gm, '');
+  return result;
+}
+
+// Heuristic: detect if a string is predominantly terminal noise rather than human text.
+// Used as a final gate before DB writes to catch patterns the regex missed.
+function isLikelyNoise(input: string): boolean {
+  if (!input || !input.trim()) return true;
+  const trimmed = input.trim();
+  // Pure digit-semicolon-M/m sequences (mouse reports and fragments thereof)
+  if (/^[\d;Mmc\s]+$/.test(trimmed)) return true;
+  // Dominated by noise characters: if >60% of chars are digits, semicolons, or M/m
+  const noiseChars = (trimmed.match(/[\d;Mmc]/g) || []).length;
+  if (trimmed.length > 5 && noiseChars / trimmed.length > 0.6) return true;
+  // Known terminal noise prefixes/patterns
+  if (/^(?:>?\d+;\d+;\d+[cm]|gb:|is\d|;\d+[Mm])/.test(trimmed)) return true;
+  return false;
 }
 
 // Claude Code terminal output patterns — verified from live tmux capture 2026-02-17
 // Markers: ● (U+25CF BLACK CIRCLE), ⏺ (U+23FA BLACK CIRCLE FOR RECORD), ⎿ (U+23BF BOTTOM LEFT CORNER)
-// Tool name must be a single PascalCase/camelCase identifier (letters only, starting uppercase)
-// to avoid matching TUI summary lines like "Read 1 file (ctrl+o to expand)".
+//
+// IMPORTANT: TOOL_CALL_RE uses an explicit allowlist of known Claude Code tool names
+// to prevent false positives from TUI summary lines. When Claude Code adds new tools,
+// add them to KNOWN_TOOL_NAMES below.
+//
+// Why allowlist instead of pattern matching:
+// Claude's TUI renders tool result summaries like "⏺ Searched for 1 pattern (ctrl+o to expand)"
+// After ANSI/cursor-movement stripping, spaces and digits can be removed, producing
+// "Searchedforpattern(ctrl+otoexpand)" which matches any PascalCase+parens pattern.
+// An allowlist ensures only actual tool invocations are captured.
+const KNOWN_TOOL_NAMES = new Set([
+  'Read', 'Write', 'Edit', 'MultiEdit',
+  'Bash', 'Glob', 'Grep',
+  'Task', 'Skill', 'TodoRead', 'TodoWrite',
+  'WebSearch', 'WebFetch',
+  'Update', // alias for Write in some contexts
+]);
 const TOOL_CALL_RE = /^[●⏺]\s+([A-Z][a-zA-Z]*)\((.{0,200})\)/m;
 const FILE_EDIT_SUCCESS_RE = /^[⎿]\s+(?:Updated|Created|Wrote)\s+(.{1,200})/m;
 const RESULT_ERROR_RE = /^[⎿]\s+Error:/m;
@@ -246,6 +284,11 @@ class ActivityEventService {
     // Final cleanup: strip any terminal noise that accumulated in the batch buffer
     const cleaned = stripTerminalNoise(buffer).trim();
     if (!cleaned) return;
+
+    // Final noise gate: reject content that is predominantly terminal control residue.
+    // This catches partial fragments and patterns that survive regex stripping.
+    if (isLikelyNoise(cleaned)) return;
+
     try {
       const instanceId = this.resolveInstanceId(sessionName);
       const truncated = cleaned.slice(0, MAX_PROMPT_DETAIL_LENGTH);
@@ -277,7 +320,7 @@ class ActivityEventService {
   private parseAndCaptureEvents(sessionName: string, agentId: string, text: string): void {
     // Tool call: ● ToolName(args) or ⏺ ToolName(args)
     const toolMatch = TOOL_CALL_RE.exec(text);
-    if (toolMatch) {
+    if (toolMatch && KNOWN_TOOL_NAMES.has(toolMatch[1])) {
       // If there's a pending tool_call that was never resolved by an explicit result
       // indicator, assume it succeeded — no error was detected before the next tool started.
       // This handles tools like Read/Grep/Glob that produce output but no explicit
