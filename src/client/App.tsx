@@ -8,17 +8,18 @@ import { HistoryView } from './components/HistoryView.js';
 import { PluginRegistryView } from './components/PluginRegistryView.js';
 import { PluginSlotRenderer } from './components/PluginSlotRenderer.js';
 import { MobilePromptSheet } from './components/MobilePromptSheet.js';
+import { AgentsView } from './components/AgentsView.js';
 import { useActiveInstances } from './hooks/useActiveInstances.js';
 import { useAgentConfig } from './hooks/useAgentConfig.js';
 import { usePluginRegistry } from './hooks/usePluginRegistry.js';
 
-type AppView = 'terminals' | 'history' | 'plugins';
+type AppView = 'terminals' | 'history' | 'plugins' | 'agents';
 
 function parseHash(): { view: AppView; session: string | null } {
   const hash = window.location.hash.replace(/^#/, '');
   const params = new URLSearchParams(hash);
   const viewParam = params.get('view');
-  const view: AppView = viewParam === 'history' ? 'history' : viewParam === 'plugins' ? 'plugins' : 'terminals';
+  const view: AppView = viewParam === 'history' ? 'history' : viewParam === 'plugins' ? 'plugins' : viewParam === 'agents' ? 'agents' : 'terminals';
   const session = params.get('session') || null;
   return { view, session };
 }
@@ -192,6 +193,12 @@ export function App() {
             History
           </button>
           <button
+            onClick={() => handleViewChange('agents')}
+            className={`px-2 py-1 min-h-[44px] text-xs transition-colors flex items-center ${currentView === 'agents' ? 'text-warden-accent' : 'text-warden-text-dim hover:text-warden-text'}`}
+          >
+            Agents
+          </button>
+          <button
             onClick={() => handleViewChange('plugins')}
             className={`px-2 py-1 min-h-[44px] text-xs transition-colors flex items-center ${currentView === 'plugins' ? 'text-warden-accent' : 'text-warden-text-dim hover:text-warden-text'}`}
           >
@@ -202,7 +209,7 @@ export function App() {
             onClick={() => setShowSidebar(!showSidebar)}
             className={`px-2 py-1 text-xs transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center ${showSidebar ? 'text-warden-accent' : 'text-warden-text-dim hover:text-warden-text'}`}
           >
-            Agents
+            Sidebar
           </button>
           <button
             onClick={refetch}
@@ -244,6 +251,12 @@ export function App() {
                 History
               </button>
               <button
+                onClick={() => { handleViewChange('agents'); setShowMobileMenu(false); }}
+                className={`w-full text-left px-4 py-3 min-h-[44px] text-sm transition-colors ${currentView === 'agents' ? 'text-warden-accent bg-warden-accent/10' : 'text-warden-text-dim hover:text-warden-text hover:bg-warden-border/30'}`}
+              >
+                Agents
+              </button>
+              <button
                 onClick={() => { handleViewChange('plugins'); setShowMobileMenu(false); }}
                 className={`w-full text-left px-4 py-3 min-h-[44px] text-sm transition-colors ${currentView === 'plugins' ? 'text-warden-accent bg-warden-accent/10' : 'text-warden-text-dim hover:text-warden-text hover:bg-warden-border/30'}`}
               >
@@ -254,7 +267,7 @@ export function App() {
                 onClick={() => { setShowSidebar(!showSidebar); setShowMobileMenu(false); }}
                 className={`w-full text-left px-4 py-3 min-h-[44px] text-sm transition-colors ${showSidebar ? 'text-warden-accent bg-warden-accent/10' : 'text-warden-text-dim hover:text-warden-text hover:bg-warden-border/30'}`}
               >
-                Agents
+                Sidebar
               </button>
               <button
                 onClick={() => { refetch(); setShowMobileMenu(false); }}
@@ -309,6 +322,8 @@ export function App() {
                 <PluginSlotRenderer slot="terminal-overlay" enabledPlugins={enabledPlugins} />
               </div>
             </div>
+          ) : currentView === 'agents' ? (
+            <AgentsView />
           ) : currentView === 'plugins' ? (
             <PluginRegistryView plugins={plugins} enabledState={enabledState} onToggle={togglePlugin} />
           ) : (
