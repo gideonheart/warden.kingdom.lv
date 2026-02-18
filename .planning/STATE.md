@@ -6,14 +6,14 @@ See: .planning/PROJECT.md (updated 2026-02-18)
 
 **Core value:** Real-time visibility into all active Claude Code agent sessions from a single browser tab
 
-**Current focus:** v2.1 GSD Manager — Phase 13: Client Plugin (complete)
+**Current focus:** v2.1 GSD Manager — Phase 14: Enhanced Agent Visibility (complete)
 
 ## Current Position
 
-Phase: 13 — Client Plugin
+Phase: 14 — Enhanced Agent Visibility
 Plan: 01 complete (of 1)
-Status: Phase complete — ready for Phase 14
-Last activity: 2026-02-18 — Plan 01 complete: GSD Manager plugin (4-tab, bottom-panel, auto-registered)
+Status: Phase complete — v2.1 complete
+Last activity: 2026-02-18 — Plan 01 complete: Live agent state badges, context pressure, and GSD phase/progress in Agents grid
 
 Progress: [███████░░░] 70%
 
@@ -59,6 +59,7 @@ Progress: [███████░░░] 70%
 | 11.1 | Fix tmux visibility when mobile keyboard opens | v2.0 | `b6e0de0` |
 | 12 | Backend Foundation (GSD Registry + Hooks + Routes) | v2.1 | `96be120` |
 | 13 | Client Plugin (GSD Manager 4-tab panel) | v2.1 | `648a5dd` |
+| 14 | Enhanced Agent Visibility (live state, ctx pressure, GSD phase) | v2.1 | `01b447f` |
 
 ## Accumulated Context
 
@@ -98,6 +99,9 @@ Key decisions from v2.1 research (apply from Phase 12 onwards):
 - [Phase 13]: Hooks extracted to src/client/hooks/ (not co-located in plugin) because plugin grew to 481 LOC; separation keeps plugin file focused on rendering
 - [Phase 13]: Panel starts collapsed (isExpanded=false) — GsdManagerPanelExpanded conditionally rendered so Socket.IO and polling hooks never activate until operator expands
 - [Phase 13]: useActiveInstances() called directly inside plugin per zero-props PanelComponent contract; no need to extend PluginSlotRenderer
+- [Phase 14]: Promise.allSettled for live-status: parallel tmux captures with per-agent error isolation — dead sessions return nulls
+- [Phase 14]: extractContextPressure reads last 5 non-empty pane lines to capture Claude Code status bar percentage
+- [Phase 14]: sessionNames.join(',') as stable useEffect dependency key in useAgentStateFiles — avoids re-registering intervals on every render
 
 ### Quick Tasks Completed
 
@@ -124,13 +128,10 @@ None
 - Options: (1) read-only mobile terminal, (2) budget 2-3 weeks debugging, (3) defer mobile terminal
 - Research flag: Needs testing on real iOS/Android devices before implementation
 
-**Phase 14 research flag:**
-- Hook log format for context pressure percentage (e.g., "72% [WARNING/CRITICAL]") not confirmed from a live pressure event during research
-- Before planning Phase 14, sample a live `/tmp/gsd-hooks.log` line containing a pressure event to confirm exact regex pattern
-- PanelComponent receives no props by contract; if session selector needs active tab context, evaluate whether fetching instances in hook is sufficient before extending PluginSlotRenderer — RESOLVED in Phase 13: useActiveInstances() in plugin is sufficient
+Phase 14 complete. No active blockers.
 
 ## Session Continuity
 
 Last session: 2026-02-18
-Stopped at: Completed 13-01-PLAN.md — Phase 13 Client Plugin complete
-Next step: /gsd:research-phase 14
+Stopped at: Completed 14-01-PLAN.md — Phase 14 Enhanced Agent Visibility complete
+Next step: v2.1 complete — plan next features or ship

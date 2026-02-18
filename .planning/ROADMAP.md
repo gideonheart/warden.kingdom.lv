@@ -44,7 +44,7 @@
 
 - [x] **Phase 12: Backend Foundation** - Types, services, REST API, and Socket.IO namespace for GSD operations with full input validation (completed 2026-02-18)
 - [x] **Phase 13: Client Plugin** - Self-registering gsd-manager-plugin with agent grid, spawn form, command dispatch, registry viewer, hook feed, and inline bash reference (completed 2026-02-18)
-- [ ] **Phase 14: Enhanced Agent Visibility** - State hint badges, context pressure indicators, and STATE.md phase/progress per agent
+- [x] **Phase 14: Enhanced Agent Visibility** - State hint badges, context pressure indicators, and STATE.md phase/progress per agent (completed 2026-02-18)
 
 ## Phase Details
 
@@ -184,4 +184,4 @@ See `.planning/milestones/v1.1-ROADMAP.md`
 | 11. Activity Timeline & Audit Log | v2.0 | 2/2 | Complete | 2026-02-18 |
 | 12. Backend Foundation | 2/2 | Complete    | 2026-02-18 | - |
 | 13. Client Plugin | 1/1 | Complete    | 2026-02-18 | - |
-| 14. Enhanced Agent Visibility | v2.1 | 0/? | Not started | - |
+| 14. Enhanced Agent Visibility | 1/1 | Complete   | 2026-02-18 | - |

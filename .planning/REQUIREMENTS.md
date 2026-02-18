@@ -11,9 +11,9 @@ Requirements for GSD Manager Plugin milestone. Each maps to roadmap phases.
 
 - [x] **GRID-01**: Operator can view all managed agents in a grid showing session status (active/idle/stopped)
 - [x] **GRID-02**: Operator can see each agent's working directory in the grid
-- [ ] **GRID-03**: Operator can see a state hint badge per agent (idle/menu/working/error) derived from hook activity
-- [ ] **GRID-04**: Operator can see a context pressure level per agent (percentage)
-- [ ] **GRID-05**: Operator can see current phase number and progress percentage from STATE.md per agent
+- [x] **GRID-03**: Operator can see a state hint badge per agent (idle/menu/working/error) derived from hook activity
+- [x] **GRID-04**: Operator can see a context pressure level per agent (percentage)
+- [x] **GRID-05**: Operator can see current phase number and progress percentage from STATE.md per agent
 
 ### Agent Control
 
@@ -128,9 +128,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 |-------------|-------|--------|
 | GRID-01 | Phase 13 | Complete |
 | GRID-02 | Phase 13 | Complete |
-| GRID-03 | Phase 14 | Pending |
-| GRID-04 | Phase 14 | Pending |
-| GRID-05 | Phase 14 | Pending |
+| GRID-03 | Phase 14 | Complete |
+| GRID-04 | Phase 14 | Complete |
+| GRID-05 | Phase 14 | Complete |
 | CTRL-01 | Phase 13 | Complete |
 | CTRL-02 | Phase 13 | Complete |
 | REG-01 | Phase 13 | Complete |
