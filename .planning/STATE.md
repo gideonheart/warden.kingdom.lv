@@ -6,16 +6,16 @@ See: .planning/PROJECT.md (updated 2026-02-18)
 
 **Core value:** Real-time visibility into all active Claude Code agent sessions from a single browser tab
 
-**Current focus:** v2.1 GSD Manager — Phase 14: Enhanced Agent Visibility (complete)
+**Current focus:** v2.2 Code Hygiene — Not started (defining requirements)
 
 ## Current Position
 
-Phase: 14 — Enhanced Agent Visibility
-Plan: 01 complete (of 1)
-Status: Phase complete — v2.1 complete
-Last activity: 2026-02-18 - Completed quick task 8: Searchable dropdowns for GSD Controls
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-02-18 — Milestone v2.2 started
 
-Progress: [███████░░░] 70%
+Progress: [░░░░░░░░░░] 0%
 
 ## Performance Metrics
 
@@ -139,5 +139,5 @@ Phase 14 complete. No active blockers.
 ## Session Continuity
 
 Last session: 2026-02-18
-Stopped at: Completed quick-8 — Searchable dropdowns for GSD Controls
-Next step: v2.1 complete — plan next features or ship
+Stopped at: Starting milestone v2.2 Code Hygiene
+Next step: Define requirements and create roadmap

@@ -34,18 +34,17 @@ Real-time visibility into all active Claude Code agent sessions from a single br
 
 ### Active
 
-#### Current Milestone: v2.1 GSD Manager
+#### Current Milestone: v2.2 Code Hygiene
 
-**Goal:** Add a GSD Control Center plugin that lets the operator spawn agents, send commands, view session state, and monitor hook activity — all from the browser.
+**Goal:** Eliminate dead code, extract shared components, unify types, decompose monolithic views, and add lazy tab mounting — pure refactor, net-negative ~500 LOC.
 
 **Target features:**
-- Agent state grid — real-time phase, progress %, idle/working/error state, context pressure per managed agent
-- Spawn agents — launch new GSD sessions from UI with agent/workdir/command selection
-- Quick actions — send `/gsd:*` commands to running agents with presets + custom input
-- Hook activity feed — live tail of recent hook events per agent
-- Recovery registry viewer — toggle agent enabled/disabled, view launch commands
-- Manual command reference — every UI action shows equivalent bash command
-- Server API routes — 7 endpoints wrapping spawn.sh, menu-driver.sh, registry, STATE.md, hooks log
+- Delete ~750 lines of dead code (gutted plugin file, orphaned AgentsView)
+- Extract 9 duplicated constants/components into shared GSD status module
+- Create `src/shared/gsdTypes.ts` — unify GSD types across client/server boundary
+- Decompose 602-line GsdView.tsx into 4 tab sub-components (AgentsTab, ControlsTab, RegistryTab, HooksTab)
+- Lazy-mount tabs — only render active tab, eliminating ~18 HTTP req/min + 60 tmux subprocess/min waste
+- Fix minor issues: fd leak in spawn handler, setTimeout cleanup, Map re-creation, regex fragility
 
 ### Out of Scope
 
@@ -92,5 +91,9 @@ tmux configured with mouse mode and 50,000-line scrollback buffer for monitoring
 | Build-time satisfies for plugin validation | Catches invalid manifests at compile time, not runtime | ✓ Good — immediate feedback |
 | ErrorBoundary per plugin panel | Crashing plugin cannot break main dashboard | ✓ Good — isolates failures |
 
+| Lazy-mount GSD tabs | Conditional render active tab only; hooks auto-deactivate on unmount | — Pending |
+| Extract shared GSD status components | DRY — 9 constants/components duplicated across 3 files | — Pending |
+| Unified gsdTypes.ts in src/shared/ | Follow established shared types pattern, eliminate client/server type drift | — Pending |
+
 ---
-*Last updated: 2026-02-18 after milestone v2.1 start*
+*Last updated: 2026-02-18 after milestone v2.2 start*
