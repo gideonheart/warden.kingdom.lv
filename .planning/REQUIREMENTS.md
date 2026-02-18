@@ -126,20 +126,20 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| GRID-01 | — | Pending |
-| GRID-02 | — | Pending |
-| GRID-03 | — | Pending |
-| GRID-04 | — | Pending |
-| GRID-05 | — | Pending |
-| CTRL-01 | — | Pending |
-| CTRL-02 | — | Pending |
-| REG-01 | — | Pending |
-| REG-02 | — | Pending |
-| HOOK-01 | — | Pending |
-| DX-01 | — | Pending |
-| INFRA-01 | — | Pending |
-| INFRA-02 | — | Pending |
-| INFRA-03 | — | Pending |
+| GRID-01 | Phase 13 | Pending |
+| GRID-02 | Phase 13 | Pending |
+| GRID-03 | Phase 14 | Pending |
+| GRID-04 | Phase 14 | Pending |
+| GRID-05 | Phase 14 | Pending |
+| CTRL-01 | Phase 13 | Pending |
+| CTRL-02 | Phase 13 | Pending |
+| REG-01 | Phase 13 | Pending |
+| REG-02 | Phase 13 | Pending |
+| HOOK-01 | Phase 13 | Pending |
+| DX-01 | Phase 13 | Pending |
+| INFRA-01 | Phase 12 | Pending |
+| INFRA-02 | Phase 12 | Pending |
+| INFRA-03 | Phase 12 | Pending |
 | PLUG-01 | Phase 9 | Complete |
 | PLUG-02 | Phase 9 | Complete |
 | PLUG-03 | Phase 9 | Complete |
@@ -152,9 +152,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 **Coverage:**
 - v2.1 requirements: 14 total
-- Mapped to phases: 0
-- Unmapped: 14 ⚠️
+- Mapped to phases: 14
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-02-16*
-*Last updated: 2026-02-18 after v2.1 milestone requirements definition*
+*Last updated: 2026-02-18 — v2.1 roadmap created, all 14 requirements mapped to phases 12-14*

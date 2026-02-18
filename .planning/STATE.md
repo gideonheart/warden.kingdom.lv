@@ -2,18 +2,18 @@
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-02-16)
+See: .planning/PROJECT.md (updated 2026-02-18)
 
 **Core value:** Real-time visibility into all active Claude Code agent sessions from a single browser tab
 
-**Current focus:** v2.1 GSD Manager — defining requirements
+**Current focus:** v2.1 GSD Manager — Phase 12: Backend Foundation
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 12 — Backend Foundation
 Plan: —
-Status: Defining requirements
-Last activity: 2026-02-18 — Milestone v2.1 started
+Status: Not started
+Last activity: 2026-02-18 — Roadmap created for v2.1
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -35,6 +35,11 @@ Progress: [░░░░░░░░░░] 0%
 - Files modified: 25
 - LOC: 2,644 TypeScript (total src + tests)
 - Timeline: 2026-02-12 (~2 hours)
+
+**v2.0 Mission Control:**
+- Phases: 3 (9-11)
+- Plans: 5 (+ 1 decimal phase 11.1)
+- Timeline: 2026-02-17 to 2026-02-18
 
 **Completed Phases:**
 
@@ -58,8 +63,8 @@ Progress: [░░░░░░░░░░] 0%
 ### Decisions
 
 See PROJECT.md Key Decisions table for full list with outcomes.
-Recent decisions affecting v2.0:
 
+Recent decisions affecting v2.0:
 - v1.0: SRP service architecture — each service does one thing (applies to plugin system)
 - v1.0: Always-interactive terminals — informs mobile terminal strategy decision
 - v2.0: Plugin registry with build-time type-safe registration — avoid over-engineering
@@ -70,8 +75,20 @@ Recent decisions affecting v2.0:
 - [Phase 11]: Operator input batched: flush on Enter or 2s inactivity (prevents per-keystroke event explosion)
 - [Phase 11]: Activity tab placed first and default in HistoryView
 - [Phase 11]: Export fetches full filtered dataset (limit=10000), not just current page
-- [Phase 11.1-fix-tmux-visibility-when-mobile-keyboard-opens]: Use visualViewport API (not window.resize) for iOS keyboard detection in TerminalView and MobilePromptSheet
-- [Phase 11.1-fix-tmux-visibility-when-mobile-keyboard-opens]: 100ms debounce + requestAnimationFrame on refitTerminal to prevent FitAddon collapse bug (xterm.js #5320)
+- [Phase 11.1]: Use visualViewport API (not window.resize) for iOS keyboard detection in TerminalView and MobilePromptSheet
+- [Phase 11.1]: 100ms debounce + requestAnimationFrame on refitTerminal to prevent FitAddon collapse bug (xterm.js #5320)
+
+Key decisions from v2.1 research (apply from Phase 12 onwards):
+- Fire-and-forget spawn: POST /api/gsd/spawn returns 202 immediately; spawn.sh blocks 15-25s; session appears via InstanceTracker within 10s
+- Atomic rename for registry writes: writeFile to tmp then rename (mirrors spawn.sh mv pattern); POSIX atomicity; race with spawn.sh flock is acceptable at single-operator scale
+- execFile (not exec or execFileSync): prevents shell injection at Node.js boundary; async version prevents event loop blocking
+- path.resolve + prefix assertion for workdir: path.normalize insufficient per CVE-2025-27210; assert result starts with /home/forge/
+- firstCommand strict character allowlist [/a-zA-Z0-9 @:._-]: execFile does not protect against send-keys shell context injection downstream in spawn.sh
+- GsdHookLogWatcher singleton: singleton with namespace fan-out — no per-connection watcher resource leak
+- Socket.IO /gsd-hooks namespace: mirrors /terminal namespace pattern; backfills last 20 events on connect
+- 30s registry TTL cache: matches OpenClawConfigReader pattern; PATCH writes invalidate immediately
+- GSD plugin in bottom-panel slot: confirmed at App.tsx line 318; no changes to existing plugin infrastructure
+- No new npm dependencies: all capabilities map to Node.js 22 built-ins or already-installed packages
 
 ### Quick Tasks Completed
 
@@ -85,6 +102,7 @@ Recent decisions affecting v2.0:
 ### Roadmap Evolution
 
 - Phase 11.1 inserted after Phase 11: Fix tmux visibility when mobile keyboard opens (URGENT)
+- v2.1 roadmap created 2026-02-18: Phases 12-14 for GSD Manager Plugin
 
 ### Pending Todos
 
@@ -97,8 +115,13 @@ None
 - Options: (1) read-only mobile terminal, (2) budget 2-3 weeks debugging, (3) defer mobile terminal
 - Research flag: Needs testing on real iOS/Android devices before implementation
 
+**Phase 14 research flag:**
+- Hook log format for context pressure percentage (e.g., "72% [WARNING/CRITICAL]") not confirmed from a live pressure event during research
+- Before planning Phase 14, sample a live `/tmp/gsd-hooks.log` line containing a pressure event to confirm exact regex pattern
+- PanelComponent receives no props by contract; if session selector needs active tab context, evaluate whether fetching instances in hook is sufficient before extending PluginSlotRenderer
+
 ## Session Continuity
 
 Last session: 2026-02-18
-Stopped at: Starting milestone v2.1 GSD Manager
-Next step: Define requirements and create roadmap
+Stopped at: Roadmap created for v2.1 — Phases 12, 13, 14 defined; ready to plan Phase 12
+Next step: /gsd:plan-phase 12
