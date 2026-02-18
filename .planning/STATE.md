@@ -6,16 +6,16 @@ See: .planning/PROJECT.md (updated 2026-02-16)
 
 **Core value:** Real-time visibility into all active Claude Code agent sessions from a single browser tab
 
-**Current focus:** Phase 11.1 - Fix tmux visibility when mobile keyboard opens
+**Current focus:** v2.1 GSD Manager — defining requirements
 
 ## Current Position
 
-Phase: 11.1 (Fix tmux visibility when mobile keyboard opens)
-Plan: 1 of 1 in current phase
-Status: Phase complete
-Last activity: 2026-02-17 — Phase 11.1 plan 01 complete
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-02-18 — Milestone v2.1 started
 
-Progress: [██████████] 100% (12/12 phases complete)
+Progress: [░░░░░░░░░░] 0%
 
 ## Performance Metrics
 
@@ -99,6 +99,6 @@ None
 
 ## Session Continuity
 
-Last session: 2026-02-17
-Stopped at: Completed 11.1-fix-tmux-visibility-when-mobile-keyboard-opens-01-PLAN.md
-Next step: Phase 11.1 complete — all phases done
+Last session: 2026-02-18
+Stopped at: Starting milestone v2.1 GSD Manager
+Next step: Define requirements and create roadmap

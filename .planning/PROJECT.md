@@ -34,14 +34,18 @@ Real-time visibility into all active Claude Code agent sessions from a single br
 
 ### Active
 
-#### Current Milestone: v2.0 Mission Control
+#### Current Milestone: v2.1 GSD Manager
 
-**Goal:** Transform Warden from a terminal viewer into an extensible mission control platform with plugin architecture, agent activity auditing, and mobile-first design.
+**Goal:** Add a GSD Control Center plugin that lets the operator spawn agents, send commands, view session state, and monitor hook activity — all from the browser.
 
 **Target features:**
-- ~~Tool/plugin registry~~ -- SHIPPED Phase 9: Vite glob auto-discovery, type-safe manifests, 4 layout slots, enable/disable with localStorage
-- Agent activity/audit timeline — structured events (session lifecycle, operator actions) + parsed terminal output (tool calls, file edits, commands) with dedicated Activity view
-- Mobile-first UI — full experience on mobile including terminal viewing, agent list/detail with collapsible panels, bottom-sheet actions, clean typography
+- Agent state grid — real-time phase, progress %, idle/working/error state, context pressure per managed agent
+- Spawn agents — launch new GSD sessions from UI with agent/workdir/command selection
+- Quick actions — send `/gsd:*` commands to running agents with presets + custom input
+- Hook activity feed — live tail of recent hook events per agent
+- Recovery registry viewer — toggle agent enabled/disabled, view launch commands
+- Manual command reference — every UI action shows equivalent bash command
+- Server API routes — 7 endpoints wrapping spawn.sh, menu-driver.sh, registry, STATE.md, hooks log
 
 ### Out of Scope
 
@@ -89,4 +93,4 @@ tmux configured with mouse mode and 50,000-line scrollback buffer for monitoring
 | ErrorBoundary per plugin panel | Crashing plugin cannot break main dashboard | ✓ Good — isolates failures |
 
 ---
-*Last updated: 2026-02-17 after Phase 9*
+*Last updated: 2026-02-18 after milestone v2.1 start*
