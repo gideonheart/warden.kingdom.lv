@@ -122,7 +122,9 @@ See `.planning/milestones/v1.1-ROADMAP.md`
   4. A `socket.io-client` subscriber to the `/gsd-hooks` namespace receives live events as `/tmp/gsd-hooks.log` is appended to, and receives the last 20 events on connect
   5. Requests with path traversal attempts in `workdir` or disallowed characters in `firstCommand` are rejected with 400 before reaching any shell
 
-**Plans**: TBD
+**Plans**: 2 plans
+- [ ] 12-01-PLAN.md — GsdRegistryService and GsdHookLogWatcher services
+- [ ] 12-02-PLAN.md — GSD REST routes with validation and server wiring
 
 ---
 
@@ -178,6 +180,6 @@ See `.planning/milestones/v1.1-ROADMAP.md`
 | 9. Plugin Registry Foundation | v2.0 | 2/2 | Complete | 2026-02-17 |
 | 10. Mobile-First UI Restructure | v2.0 | 2/2 | Complete | 2026-02-18 |
 | 11. Activity Timeline & Audit Log | v2.0 | 2/2 | Complete | 2026-02-18 |
-| 12. Backend Foundation | v2.1 | 0/? | Not started | - |
+| 12. Backend Foundation | v2.1 | 0/2 | Planning complete | - |
 | 13. Client Plugin | v2.1 | 0/? | Not started | - |
 | 14. Enhanced Agent Visibility | v2.1 | 0/? | Not started | - |
