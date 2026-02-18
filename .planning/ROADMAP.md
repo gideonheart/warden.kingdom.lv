@@ -42,7 +42,7 @@
 
 **Milestone Goal:** Add a GSD Control Center plugin that lets the operator spawn agents, send commands, view session state, and monitor hook activity — all from the browser.
 
-- [ ] **Phase 12: Backend Foundation** - Types, services, REST API, and Socket.IO namespace for GSD operations with full input validation
+- [x] **Phase 12: Backend Foundation** - Types, services, REST API, and Socket.IO namespace for GSD operations with full input validation (completed 2026-02-18)
 - [ ] **Phase 13: Client Plugin** - Self-registering gsd-manager-plugin with agent grid, spawn form, command dispatch, registry viewer, hook feed, and inline bash reference
 - [ ] **Phase 14: Enhanced Agent Visibility** - State hint badges, context pressure indicators, and STATE.md phase/progress per agent
 
@@ -180,6 +180,6 @@ See `.planning/milestones/v1.1-ROADMAP.md`
 | 9. Plugin Registry Foundation | v2.0 | 2/2 | Complete | 2026-02-17 |
 | 10. Mobile-First UI Restructure | v2.0 | 2/2 | Complete | 2026-02-18 |
 | 11. Activity Timeline & Audit Log | v2.0 | 2/2 | Complete | 2026-02-18 |
-| 12. Backend Foundation | 1/2 | In Progress|  | - |
+| 12. Backend Foundation | 2/2 | Complete   | 2026-02-18 | - |
 | 13. Client Plugin | v2.1 | 0/? | Not started | - |
 | 14. Enhanced Agent Visibility | v2.1 | 0/? | Not started | - |

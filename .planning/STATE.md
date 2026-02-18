@@ -11,11 +11,11 @@ See: .planning/PROJECT.md (updated 2026-02-18)
 ## Current Position
 
 Phase: 12 — Backend Foundation
-Plan: 01 complete (of 3)
-Status: In progress
-Last activity: 2026-02-18 — Plan 01 complete: GsdRegistryService + GsdHookLogWatcher
+Plan: 02 complete (of 2)
+Status: Phase complete — ready for Phase 13
+Last activity: 2026-02-18 — Plan 02 complete: gsdRoutes 6 endpoints + server wiring
 
-Progress: [███░░░░░░░] 33%
+Progress: [██████░░░░] 60%
 
 ## Performance Metrics
 
@@ -91,6 +91,8 @@ Key decisions from v2.1 research (apply from Phase 12 onwards):
 - No new npm dependencies: all capabilities map to Node.js 22 built-ins or already-installed packages
 - [Phase 12]: Used fs.watchFile (not fs.watch) for /tmp/gsd-hooks.log — watchFile polls and works when file does not yet exist
 - [Phase 12]: GsdRegistryService: atomic registry writes via writeFile+rename (.tmp then rename), cache invalidated immediately after patchAgent
+- [Phase 12]: String(request.params.x) cast resolves Express 5 ParamsDictionary string|string[] type error
+- [Phase 12]: readLastLines made public on GsdHookLogWatcher for REST endpoint access without wrapper method
 
 ### Quick Tasks Completed
 
@@ -125,5 +127,5 @@ None
 ## Session Continuity
 
 Last session: 2026-02-18
-Stopped at: Roadmap created for v2.1 — Phases 12, 13, 14 defined; ready to plan Phase 12
-Next step: /gsd:plan-phase 12
+Stopped at: Completed 12-02-PLAN.md — Phase 12 Backend Foundation complete
+Next step: /gsd:plan-phase 13
