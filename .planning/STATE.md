@@ -6,16 +6,16 @@ See: .planning/PROJECT.md (updated 2026-02-18)
 
 **Core value:** Real-time visibility into all active Claude Code agent sessions from a single browser tab
 
-**Current focus:** v2.1 GSD Manager — Phase 12: Backend Foundation
+**Current focus:** v2.1 GSD Manager — Phase 13: Client Plugin (complete)
 
 ## Current Position
 
-Phase: 12 — Backend Foundation
-Plan: 02 complete (of 2)
-Status: Phase complete — ready for Phase 13
-Last activity: 2026-02-18 — Plan 02 complete: gsdRoutes 6 endpoints + server wiring
+Phase: 13 — Client Plugin
+Plan: 01 complete (of 1)
+Status: Phase complete — ready for Phase 14
+Last activity: 2026-02-18 — Plan 01 complete: GSD Manager plugin (4-tab, bottom-panel, auto-registered)
 
-Progress: [██████░░░░] 60%
+Progress: [███████░░░] 70%
 
 ## Performance Metrics
 
@@ -57,6 +57,8 @@ Progress: [██████░░░░] 60%
 | 10 | Mobile-First UI Restructure | v2.0 | `39eeea8` |
 | 11 | Activity Timeline & Audit Log | v2.0 | `24306a0` |
 | 11.1 | Fix tmux visibility when mobile keyboard opens | v2.0 | `b6e0de0` |
+| 12 | Backend Foundation (GSD Registry + Hooks + Routes) | v2.1 | `96be120` |
+| 13 | Client Plugin (GSD Manager 4-tab panel) | v2.1 | `648a5dd` |
 
 ## Accumulated Context
 
@@ -93,6 +95,9 @@ Key decisions from v2.1 research (apply from Phase 12 onwards):
 - [Phase 12]: GsdRegistryService: atomic registry writes via writeFile+rename (.tmp then rename), cache invalidated immediately after patchAgent
 - [Phase 12]: String(request.params.x) cast resolves Express 5 ParamsDictionary string|string[] type error
 - [Phase 12]: readLastLines made public on GsdHookLogWatcher for REST endpoint access without wrapper method
+- [Phase 13]: Hooks extracted to src/client/hooks/ (not co-located in plugin) because plugin grew to 481 LOC; separation keeps plugin file focused on rendering
+- [Phase 13]: Panel starts collapsed (isExpanded=false) — GsdManagerPanelExpanded conditionally rendered so Socket.IO and polling hooks never activate until operator expands
+- [Phase 13]: useActiveInstances() called directly inside plugin per zero-props PanelComponent contract; no need to extend PluginSlotRenderer
 
 ### Quick Tasks Completed
 
@@ -122,10 +127,10 @@ None
 **Phase 14 research flag:**
 - Hook log format for context pressure percentage (e.g., "72% [WARNING/CRITICAL]") not confirmed from a live pressure event during research
 - Before planning Phase 14, sample a live `/tmp/gsd-hooks.log` line containing a pressure event to confirm exact regex pattern
-- PanelComponent receives no props by contract; if session selector needs active tab context, evaluate whether fetching instances in hook is sufficient before extending PluginSlotRenderer
+- PanelComponent receives no props by contract; if session selector needs active tab context, evaluate whether fetching instances in hook is sufficient before extending PluginSlotRenderer — RESOLVED in Phase 13: useActiveInstances() in plugin is sufficient
 
 ## Session Continuity
 
 Last session: 2026-02-18
-Stopped at: Completed 12-02-PLAN.md — Phase 12 Backend Foundation complete
-Next step: /gsd:plan-phase 13
+Stopped at: Completed 13-01-PLAN.md — Phase 13 Client Plugin complete
+Next step: /gsd:research-phase 14

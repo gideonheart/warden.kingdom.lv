@@ -9,29 +9,29 @@ Requirements for GSD Manager Plugin milestone. Each maps to roadmap phases.
 
 ### Agent Grid
 
-- [ ] **GRID-01**: Operator can view all managed agents in a grid showing session status (active/idle/stopped)
-- [ ] **GRID-02**: Operator can see each agent's working directory in the grid
+- [x] **GRID-01**: Operator can view all managed agents in a grid showing session status (active/idle/stopped)
+- [x] **GRID-02**: Operator can see each agent's working directory in the grid
 - [ ] **GRID-03**: Operator can see a state hint badge per agent (idle/menu/working/error) derived from hook activity
 - [ ] **GRID-04**: Operator can see a context pressure level per agent (percentage)
 - [ ] **GRID-05**: Operator can see current phase number and progress percentage from STATE.md per agent
 
 ### Agent Control
 
-- [ ] **CTRL-01**: Operator can spawn a new GSD agent session from the UI with agent name, working directory, and optional first command
-- [ ] **CTRL-02**: Operator can send any custom command to a running agent's tmux session
+- [x] **CTRL-01**: Operator can spawn a new GSD agent session from the UI with agent name, working directory, and optional first command
+- [x] **CTRL-02**: Operator can send any custom command to a running agent's tmux session
 
 ### Registry Management
 
-- [ ] **REG-01**: Operator can view all agents in the recovery registry with their configuration
-- [ ] **REG-02**: Operator can toggle an agent's enabled/disabled status from the UI
+- [x] **REG-01**: Operator can view all agents in the recovery registry with their configuration
+- [x] **REG-02**: Operator can toggle an agent's enabled/disabled status from the UI
 
 ### Hook Activity
 
-- [ ] **HOOK-01**: Operator can see a live feed of the last 20 hook events streamed via Socket.IO
+- [x] **HOOK-01**: Operator can see a live feed of the last 20 hook events streamed via Socket.IO
 
 ### Developer Experience
 
-- [ ] **DX-01**: Every UI action displays the equivalent manual bash command with copy-to-clipboard
+- [x] **DX-01**: Every UI action displays the equivalent manual bash command with copy-to-clipboard
 
 ### Infrastructure
 
@@ -126,17 +126,17 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| GRID-01 | Phase 13 | Pending |
-| GRID-02 | Phase 13 | Pending |
+| GRID-01 | Phase 13 | Complete |
+| GRID-02 | Phase 13 | Complete |
 | GRID-03 | Phase 14 | Pending |
 | GRID-04 | Phase 14 | Pending |
 | GRID-05 | Phase 14 | Pending |
-| CTRL-01 | Phase 13 | Pending |
-| CTRL-02 | Phase 13 | Pending |
-| REG-01 | Phase 13 | Pending |
-| REG-02 | Phase 13 | Pending |
-| HOOK-01 | Phase 13 | Pending |
-| DX-01 | Phase 13 | Pending |
+| CTRL-01 | Phase 13 | Complete |
+| CTRL-02 | Phase 13 | Complete |
+| REG-01 | Phase 13 | Complete |
+| REG-02 | Phase 13 | Complete |
+| HOOK-01 | Phase 13 | Complete |
+| DX-01 | Phase 13 | Complete |
 | INFRA-01 | Phase 12 | Complete |
 | INFRA-02 | Phase 12 | Complete |
 | INFRA-03 | Phase 12 | Complete |
