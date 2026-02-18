@@ -52,6 +52,10 @@ class ActivityEventService {
   // Instance ID cache to avoid repeated DB lookups per session
   private instanceIdCache = new Map<string, number | null>();
 
+  // Pending tool call event ID per session — tracks the most recent tool_call
+  // event so its success field can be updated when a result indicator appears
+  private pendingToolCallIds = new Map<string, number>();
+
   // Retention cleanup interval
   private retentionInterval: ReturnType<typeof setInterval> | null = null;
 
@@ -191,6 +195,9 @@ class ActivityEventService {
   clearSessionBuffer(sessionName: string): void {
     this.chunkBuffers.delete(sessionName);
 
+    // Resolve any pending tool call as successful — session ended without error
+    this.resolvePendingToolCallSuccess(sessionName, true);
+
     // Flush any pending operator input batch
     const batch = this.inputBatches.get(sessionName);
     if (batch) {
@@ -255,25 +262,47 @@ class ActivityEventService {
     }
   }
 
+  private resolvePendingToolCallSuccess(sessionName: string, success: boolean): void {
+    const pendingId = this.pendingToolCallIds.get(sessionName);
+    if (pendingId !== undefined) {
+      try {
+        database.updateActivityEventSuccess(pendingId, success);
+      } catch (error) {
+        console.error('[ActivityEvent] Failed to update tool_call success:', error);
+      }
+      this.pendingToolCallIds.delete(sessionName);
+    }
+  }
+
   private parseAndCaptureEvents(sessionName: string, agentId: string, text: string): void {
     // Tool call: ● ToolName(args) or ⏺ ToolName(args)
     const toolMatch = TOOL_CALL_RE.exec(text);
     if (toolMatch) {
+      // If there's a pending tool_call that was never resolved by an explicit result
+      // indicator, assume it succeeded — no error was detected before the next tool started.
+      // This handles tools like Read/Grep/Glob that produce output but no explicit
+      // success marker in the PTY stream.
+      this.resolvePendingToolCallSuccess(sessionName, true);
+
       const toolName = toolMatch[1];
       const toolArgs = toolMatch[2];
       const instanceId = this.resolveInstanceId(sessionName);
-      database.insertActivityEvent({
+      const eventId = database.insertActivityEvent({
         instanceId,
         agentId,
         sessionName,
         eventType: 'tool_call',
         summary: `${toolName}(${toolArgs})`,
       });
+      // Track this tool_call so we can update its success when a result arrives
+      this.pendingToolCallIds.set(sessionName, eventId);
     }
 
     // File edit success: ⎿ Updated/Created/Wrote <file>
+    // This is a result indicator — update the pending tool_call's success
     const fileEditMatch = FILE_EDIT_SUCCESS_RE.exec(text);
     if (fileEditMatch) {
+      this.resolvePendingToolCallSuccess(sessionName, true);
       const filePath = fileEditMatch[1].trim();
       const instanceId = this.resolveInstanceId(sessionName);
       database.insertActivityEvent({
@@ -288,7 +317,9 @@ class ActivityEventService {
     }
 
     // Error result: ⎿ Error:
+    // This is a result indicator — update the pending tool_call's success
     if (RESULT_ERROR_RE.test(text)) {
+      this.resolvePendingToolCallSuccess(sessionName, false);
       const instanceId = this.resolveInstanceId(sessionName);
       database.insertActivityEvent({
         instanceId,
@@ -301,9 +332,12 @@ class ActivityEventService {
     }
 
     // Bash exit code
+    // This is a result indicator — update the pending tool_call's success
     const bashExitMatch = BASH_EXIT_RE.exec(text);
     if (bashExitMatch) {
       const exitCode = parseInt(bashExitMatch[1], 10);
+      const bashSuccess = exitCode === 0;
+      this.resolvePendingToolCallSuccess(sessionName, bashSuccess);
       const instanceId = this.resolveInstanceId(sessionName);
       database.insertActivityEvent({
         instanceId,
@@ -311,7 +345,7 @@ class ActivityEventService {
         sessionName,
         eventType: 'bash_command',
         summary: `Bash command exited with code ${exitCode}`,
-        success: exitCode === 0,
+        success: bashSuccess,
       });
     }
   }

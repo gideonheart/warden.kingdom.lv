@@ -191,8 +191,8 @@ class DatabaseConnection {
     detail?: string;
     success?: boolean;
     metadata?: string;
-  }): void {
-    this.db.prepare(`
+  }): number {
+    const result = this.db.prepare(`
       INSERT INTO activity_events
         (instance_id, agent_id, session_name, event_type, summary, detail, success, metadata)
       VALUES
@@ -207,6 +207,13 @@ class DatabaseConnection {
       success: params.success === undefined ? null : params.success ? 1 : 0,
       metadata: params.metadata ?? null,
     });
+    return result.lastInsertRowid as number;
+  }
+
+  updateActivityEventSuccess(eventId: number, success: boolean): void {
+    this.db.prepare(
+      'UPDATE activity_events SET success = ? WHERE id = ?'
+    ).run(success ? 1 : 0, eventId);
   }
 
   queryActivityEvents(filters: {
@@ -245,16 +252,20 @@ class DatabaseConnection {
       `SELECT COUNT(*) as count FROM activity_events ${whereClause}`
     ).get(...params) as { count: number }).count;
 
-    const events = this.db.prepare(`
+    const rows = this.db.prepare(`
       SELECT id, instance_id as instanceId, agent_id as agentId,
              session_name as sessionName, event_type as eventType,
-             timestamp, summary, detail,
-             CASE WHEN success IS NULL THEN NULL WHEN success = 1 THEN 1 ELSE 0 END as success,
-             metadata
+             timestamp, summary, detail, success, metadata
       FROM activity_events ${whereClause}
       ORDER BY timestamp DESC, id DESC
       LIMIT ? OFFSET ?
-    `).all(...params, limit, offset) as ActivityEvent[];
+    `).all(...params, limit, offset) as (Omit<ActivityEvent, 'success'> & { success: number | null })[];
+
+    // Convert SQLite INTEGER (0/1/NULL) to JavaScript boolean/null
+    const events: ActivityEvent[] = rows.map((row) => ({
+      ...row,
+      success: row.success === null ? null : row.success === 1,
+    }));
 
     return { events, total };
   }

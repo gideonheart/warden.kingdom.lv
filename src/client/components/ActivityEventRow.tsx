@@ -28,14 +28,32 @@ const EVENT_TYPE_LABELS: Record<ActivityEventType, string> = {
   error: 'error',
 };
 
-function SuccessIndicator({ success }: { success: boolean | null }) {
+// Event types where success/failure is tracked and meaningful
+const EVENT_TYPES_WITH_SUCCESS: Set<ActivityEventType> = new Set([
+  'tool_call',
+  'file_edit',
+  'bash_command',
+  'error',
+  'prompt_sent',
+]);
+
+function hasSuccessTracking(eventType: ActivityEventType): boolean {
+  return EVENT_TYPES_WITH_SUCCESS.has(eventType);
+}
+
+function SuccessIndicator({ success, eventType }: { success: boolean | null; eventType: ActivityEventType }) {
+  // Event types without success tracking get an empty spacer to maintain alignment
+  if (!hasSuccessTracking(eventType)) {
+    return <span className="w-5" />;
+  }
   if (success === true) {
     return <span className="w-5 text-center text-warden-success">&#10003;</span>;
   }
   if (success === false) {
     return <span className="w-5 text-center text-warden-error">&#10007;</span>;
   }
-  return <span className="w-5 text-center text-warden-text-dim">&#8722;</span>;
+  // null success on a tracked event type means result pending / not yet captured
+  return <span className="w-5 text-center text-warden-text-dim" title="Pending">&#8943;</span>;
 }
 
 function EventTypeBadge({ eventType }: { eventType: ActivityEventType }) {
@@ -93,7 +111,7 @@ export function ActivityEventRow({ event, onNavigateToSession }: ActivityEventRo
           <span className="text-warden-text-dim/60 text-xs font-mono w-36 truncate">
             {formatTimestamp(event.timestamp)}
           </span>
-          <SuccessIndicator success={event.success} />
+          <SuccessIndicator success={event.success} eventType={event.eventType} />
           <EventTypeBadge eventType={event.eventType} />
           <span className="text-warden-text-dim w-20 truncate text-xs">{event.agentId}</span>
           <span className="text-warden-text flex-1 truncate text-xs">{event.summary}</span>
@@ -107,7 +125,7 @@ export function ActivityEventRow({ event, onNavigateToSession }: ActivityEventRo
         {/* Mobile: stacked card */}
         <div className="flex sm:hidden flex-col gap-1 px-3 py-2 min-h-[44px]">
           <div className="flex items-center gap-2">
-            <SuccessIndicator success={event.success} />
+            <SuccessIndicator success={event.success} eventType={event.eventType} />
             <EventTypeBadge eventType={event.eventType} />
             <span className="text-xs text-warden-text-dim truncate">{event.agentId}</span>
           </div>
@@ -136,12 +154,14 @@ export function ActivityEventRow({ event, onNavigateToSession }: ActivityEventRo
               <span className="text-warden-text-dim">Timestamp: </span>
               <span className="font-mono text-warden-text-dim">{event.timestamp}</span>
             </div>
-            <div>
-              <span className="text-warden-text-dim">Success: </span>
-              <span className="text-warden-text">
-                {event.success === true ? 'Yes' : event.success === false ? 'No' : 'N/A'}
-              </span>
-            </div>
+            {hasSuccessTracking(event.eventType) && (
+              <div>
+                <span className="text-warden-text-dim">Success: </span>
+                <span className="text-warden-text">
+                  {event.success === true ? 'Yes' : event.success === false ? 'No' : 'Pending'}
+                </span>
+              </div>
+            )}
           </div>
 
           {truncatedDetail && (
