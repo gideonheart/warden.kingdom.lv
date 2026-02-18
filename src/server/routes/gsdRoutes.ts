@@ -2,10 +2,12 @@ import { Router } from 'express';
 import { spawn } from 'child_process';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
+import { openSync, closeSync } from 'fs';
 import { readFile } from 'fs/promises';
 import path from 'path';
 import { gsdRegistryService } from '../services/GsdRegistryService.js';
 import { gsdHookLogWatcher } from '../services/GsdHookLogWatcher.js';
+import { database } from '../database/DatabaseConnection.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -61,7 +63,7 @@ router.patch('/api/gsd/registry/agents/:agentId', async (request, response) => {
 });
 
 // POST /api/gsd/spawn — fire-and-forget agent spawn; returns 202 immediately
-router.post('/api/gsd/spawn', (request, response) => {
+router.post('/api/gsd/spawn', async (request, response) => {
   const { agentName, workdir, firstCommand } = request.body as {
     agentName?: unknown;
     workdir?: unknown;
@@ -84,7 +86,7 @@ router.post('/api/gsd/spawn', (request, response) => {
   }
 
   const resolvedWorkdir = path.resolve(workdir);
-  if (!resolvedWorkdir.startsWith(WORKDIR_PREFIX)) {
+  if (resolvedWorkdir !== '/home/forge' && !resolvedWorkdir.startsWith(WORKDIR_PREFIX)) {
     response.status(400).json({ error: 'workdir must be within /home/forge/' });
     return;
   }
@@ -100,15 +102,48 @@ router.post('/api/gsd/spawn', (request, response) => {
     }
   }
 
-  // Fire-and-forget: spawn detached so the 15-25s blocking spawn.sh does not block Node
+  // Look up agent in registry to predict session name and validate it exists
+  let expectedSessionName = `${agentName}-main`;
+  try {
+    const agent = await gsdRegistryService.getAgent(agentName);
+    if (agent?.tmux_session_name) {
+      expectedSessionName = agent.tmux_session_name;
+    }
+  } catch {
+    // Registry read failed — proceed with default session name prediction
+  }
+
+  // Pre-register the session in the instances database for immediate /api/instances visibility.
+  // InstanceTracker will confirm the session on its next 10s poll once tmux session exists.
+  // If spawn.sh fails, the next poll will mark it as stopped — correct behavior.
+  database.upsertInstance({
+    agentId: agentName,
+    agentName: agentName.charAt(0).toUpperCase() + agentName.slice(1),
+    tmuxSessionName: expectedSessionName,
+    projectPath: resolvedWorkdir,
+    telegramTopicId: undefined,
+  });
+
+  // Fire-and-forget: spawn detached so the 15-25s blocking spawn.sh does not block Node.
+  // Log output to /tmp for debugging instead of stdio: 'ignore'.
+  const spawnLogPath = `/tmp/gsd-spawn-${agentName}.log`;
+  const logFd = openSync(spawnLogPath, 'w');
   const child = spawn(
     SPAWN_SH_PATH,
     [agentName, resolvedWorkdir, ...(firstCommand ? [firstCommand as string] : [])],
-    { detached: true, stdio: 'ignore' },
+    { detached: true, stdio: ['ignore', logFd, logFd] },
   );
   child.unref();
+  closeSync(logFd);
 
-  response.status(202).json({ message: 'Spawn initiated', agentName, workdir: resolvedWorkdir });
+  console.log(`[GsdRoutes] Spawn initiated: agent=${agentName} session=${expectedSessionName} log=${spawnLogPath}`);
+  response.status(202).json({
+    message: 'Spawn initiated',
+    agentName,
+    workdir: resolvedWorkdir,
+    expectedSessionName,
+    spawnLogFile: spawnLogPath,
+  });
 });
 
 // POST /api/gsd/sessions/:session/command — dispatch a menu-driver action to a tmux session
