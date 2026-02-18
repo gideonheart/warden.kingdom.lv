@@ -201,7 +201,7 @@ function GsdManagerPanelExpanded() {
       const response = await fetch(`/api/gsd/sessions/${targetSession}/command`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'clear_then', args: commandText }),
+        body: JSON.stringify({ action: 'type', args: commandText }),
       });
       const data = (await response.json()) as { dispatched?: boolean; output?: string; error?: string };
       if (response.ok) {
@@ -220,7 +220,7 @@ function GsdManagerPanelExpanded() {
   }, [targetSession, commandText]);
 
   const spawnBashCommand = `spawn.sh ${agentName} ${workdir}${firstCommand ? ` "${firstCommand}"` : ''}`;
-  const dispatchBashCommand = `menu-driver.sh ${targetSession} clear_then "${commandText}"`;
+  const dispatchBashCommand = `menu-driver.sh ${targetSession} type "${commandText}"`;
 
   return (
     <div className="flex flex-col h-64">

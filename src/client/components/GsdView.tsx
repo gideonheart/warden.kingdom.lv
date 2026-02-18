@@ -213,7 +213,7 @@ export function GsdView() {
       const response = await fetch(`/api/gsd/sessions/${targetSession}/command`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'clear_then', args: commandText }),
+        body: JSON.stringify({ action: 'type', args: commandText }),
       });
       const data = (await response.json()) as { dispatched?: boolean; output?: string; error?: string };
       if (response.ok) {
@@ -232,7 +232,7 @@ export function GsdView() {
   }, [targetSession, commandText]);
 
   const spawnBashCommand = `spawn.sh ${agentName} ${workdir}${firstCommand ? ` "${firstCommand}"` : ''}`;
-  const dispatchBashCommand = `menu-driver.sh ${targetSession} clear_then "${commandText}"`;
+  const dispatchBashCommand = `menu-driver.sh ${targetSession} type "${commandText}"`;
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
