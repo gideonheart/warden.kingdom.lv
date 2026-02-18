@@ -81,7 +81,7 @@ class GsdHookLogWatcher {
     }
   }
 
-  private readLastLines(lineCount: number): string[] {
+  readLastLines(lineCount: number): string[] {
     try {
       const stat = fs.statSync(HOOK_LOG_PATH);
 
