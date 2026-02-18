@@ -144,7 +144,8 @@ See `.planning/milestones/v1.1-ROADMAP.md`
   5. Operator can see a live feed of the last 20 hook events auto-updating as new events arrive via Socket.IO, newest first
   6. Every UI action (spawn, command, toggle) displays the equivalent manual bash command with a one-click copy-to-clipboard button that shows "Copied!" confirmation
 
-**Plans**: TBD
+**Plans**: 1 plan
+- [ ] 13-01-PLAN.md — Data hooks (useGsdRegistry, useGsdHookFeed) and GSD Manager plugin with 4-tab panel UI
 
 ---
 
@@ -181,5 +182,5 @@ See `.planning/milestones/v1.1-ROADMAP.md`
 | 10. Mobile-First UI Restructure | v2.0 | 2/2 | Complete | 2026-02-18 |
 | 11. Activity Timeline & Audit Log | v2.0 | 2/2 | Complete | 2026-02-18 |
 | 12. Backend Foundation | 2/2 | Complete    | 2026-02-18 | - |
-| 13. Client Plugin | v2.1 | 0/? | Not started | - |
+| 13. Client Plugin | v2.1 | 0/1 | Planned | - |
 | 14. Enhanced Agent Visibility | v2.1 | 0/? | Not started | - |
