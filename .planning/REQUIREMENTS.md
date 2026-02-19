@@ -20,11 +20,11 @@ Requirements for Code Hygiene milestone. Pure refactor — zero feature changes,
 
 ### SRP — View Decomposition
 
-- [ ] **SRP-01**: Extract `AgentsTab` from `GsdView.tsx` into own component file
-- [ ] **SRP-02**: Extract `ControlsTab` from `GsdView.tsx` into own component file
-- [ ] **SRP-03**: Extract `RegistryTab` from `GsdView.tsx` into own component file
-- [ ] **SRP-04**: Extract `HooksTab` from `GsdView.tsx` into own component file
-- [ ] **SRP-05**: `GsdView.tsx` becomes thin shell: tab state + router, under 100 LOC
+- [x] **SRP-01**: Extract `AgentsTab` from `GsdView.tsx` into own component file
+- [x] **SRP-02**: Extract `ControlsTab` from `GsdView.tsx` into own component file
+- [x] **SRP-03**: Extract `RegistryTab` from `GsdView.tsx` into own component file
+- [x] **SRP-04**: Extract `HooksTab` from `GsdView.tsx` into own component file
+- [x] **SRP-05**: `GsdView.tsx` becomes thin shell: tab state + router, under 100 LOC
 
 ### Types — Shared Type Unification
 
@@ -154,11 +154,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DRY-01 | Phase 16 | Complete |
 | DRY-02 | Phase 16 | Complete |
 | DRY-03 | Phase 16 | Complete |
-| SRP-01 | Phase 16 | Pending |
-| SRP-02 | Phase 16 | Pending |
-| SRP-03 | Phase 16 | Pending |
-| SRP-04 | Phase 16 | Pending |
-| SRP-05 | Phase 16 | Pending |
+| SRP-01 | Phase 16 | Complete |
+| SRP-02 | Phase 16 | Complete |
+| SRP-03 | Phase 16 | Complete |
+| SRP-04 | Phase 16 | Complete |
+| SRP-05 | Phase 16 | Complete |
 | PERF-01 | Phase 17 | Pending |
 | PERF-02 | Phase 17 | Pending |
 | FIX-01 | Phase 17 | Pending |

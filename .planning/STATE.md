@@ -6,16 +6,16 @@ See: .planning/PROJECT.md (updated 2026-02-18)
 
 **Core value:** Real-time visibility into all active Claude Code agent sessions from a single browser tab
 
-**Current focus:** v2.2 Code Hygiene — Phase 16: DRY/SRP (Plan 01 complete)
+**Current focus:** v2.2 Code Hygiene — Phase 16: DRY/SRP (complete)
 
 ## Current Position
 
 Phase: 16 — DRY/SRP
-Plan: 01 complete
-Status: Plan 16-01 complete — gsdShared.tsx extracted, ready for Plan 02
-Last activity: 2026-02-19 — 16-01 extract shared GSD constants complete
+Plan: 02 of 02 complete
+Status: Phase 16 complete — all GSD tabs extracted to standalone components, GsdView.tsx is 76-line router shell
+Last activity: 2026-02-19 — 16-02 SRP tab extraction complete
 
-Progress: [#####-----] 50% (Phase 16 — 1/2 plans done)
+Progress: [##########] 100% (Phase 16 — 2/2 plans done)
 
 ## Performance Metrics
 
@@ -66,6 +66,7 @@ Progress: [#####-----] 50% (Phase 16 — 1/2 plans done)
 | 13 | Client Plugin (GSD Manager 4-tab panel) | v2.1 | `648a5dd` |
 | 14 | Enhanced Agent Visibility (live state, ctx pressure, GSD phase) | v2.1 | `01b447f` |
 | 15 | Foundation — Dead code removal (~740 LOC) | v2.2 | `f67ada3` |
+| 16 | DRY/SRP — shared module + tab extraction | v2.2 | `e423c67` |
 
 ## Accumulated Context
 
@@ -122,6 +123,10 @@ Key decisions for v2.2:
 - [Phase 15]: AgentsView.tsx deleted entirely - orphaned after Quick-6 created Agents tab inside GsdView.tsx
 - [Phase 16]: All 9 GSD shared symbols (4 constants + 5 components) extracted to single gsdShared.tsx module
 - [Phase 16]: AgentStateHint/PressureLevel type imports removed from GsdView.tsx since no direct references remain
+- [Phase 16]: 4 GSD tabs extracted to standalone components (AgentsTab, ControlsTab, RegistryTab, HooksTab)
+- [Phase 16]: ControlsTab owns all spawn/dispatch state — GsdView passes only data props, zero form state
+- [Phase 16]: GSD_COMMANDS constant moved into ControlsTab since only Controls tab uses it
+- [Phase 16]: GsdView.tsx reduced from 489 to 76 lines — pure tab router shell
 ### Quick Tasks Completed
 
 | # | Description | Date | Commit |
@@ -156,5 +161,5 @@ No active blockers for v2.2.
 ## Session Continuity
 
 Last session: 2026-02-19
-Stopped at: Completed 16-01-PLAN.md — gsdShared.tsx extraction done
-Next step: Execute 16-02-PLAN.md (SRP tab extraction)
+Stopped at: Completed 16-02-PLAN.md — Phase 16 complete
+Next step: Begin Phase 17 (performance optimizations and bug fixes)
