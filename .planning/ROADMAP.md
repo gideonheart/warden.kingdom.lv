@@ -216,7 +216,9 @@ See `.planning/milestones/v1.1-ROADMAP.md`
   4. All existing GSD UI behaviors (badges, indicators, progress bars, copy buttons) continue to work identically after extraction — no visual regressions
   5. `npm run typecheck` and `npm run build` pass with zero errors after all import paths are updated
 
-**Plans**: TBD
+**Plans**: 2 plans
+- [ ] 16-01-PLAN.md — Extract shared GSD constants and helper components to gsdShared.tsx
+- [ ] 16-02-PLAN.md — Extract 4 tab components and slim GsdView.tsx to router shell
 
 ---
 
