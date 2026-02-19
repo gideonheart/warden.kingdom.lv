@@ -145,6 +145,25 @@ function MobileKeyToolbar({ sendInput, selectMode, onToggleCopyMode }: MobileKey
   );
 }
 
+/** Estimate terminal dimensions from the container element and current font size.
+ *  This is used to pre-configure the PTY at approximately the correct size before
+ *  xterm.js is fully initialized, avoiding the garbled-repaint window. */
+function estimateTerminalDimensions(
+  container: HTMLElement | null,
+  fontSize: number,
+): { cols: number; rows: number } {
+  if (!container) return { cols: 120, rows: 40 };
+  const { clientWidth, clientHeight } = container;
+  if (clientWidth === 0 || clientHeight === 0) return { cols: 120, rows: 40 };
+  // Approximate character cell dimensions for monospace fonts at the given size.
+  // These match xterm.js defaults for lineHeight 1.2.
+  const charWidth = fontSize * 0.6;
+  const charHeight = fontSize * 1.2;
+  const cols = Math.max(40, Math.floor(clientWidth / charWidth));
+  const rows = Math.max(10, Math.floor(clientHeight / charHeight));
+  return { cols, rows };
+}
+
 export function TerminalView({ tmuxSessionName, onSessionExit }: TerminalViewProps) {
   const terminalContainerRef = useRef<HTMLDivElement>(null);
   const terminalInstanceRef = useRef<Terminal | null>(null);
@@ -190,14 +209,47 @@ export function TerminalView({ tmuxSessionName, onSessionExit }: TerminalViewPro
     terminalInstanceRef.current?.write(filtered);
   }, []);
 
+  // Called when the server spawns a fresh PTY (not reusing a keep-alive one).
+  // Clear the xterm.js display so stale content doesn't show through during the
+  // brief moment before the new PTY repaint arrives.
+  const handleTerminalReset = useCallback(() => {
+    const terminal = terminalInstanceRef.current;
+    const fitAddon = fitAddonRef.current;
+    if (!terminal) return;
+    terminal.reset();
+    // Refit after reset to ensure correct dimensions are in sync.
+    if (fitAddon) {
+      requestAnimationFrame(() => {
+        try {
+          fitAddon.fit();
+        } catch {
+          // Container may have zero dimensions
+        }
+      });
+    }
+  }, []);
+
   const handleSessionExit = useCallback((exitCode: number) => {
     onSessionExit(tmuxSessionName, exitCode);
   }, [tmuxSessionName, onSessionExit]);
 
+  // getDimensions is called inside useTerminalSocket's effect at socket-creation time,
+  // so it reads the actual rendered container dimensions rather than a stale render-phase value.
+  const fontSizeLabelRef = useRef(fontSizeLabel);
+  fontSizeLabelRef.current = fontSizeLabel;
+  const getDimensions = useCallback(() => {
+    return estimateTerminalDimensions(
+      terminalContainerRef.current,
+      FONT_SIZES[fontSizeLabelRef.current] ?? 13,
+    );
+  }, []);
+
   const { sendInput, sendResize, isConnected, isReconnecting } = useTerminalSocket({
     sessionName: tmuxSessionName,
     onTerminalOutput: handleTerminalOutput,
+    onTerminalReset: handleTerminalReset,
     onSessionExit: handleSessionExit,
+    getDimensions,
   });
 
   const handleToggleCopyMode = useCallback(() => {

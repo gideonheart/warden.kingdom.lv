@@ -2,11 +2,18 @@ import * as pty from 'node-pty';
 import type { Server as SocketIOServer, Socket } from 'socket.io';
 import { activityEventService } from './ActivityEventService.js';
 
+// How long to keep a PTY alive after the last subscriber disconnects.
+// This allows fast navigation away and back (e.g., switching views) to reuse the
+// existing PTY without spawning a new process and suffering a dimension-mismatch
+// repaint glitch.
+const PTY_KEEPALIVE_MS = 30_000;
+
 interface SharedPtySession {
   ptyProcess: pty.IPty;
   sessionName: string;
   isAlive: boolean;
   subscribers: Set<string>; // socket IDs viewing this session
+  keepAliveTimer: ReturnType<typeof setTimeout> | null; // deferred cleanup timer
 }
 
 export class TerminalStreamService {
@@ -15,10 +22,15 @@ export class TerminalStreamService {
   private socketServer: SocketIOServer | null = null;
 
   setupSocketNamespace(socketServer: SocketIOServer): void {
+    this.socketServer = socketServer;
     const terminalNamespace = socketServer.of('/terminal');
 
     terminalNamespace.on('connection', (socket: Socket) => {
       const sessionName = socket.handshake.query.sessionName as string;
+      const colsParam = socket.handshake.query.cols as string | undefined;
+      const rowsParam = socket.handshake.query.rows as string | undefined;
+      const initialCols = colsParam ? parseInt(colsParam, 10) : 120;
+      const initialRows = rowsParam ? parseInt(rowsParam, 10) : 40;
 
       if (!sessionName) {
         socket.emit('terminal:error', { message: 'Missing sessionName query parameter' });
@@ -26,8 +38,8 @@ export class TerminalStreamService {
         return;
       }
 
-      console.log(`[TerminalStream] Client ${socket.id} connecting to session: ${sessionName}`);
-      this.attachSocketToSession(socket, sessionName);
+      console.log(`[TerminalStream] Client ${socket.id} connecting to session: ${sessionName} (${initialCols}x${initialRows})`);
+      this.attachSocketToSession(socket, sessionName, initialCols, initialRows);
 
       socket.on('disconnect', () => {
         console.log(`[TerminalStream] Client ${socket.id} disconnected from ${sessionName}`);
@@ -36,11 +48,18 @@ export class TerminalStreamService {
     });
   }
 
-  attachSocketToSession(socket: Socket, sessionName: string): void {
+  attachSocketToSession(socket: Socket, sessionName: string, initialCols: number, initialRows: number): void {
     const existing = this.sessions.get(sessionName);
 
     if (existing && existing.isAlive) {
-      // Reuse existing PTY — just add this socket as a subscriber
+      // Cancel any pending deferred cleanup — a new subscriber arrived in time.
+      if (existing.keepAliveTimer !== null) {
+        clearTimeout(existing.keepAliveTimer);
+        existing.keepAliveTimer = null;
+        console.log(`[TerminalStream] Keep-alive timer cancelled for ${sessionName} — new subscriber arrived`);
+      }
+
+      // Reuse existing PTY — just add this socket as a subscriber.
       console.log(`[TerminalStream] Reusing existing PTY for session ${sessionName} (now ${existing.subscribers.size + 1} viewers)`);
       existing.subscribers.add(socket.id);
       this.socketToSession.set(socket.id, sessionName);
@@ -49,16 +68,23 @@ export class TerminalStreamService {
       return;
     }
 
-    // Clean up dead session if it exists
+    // Clean up dead session entry if it exists.
     if (existing) {
       this.cleanupSession(sessionName);
     }
 
-    // Spawn new PTY for this tmux session
+    // Spawn new PTY for this tmux session using client-supplied dimensions.
+    const cols = Number.isFinite(initialCols) && initialCols > 0 ? initialCols : 120;
+    const rows = Number.isFinite(initialRows) && initialRows > 0 ? initialRows : 40;
+
+    // Signal to the connecting client that a fresh PTY is being spawned so it can
+    // clear any stale xterm.js content before the new repaint arrives.
+    socket.emit('terminal:reset');
+
     const ptyProcess = pty.spawn('tmux', ['attach-session', '-t', sessionName], {
       name: 'xterm-256color',
-      cols: 120,
-      rows: 40,
+      cols,
+      rows,
       env: process.env as Record<string, string>,
     });
 
@@ -67,12 +93,13 @@ export class TerminalStreamService {
       sessionName,
       isAlive: true,
       subscribers: new Set([socket.id]),
+      keepAliveTimer: null,
     };
 
     this.sessions.set(sessionName, session);
     this.socketToSession.set(socket.id, sessionName);
 
-    // Broadcast PTY output to ALL subscribers
+    // Broadcast PTY output to ALL subscribers.
     ptyProcess.onData((terminalOutput: string) => {
       for (const subscriberId of session.subscribers) {
         const subscriberSocket = this.findSocketById(subscriberId);
@@ -80,7 +107,7 @@ export class TerminalStreamService {
           subscriberSocket.emit('terminal:output', terminalOutput);
         }
       }
-      // Non-blocking side-channel tap for activity event parsing
+      // Non-blocking side-channel tap for activity event parsing.
       const agentId = sessionName.split('-')[0];
       setImmediate(() => {
         activityEventService.processTerminalChunk(sessionName, agentId, terminalOutput);
@@ -90,7 +117,13 @@ export class TerminalStreamService {
     ptyProcess.onExit(({ exitCode }) => {
       session.isAlive = false;
 
-      // Notify all subscribers
+      // Cancel any pending keep-alive timer before cleaning up.
+      if (session.keepAliveTimer !== null) {
+        clearTimeout(session.keepAliveTimer);
+        session.keepAliveTimer = null;
+      }
+
+      // Notify all subscribers.
       for (const subscriberId of session.subscribers) {
         const subscriberSocket = this.findSocketById(subscriberId);
         if (subscriberSocket) {
@@ -98,10 +131,10 @@ export class TerminalStreamService {
         }
       }
 
-      // Flush activity event buffers
+      // Flush activity event buffers.
       activityEventService.clearSessionBuffer(sessionName);
 
-      // Clean up
+      // Clean up.
       for (const subscriberId of session.subscribers) {
         this.socketToSession.delete(subscriberId);
       }
@@ -115,7 +148,7 @@ export class TerminalStreamService {
     socket.on('terminal:input', (userInput: string) => {
       if (!session.isAlive) return;
       session.ptyProcess.write(userInput);
-      // Capture operator input as batched activity events
+      // Capture operator input as batched activity events.
       const agentId = session.sessionName.split('-')[0];
       activityEventService.captureOperatorInput(session.sessionName, agentId, userInput);
     });
@@ -148,9 +181,14 @@ export class TerminalStreamService {
     session.subscribers.delete(socketId);
 
     if (session.subscribers.size === 0) {
-      // Last viewer disconnected — kill the PTY
-      console.log(`[TerminalStream] Last viewer left session ${sessionName}, killing PTY`);
-      this.cleanupSession(sessionName);
+      // Last viewer disconnected. Instead of killing the PTY immediately, keep it alive
+      // for PTY_KEEPALIVE_MS to handle the common case of navigating away and back quickly.
+      console.log(`[TerminalStream] Last viewer left session ${sessionName}, scheduling PTY cleanup in ${PTY_KEEPALIVE_MS}ms`);
+      session.keepAliveTimer = setTimeout(() => {
+        session.keepAliveTimer = null;
+        console.log(`[TerminalStream] Keep-alive grace period expired for ${sessionName}, cleaning up PTY`);
+        this.cleanupSession(sessionName);
+      }, PTY_KEEPALIVE_MS);
     } else {
       console.log(`[TerminalStream] Viewer left session ${sessionName} (${session.subscribers.size} remaining)`);
     }
@@ -159,6 +197,12 @@ export class TerminalStreamService {
   private cleanupSession(sessionName: string): void {
     const session = this.sessions.get(sessionName);
     if (!session) return;
+
+    // Cancel any pending keep-alive timer.
+    if (session.keepAliveTimer !== null) {
+      clearTimeout(session.keepAliveTimer);
+      session.keepAliveTimer = null;
+    }
 
     if (session.isAlive) {
       session.ptyProcess.kill();
