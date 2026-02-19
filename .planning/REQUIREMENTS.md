@@ -9,8 +9,8 @@ Requirements for Code Hygiene milestone. Pure refactor — zero feature changes,
 
 ### Dead Code Removal
 
-- [ ] **DEAD-01**: Delete dead `GsdManagerPanelExpanded` component body from `gsd-manager-plugin.tsx` (keep only `DisabledPanel` export)
-- [ ] **DEAD-02**: Delete orphaned `AgentsView.tsx` (superseded by Agents tab in `GsdView.tsx`)
+- [x] **DEAD-01**: Delete dead `GsdManagerPanelExpanded` component body from `gsd-manager-plugin.tsx` (keep only `DisabledPanel` export)
+- [x] **DEAD-02**: Delete orphaned `AgentsView.tsx` (superseded by Agents tab in `GsdView.tsx`)
 
 ### DRY — Shared Component Extraction
 
@@ -28,9 +28,9 @@ Requirements for Code Hygiene milestone. Pure refactor — zero feature changes,
 
 ### Types — Shared Type Unification
 
-- [ ] **TYPE-01**: Create `src/shared/gsdTypes.ts` with `RegistryAgent`, `GsdRegistry`, `AgentStateHint`, `PressureLevel`
-- [ ] **TYPE-02**: Update server imports (`gsdRoutes.ts`, `GsdRegistryService.ts`) to use shared types
-- [ ] **TYPE-03**: Update client imports (hooks, views) to use shared types
+- [x] **TYPE-01**: Create `src/shared/gsdTypes.ts` with `RegistryAgent`, `GsdRegistry`, `AgentStateHint`, `PressureLevel`
+- [x] **TYPE-02**: Update server imports (`gsdRoutes.ts`, `GsdRegistryService.ts`) to use shared types
+- [x] **TYPE-03**: Update client imports (hooks, views) to use shared types
 
 ### Performance — Lazy Tab Mounting
 
@@ -146,11 +146,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| DEAD-01 | Phase 15 | Pending |
-| DEAD-02 | Phase 15 | Pending |
-| TYPE-01 | Phase 15 | Pending |
-| TYPE-02 | Phase 15 | Pending |
-| TYPE-03 | Phase 15 | Pending |
+| DEAD-01 | Phase 15 | Complete |
+| DEAD-02 | Phase 15 | Complete |
+| TYPE-01 | Phase 15 | Complete |
+| TYPE-02 | Phase 15 | Complete |
+| TYPE-03 | Phase 15 | Complete |
 | DRY-01 | Phase 16 | Pending |
 | DRY-02 | Phase 16 | Pending |
 | DRY-03 | Phase 16 | Pending |

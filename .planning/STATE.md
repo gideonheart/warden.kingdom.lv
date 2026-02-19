@@ -6,16 +6,16 @@ See: .planning/PROJECT.md (updated 2026-02-18)
 
 **Core value:** Real-time visibility into all active Claude Code agent sessions from a single browser tab
 
-**Current focus:** v2.2 Code Hygiene — Phase 15: Foundation (ready to plan)
+**Current focus:** v2.2 Code Hygiene — Phase 15: Foundation (Plan 01 complete)
 
 ## Current Position
 
 Phase: 15 — Foundation
-Plan: —
-Status: Roadmap created, ready for planning
-Last activity: 2026-02-18 — v2.2 roadmap created (Phases 15-17)
+Plan: 01 complete
+Status: Phase 15 complete — ready for Phase 16
+Last activity: 2026-02-19 — 15-01 dead code removal complete
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [##########] 100% (Phase 15 — 2/2 plans done)
 
 ## Performance Metrics
 
@@ -65,6 +65,7 @@ Progress: [░░░░░░░░░░] 0%
 | 12 | Backend Foundation (GSD Registry + Hooks + Routes) | v2.1 | `96be120` |
 | 13 | Client Plugin (GSD Manager 4-tab panel) | v2.1 | `648a5dd` |
 | 14 | Enhanced Agent Visibility (live state, ctx pressure, GSD phase) | v2.1 | `01b447f` |
+| 15 | Foundation — Dead code removal (~740 LOC) | v2.2 | `f67ada3` |
 
 ## Accumulated Context
 
@@ -117,6 +118,11 @@ Key decisions for v2.2:
 - SRP tab extraction happens after DRY extraction: tab sub-components import from shared module, so shared module must exist first
 - PERF lazy-mount implemented after SRP decomposition: only makes sense when tabs are standalone components with their own hook lifecycle
 - FIX bugs addressed in Phase 17 alongside PERF: same pass through the codebase, low risk changes
+- [Phase 15]: Dead GsdManagerPanelExpanded body deleted (not extracted) - content lives in GsdView.tsx from Quick-7
+- [Phase 15]: AgentsView.tsx deleted entirely - orphaned after Quick-6 created Agents tab inside GsdView.tsx
+- [Phase 15]: Re-export pattern from GsdRegistryService/useGsdRegistry/useAgentLiveStatus preserves backward compatibility; Phase 16 may clean up
+- [Phase 15]: GsdView.tsx imports AgentStateHint/PressureLevel directly from @shared/gsdTypes (not via hook re-export) — cleaner direct dependency
+- [Phase 15]: Shared types module pattern: create @shared/gsdTypes.ts, import with @shared alias in both server (tsc) and client (vite)
 
 ### Quick Tasks Completed
 
