@@ -13,7 +13,7 @@ See: .planning/PROJECT.md (updated 2026-02-19)
 Phase: 17 — Polish
 Plan: 02 of 02 complete
 Status: Phase 17 complete — lazy-mount tabs + fd safety + anchored regex + stable Map ref + setTimeout cleanup
-Last activity: 2026-02-19 — 17-01 lazy-mount + 17-02 bug fixes complete
+Last activity: 2026-02-19 - Completed quick task 9: Delete unused tools/ directory
 
 Progress: [##########] 100% (Phase 17 — 2/2 plans done)
 
@@ -146,6 +146,7 @@ Key decisions for v2.2:
 | 6 | Agents full-page nav view with responsive card grid (state, context, phase) | 2026-02-18 | `d45a5ed` |
 | 7 | GSD Control Center as full-page 4-tab nav view (replaces bottom-panel plugin) | 2026-02-18 | `fc76d8b` |
 | 8 | Searchable dropdowns for GSD Controls (agent name, commands) with auto-fill | 2026-02-18 | `b1ea88c` |
+| 9 | Delete unused tools/ directory | 2026-02-19 | `eeaa55b` |
 
 ### Roadmap Evolution
 
