@@ -64,8 +64,11 @@ class GsdHookLogWatcher {
       const readSize = stat.size - this.currentOffset;
       const buffer = Buffer.alloc(readSize);
       const fileDescriptor = fs.openSync(HOOK_LOG_PATH, 'r');
-      fs.readSync(fileDescriptor, buffer, 0, readSize, this.currentOffset);
-      fs.closeSync(fileDescriptor);
+      try {
+        fs.readSync(fileDescriptor, buffer, 0, readSize, this.currentOffset);
+      } finally {
+        fs.closeSync(fileDescriptor);
+      }
 
       this.currentOffset = stat.size;
 
@@ -89,8 +92,11 @@ class GsdHookLogWatcher {
       const readBytes = Math.min(stat.size, lineCount * 120);
       const buffer = Buffer.alloc(readBytes);
       const fileDescriptor = fs.openSync(HOOK_LOG_PATH, 'r');
-      fs.readSync(fileDescriptor, buffer, 0, readBytes, stat.size - readBytes);
-      fs.closeSync(fileDescriptor);
+      try {
+        fs.readSync(fileDescriptor, buffer, 0, readBytes, stat.size - readBytes);
+      } finally {
+        fs.closeSync(fileDescriptor);
+      }
 
       const content = buffer.toString('utf-8');
       return content

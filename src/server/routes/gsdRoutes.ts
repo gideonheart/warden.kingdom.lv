@@ -41,8 +41,12 @@ function detectAgentState(pane: string): AgentStateHint {
 
 function extractContextPressure(pane: string): { contextPressure: number | null; contextPressureLevel: PressureLevel | null } {
   const nonEmptyLines = pane.split('\n').filter((line) => line.trim().length > 0);
-  const lastFiveLines = nonEmptyLines.slice(-5).join('\n');
-  const match = /(\d{1,3})%/.exec(lastFiveLines);
+  // Filter to short lines (< 80 chars) typical of status bars, then look for
+  // Unicode block/box-drawing characters or the word "context" preceding a percentage.
+  // This avoids false positives from arbitrary terminal output like "npm install 45%".
+  const statusCandidates = nonEmptyLines.slice(-5).filter((line) => line.trim().length < 80);
+  const candidateText = statusCandidates.join('\n');
+  const match = /(?:[\u2580-\u259F]|context).*?(\d{1,3})%/i.exec(candidateText);
   if (!match) {
     return { contextPressure: null, contextPressureLevel: null };
   }
@@ -214,13 +218,16 @@ router.post('/api/gsd/spawn', async (request, response) => {
   // Log output to /tmp for debugging instead of stdio: 'ignore'.
   const spawnLogPath = `/tmp/gsd-spawn-${agentName}.log`;
   const logFd = openSync(spawnLogPath, 'w');
-  const child = spawn(
-    SPAWN_SH_PATH,
-    [agentName, resolvedWorkdir, ...(firstCommand ? [firstCommand as string] : [])],
-    { detached: true, stdio: ['ignore', logFd, logFd] },
-  );
-  child.unref();
-  closeSync(logFd);
+  try {
+    const child = spawn(
+      SPAWN_SH_PATH,
+      [agentName, resolvedWorkdir, ...(firstCommand ? [firstCommand as string] : [])],
+      { detached: true, stdio: ['ignore', logFd, logFd] },
+    );
+    child.unref();
+  } finally {
+    closeSync(logFd);
+  }
 
   console.log(`[GsdRoutes] Spawn initiated: agent=${agentName} session=${expectedSessionName} log=${spawnLogPath}`);
   response.status(202).json({
