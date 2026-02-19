@@ -238,7 +238,9 @@ See `.planning/milestones/v1.1-ROADMAP.md`
   5. `useAgentLiveStatus` produces a stable Map reference across renders when the underlying data has not changed — no unnecessary child re-renders triggered by Map identity changes
   6. `extractContextPressure()` anchors its regex to the Claude Code status bar format, reducing false positives when other terminal output matches the percentage pattern
 
-**Plans**: TBD
+**Plans**: 2 plans
+- [ ] 17-01-PLAN.md — Lazy-mount GSD tabs (move hooks into tabs) + setTimeout cleanup
+- [ ] 17-02-PLAN.md — fd safety (try/finally), Map stabilization, regex anchoring
 
 ---
 
