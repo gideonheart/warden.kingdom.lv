@@ -2,11 +2,11 @@
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-02-18)
+See: .planning/PROJECT.md (updated 2026-02-19)
 
 **Core value:** Real-time visibility into all active Claude Code agent sessions from a single browser tab
 
-**Current focus:** v2.2 Code Hygiene — Phase 16: DRY/SRP (complete)
+**Current focus:** v2.2 Code Hygiene — Phase 17: Polish (lazy-mount + bug fixes)
 
 ## Current Position
 
@@ -161,5 +161,5 @@ No active blockers for v2.2.
 ## Session Continuity
 
 Last session: 2026-02-19
-Stopped at: Completed 16-02-PLAN.md — Phase 16 complete
-Next step: Begin Phase 17 (performance optimizations and bug fixes)
+Stopped at: Phase 16 complete, ready to plan Phase 17
+Next step: `/gsd:plan-phase 17` (lazy-mount tabs + 4 bug fixes)

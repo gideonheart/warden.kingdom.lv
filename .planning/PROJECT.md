@@ -39,10 +39,10 @@ Real-time visibility into all active Claude Code agent sessions from a single br
 **Goal:** Eliminate dead code, extract shared components, unify types, decompose monolithic views, and add lazy tab mounting — pure refactor, net-negative ~500 LOC.
 
 **Target features:**
-- Delete ~750 lines of dead code (gutted plugin file, orphaned AgentsView)
-- Extract 9 duplicated constants/components into shared GSD status module
-- Create `src/shared/gsdTypes.ts` — unify GSD types across client/server boundary
-- Decompose 602-line GsdView.tsx into 4 tab sub-components (AgentsTab, ControlsTab, RegistryTab, HooksTab)
+- ✓ Delete ~750 lines of dead code (gutted plugin file, orphaned AgentsView) — Phase 15
+- ✓ Create `src/shared/gsdTypes.ts` — unify GSD types across client/server boundary — Phase 15
+- ✓ Extract 9 duplicated constants/components into shared GSD status module (`gsdShared.tsx`) — Phase 16
+- ✓ Decompose GsdView.tsx into 4 tab sub-components (AgentsTab, ControlsTab, RegistryTab, HooksTab) — Phase 16, GsdView now 76 lines
 - Lazy-mount tabs — only render active tab, eliminating ~18 HTTP req/min + 60 tmux subprocess/min waste
 - Fix minor issues: fd leak in spawn handler, setTimeout cleanup, Map re-creation, regex fragility
 
@@ -92,8 +92,9 @@ tmux configured with mouse mode and 50,000-line scrollback buffer for monitoring
 | ErrorBoundary per plugin panel | Crashing plugin cannot break main dashboard | ✓ Good — isolates failures |
 
 | Lazy-mount GSD tabs | Conditional render active tab only; hooks auto-deactivate on unmount | — Pending |
-| Extract shared GSD status components | DRY — 9 constants/components duplicated across 3 files | — Pending |
-| Unified gsdTypes.ts in src/shared/ | Follow established shared types pattern, eliminate client/server type drift | — Pending |
+| Extract shared GSD status components | DRY — 9 constants/components duplicated across 3 files | ✓ Good — gsdShared.tsx, zero duplicates |
+| Unified gsdTypes.ts in src/shared/ | Follow established shared types pattern, eliminate client/server type drift | ✓ Good — Phase 15, all imports updated |
+| SRP tab extraction for GsdView.tsx | Each tab standalone, parent is pure router | ✓ Good — 76 LOC router, 4 tab files |
 
 ---
-*Last updated: 2026-02-18 after milestone v2.2 start*
+*Last updated: 2026-02-19 after Phase 16*
