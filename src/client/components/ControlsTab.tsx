@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { BashHint } from './gsdShared.js';
 import { SearchableSelect } from './SearchableSelect.js';
 import { useGsdRegistry } from '../hooks/useGsdRegistry.js';
@@ -38,6 +38,17 @@ export function ControlsTab() {
   const agents = registry?.agents ?? [];
   const activeInstances = instances.filter((i) => i.status === 'active' || i.status === 'idle');
 
+  // Timer refs for setTimeout cleanup on unmount
+  const spawnTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dispatchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (spawnTimerRef.current) clearTimeout(spawnTimerRef.current);
+      if (dispatchTimerRef.current) clearTimeout(dispatchTimerRef.current);
+    };
+  }, []);
+
   // Spawn form state
   const [agentName, setAgentName] = useState('');
   const [workdir, setWorkdir] = useState('');
@@ -71,14 +82,14 @@ export function ControlsTab() {
       const data = (await response.json()) as { message?: string; agentName?: string; expectedSessionName?: string; error?: string };
       if (response.status === 202) {
         setSpawnStatus({ type: 'success', text: `Spawning ${data.agentName ?? agentName}... session: ${data.expectedSessionName ?? ''}` });
-        setTimeout(() => setSpawnStatus(null), 5000);
+        spawnTimerRef.current = setTimeout(() => setSpawnStatus(null), 5000);
       } else {
         setSpawnStatus({ type: 'error', text: data.error ?? 'Spawn failed' });
-        setTimeout(() => setSpawnStatus(null), 5000);
+        spawnTimerRef.current = setTimeout(() => setSpawnStatus(null), 5000);
       }
     } catch {
       setSpawnStatus({ type: 'error', text: 'Network error' });
-      setTimeout(() => setSpawnStatus(null), 5000);
+      spawnTimerRef.current = setTimeout(() => setSpawnStatus(null), 5000);
     } finally {
       setIsSpawning(false);
     }
@@ -97,14 +108,14 @@ export function ControlsTab() {
       const data = (await response.json()) as { dispatched?: boolean; output?: string; error?: string };
       if (response.ok) {
         setDispatchStatus({ type: 'success', text: 'Dispatched' });
-        setTimeout(() => setDispatchStatus(null), 3000);
+        dispatchTimerRef.current = setTimeout(() => setDispatchStatus(null), 3000);
       } else {
         setDispatchStatus({ type: 'error', text: data.error ?? 'Dispatch failed' });
-        setTimeout(() => setDispatchStatus(null), 5000);
+        dispatchTimerRef.current = setTimeout(() => setDispatchStatus(null), 5000);
       }
     } catch {
       setDispatchStatus({ type: 'error', text: 'Network error' });
-      setTimeout(() => setDispatchStatus(null), 5000);
+      dispatchTimerRef.current = setTimeout(() => setDispatchStatus(null), 5000);
     } finally {
       setIsDispatching(false);
     }
