@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { AgentStateHint, PressureLevel } from '@shared/gsdTypes.js';
 
 export type { AgentStateHint, PressureLevel } from '@shared/gsdTypes.js';
@@ -25,6 +25,7 @@ interface LiveStatusResponse {
 
 export function useAgentLiveStatus(): Map<string, AgentLiveStatus> {
   const [statusMap, setStatusMap] = useState<Map<string, AgentLiveStatus>>(new Map());
+  const previousDataRef = useRef<string>('');
 
   useEffect(() => {
     const fetchStatus = async () => {
@@ -40,6 +41,11 @@ export function useAgentLiveStatus(): Map<string, AgentLiveStatus> {
             contextPressureLevel: agent.contextPressureLevel,
           });
         }
+        // Only update state if data actually changed — keeps Map reference stable
+        // to prevent unnecessary re-renders in consuming components
+        const serialized = JSON.stringify(Array.from(nextMap.entries()));
+        if (serialized === previousDataRef.current) return;
+        previousDataRef.current = serialized;
         setStatusMap(nextMap);
       } catch {
         // On fetch error, leave previous data in place
