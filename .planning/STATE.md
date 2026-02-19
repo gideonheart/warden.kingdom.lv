@@ -120,10 +120,6 @@ Key decisions for v2.2:
 - FIX bugs addressed in Phase 17 alongside PERF: same pass through the codebase, low risk changes
 - [Phase 15]: Dead GsdManagerPanelExpanded body deleted (not extracted) - content lives in GsdView.tsx from Quick-7
 - [Phase 15]: AgentsView.tsx deleted entirely - orphaned after Quick-6 created Agents tab inside GsdView.tsx
-- [Phase 15]: Re-export pattern from GsdRegistryService/useGsdRegistry/useAgentLiveStatus preserves backward compatibility; Phase 16 may clean up
-- [Phase 15]: GsdView.tsx imports AgentStateHint/PressureLevel directly from @shared/gsdTypes (not via hook re-export) — cleaner direct dependency
-- [Phase 15]: Shared types module pattern: create @shared/gsdTypes.ts, import with @shared alias in both server (tsc) and client (vite)
-
 ### Quick Tasks Completed
 
 | # | Description | Date | Commit |
@@ -157,6 +153,6 @@ No active blockers for v2.2.
 
 ## Session Continuity
 
-Last session: 2026-02-18
-Stopped at: v2.2 roadmap created — Phases 15-17 defined
-Next step: `/gsd:plan-phase 15`
+Last session: 2026-02-19
+Stopped at: Completed 15-01-PLAN.md — dead code removal done
+Next step: `/gsd:execute-phase 16` (or plan Phase 16 first if needed)
