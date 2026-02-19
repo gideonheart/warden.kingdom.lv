@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { AgentInstance } from '../../shared/types.js';
+import { STATUS_COLORS } from './gsdShared.js';
 
 interface InstanceTabBarProps {
   instances: AgentInstance[];
@@ -7,13 +8,6 @@ interface InstanceTabBarProps {
   onSelectSession: (sessionName: string) => void;
   onSessionStopped?: (sessionName: string) => void;
 }
-
-const STATUS_COLORS: Record<string, string> = {
-  active: 'bg-warden-success',
-  idle: 'bg-warden-idle',
-  stopped: 'bg-warden-error',
-  error: 'bg-warden-error',
-};
 
 export function InstanceTabBar({ instances, selectedSessionName, onSelectSession, onSessionStopped }: InstanceTabBarProps) {
   const [stoppingSession, setStoppingSession] = useState<string | null>(null);

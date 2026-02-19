@@ -4,41 +4,8 @@ import { useGsdHookFeed } from '../hooks/useGsdHookFeed.js';
 import { useActiveInstances } from '../hooks/useActiveInstances.js';
 import { useAgentLiveStatus } from '../hooks/useAgentLiveStatus.js';
 import { useAgentStateFiles } from '../hooks/useAgentStateFiles.js';
-import type { AgentStateHint, PressureLevel } from '@shared/gsdTypes.js';
+import { STATUS_COLORS, StateBadge, PressureIndicator, PhaseProgress, BashHint } from './gsdShared.js';
 import { SearchableSelect } from './SearchableSelect.js';
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Color maps
-// ─────────────────────────────────────────────────────────────────────────────
-
-const STATUS_COLORS: Record<string, string> = {
-  active: 'bg-warden-success',
-  idle: 'bg-warden-idle',
-  stopped: 'bg-warden-error',
-  error: 'bg-warden-error',
-};
-
-const STATE_BADGE_COLORS: Record<AgentStateHint, string> = {
-  working: 'bg-warden-accent text-white',
-  idle: 'bg-warden-idle text-white',
-  menu: 'bg-warden-warning text-warden-bg',
-  permission_prompt: 'bg-warden-warning text-warden-bg',
-  error: 'bg-warden-error text-white',
-};
-
-const STATE_LABELS: Record<AgentStateHint, string> = {
-  working: 'working',
-  idle: 'idle',
-  menu: 'menu',
-  permission_prompt: 'perm',
-  error: 'error',
-};
-
-const PRESSURE_COLORS: Record<PressureLevel, string> = {
-  ok: 'text-warden-success',
-  warning: 'text-warden-warning',
-  critical: 'text-warden-error',
-};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GSD slash commands for searchable dropdowns
@@ -62,86 +29,6 @@ const GSD_COMMANDS: string[] = [
   '/gsd:status',
   '/gsd:research-phase',
 ];
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Helper components
-// ─────────────────────────────────────────────────────────────────────────────
-
-function StateBadge({ state }: { state: AgentStateHint | null }) {
-  if (state === null) {
-    return <span className="text-warden-text-dim text-sm">—</span>;
-  }
-  const colorClass = STATE_BADGE_COLORS[state];
-  const label = STATE_LABELS[state];
-  return (
-    <span className={`px-2 py-0.5 rounded text-xs font-mono ${colorClass}`}>{label}</span>
-  );
-}
-
-function PressureIndicator({
-  percentage,
-  level,
-}: {
-  percentage: number | null;
-  level: PressureLevel | null;
-}) {
-  if (percentage === null) {
-    return <span className="text-warden-text-dim text-sm">—</span>;
-  }
-  const colorClass = level ? PRESSURE_COLORS[level] : 'text-warden-text-dim';
-  return <span className={`font-mono text-sm ${colorClass}`}>{percentage}%</span>;
-}
-
-function PhaseProgress({
-  phase,
-  progress,
-}: {
-  phase: string | null;
-  progress: number | null;
-}) {
-  if (phase === null && progress === null) {
-    return <span className="text-warden-text-dim text-sm">—</span>;
-  }
-  return (
-    <span className="font-mono text-sm text-warden-text-dim">
-      P{phase}{progress !== null ? ` ${progress}%` : ''}
-    </span>
-  );
-}
-
-function CopyButton({ text }: { text: string }) {
-  const [copied, setCopied] = useState(false);
-
-  const handleCopy = useCallback(() => {
-    navigator.clipboard
-      .writeText(text)
-      .then(() => {
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-      })
-      .catch(() => {});
-  }, [text]);
-
-  return (
-    <button
-      onClick={handleCopy}
-      className="text-xs px-2 py-0.5 rounded bg-warden-border/50 text-warden-text-dim hover:text-warden-text transition-colors"
-    >
-      {copied ? 'Copied!' : 'Copy'}
-    </button>
-  );
-}
-
-function BashHint({ command }: { command: string }) {
-  return (
-    <div className="flex items-center gap-2 mt-1">
-      <code className="text-xs text-warden-text-dim font-mono bg-warden-bg/50 px-2 py-1 rounded flex-1 overflow-x-auto whitespace-nowrap">
-        {command}
-      </code>
-      <CopyButton text={command} />
-    </div>
-  );
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Tab definitions
