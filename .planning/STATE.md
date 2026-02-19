@@ -12,8 +12,8 @@ See: .planning/PROJECT.md (updated 2026-02-19)
 
 Phase: 17 — Polish
 Plan: 02 of 02 complete
-Status: Phase 17 plan 02 complete — fd safety, anchored regex, stable Map reference
-Last activity: 2026-02-19 — 17-02 bug fixes complete
+Status: Phase 17 complete — lazy-mount tabs + fd safety + anchored regex + stable Map ref + setTimeout cleanup
+Last activity: 2026-02-19 — 17-01 lazy-mount + 17-02 bug fixes complete
 
 Progress: [##########] 100% (Phase 17 — 2/2 plans done)
 
@@ -67,7 +67,7 @@ Progress: [##########] 100% (Phase 17 — 2/2 plans done)
 | 14 | Enhanced Agent Visibility (live state, ctx pressure, GSD phase) | v2.1 | `01b447f` |
 | 15 | Foundation — Dead code removal (~740 LOC) | v2.2 | `f67ada3` |
 | 16 | DRY/SRP — shared module + tab extraction | v2.2 | `e423c67` |
-| 17 | Polish — fd safety, anchored regex, stable Map ref | v2.2 | `e28f109` |
+| 17 | Polish — lazy-mount tabs, fd safety, anchored regex, setTimeout cleanup | v2.2 | `673cf5a` |
 
 ## Accumulated Context
 
@@ -131,6 +131,9 @@ Key decisions for v2.2:
 - [Phase 17]: try/finally (not try/catch) for fd cleanup — ensures cleanup on both success and error paths
 - [Phase 17]: extractContextPressure filters to lines < 80 chars + anchors to Unicode block chars or "context" keyword
 - [Phase 17]: JSON.stringify of Map entries for useAgentLiveStatus shallow comparison — negligible cost for 3-8 agents
+- [Phase 17]: Header badge/spinner/error moved from GsdView into AgentsTab — only Agents tab needs registry status display
+- [Phase 17]: Each tab calls its own hooks independently (no shared state lifting) for clean unmount lifecycle
+- [Phase 17]: useRef + useEffect cleanup pattern for all setTimeout calls in ControlsTab and CopyButton
 
 ### Quick Tasks Completed
 
@@ -166,5 +169,5 @@ No active blockers for v2.2.
 ## Session Continuity
 
 Last session: 2026-02-19
-Stopped at: Phase 17 plan 02 complete — all bug fixes applied
-Next step: Execute 17-01 (lazy-mount tabs) or advance to next milestone
+Stopped at: Phase 17 complete — all plans (17-01 lazy-mount + 17-02 bug fixes) executed
+Next step: v2.2 milestone complete, advance to next milestone

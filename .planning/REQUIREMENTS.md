@@ -34,13 +34,13 @@ Requirements for Code Hygiene milestone. Pure refactor — zero feature changes,
 
 ### Performance — Lazy Tab Mounting
 
-- [ ] **PERF-01**: Conditionally render only the active GSD tab (lazy mount), so hooks only run when tab is visible
-- [ ] **PERF-02**: Verify polling stops when switching away from Agents/Controls tabs
+- [x] **PERF-01**: Conditionally render only the active GSD tab (lazy mount), so hooks only run when tab is visible
+- [x] **PERF-02**: Verify polling stops when switching away from Agents/Controls tabs
 
 ### Bug Fixes
 
 - [x] **FIX-01**: Wrap `openSync`/`closeSync` in spawn handler with `try/finally` for fd safety
-- [ ] **FIX-02**: Clean up `setTimeout` calls in form handlers on component unmount
+- [x] **FIX-02**: Clean up `setTimeout` calls in form handlers on component unmount
 - [x] **FIX-03**: Stabilize `useAgentLiveStatus` Map reference to prevent unnecessary re-renders
 - [x] **FIX-04**: Improve `extractContextPressure()` to reduce false positives (anchor to Claude status bar format)
 
@@ -159,10 +159,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SRP-03 | Phase 16 | Complete |
 | SRP-04 | Phase 16 | Complete |
 | SRP-05 | Phase 16 | Complete |
-| PERF-01 | Phase 17 | Pending |
-| PERF-02 | Phase 17 | Pending |
+| PERF-01 | Phase 17 | Complete |
+| PERF-02 | Phase 17 | Complete |
 | FIX-01 | Phase 17 | Complete |
-| FIX-02 | Phase 17 | Pending |
+| FIX-02 | Phase 17 | Complete |
 | FIX-03 | Phase 17 | Complete |
 | FIX-04 | Phase 17 | Complete |
 | GRID-01 | Phase 13 | Complete |
