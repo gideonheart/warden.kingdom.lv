@@ -1,26 +1,10 @@
 import { readFile, writeFile, rename } from 'fs/promises';
+import type { RegistryAgent, GsdRegistry } from '@shared/gsdTypes.js';
+
+export type { RegistryAgent, GsdRegistry } from '@shared/gsdTypes.js';
 
 const REGISTRY_PATH = '/home/forge/.openclaw/workspace/skills/gsd-code-skill/config/recovery-registry.json';
 const CACHE_TTL_MS = 30_000;
-
-export interface RegistryAgent {
-  agent_id: string;
-  enabled: boolean;
-  working_directory: string;
-  tmux_session_name: string;
-  claude_launch_command: string;
-  auto_wake: boolean;
-  topic_id: number;
-  openclaw_session_id: string;
-  claude_resume_target: string;
-  claude_post_launch_mode: string;
-}
-
-export interface GsdRegistry {
-  global_status_openclaw_session_id: string;
-  global_status_openclaw_session_key: string;
-  agents: RegistryAgent[];
-}
 
 class GsdRegistryService {
   private cachedRegistry: GsdRegistry | null = null;

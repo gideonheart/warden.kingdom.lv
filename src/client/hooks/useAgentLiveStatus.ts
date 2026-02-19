@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
+import type { AgentStateHint, PressureLevel } from '@shared/gsdTypes.js';
+
+export type { AgentStateHint, PressureLevel } from '@shared/gsdTypes.js';
 
 const POLL_INTERVAL_MS = 5_000;
-
-export type AgentStateHint = 'working' | 'idle' | 'menu' | 'permission_prompt' | 'error';
-export type PressureLevel = 'ok' | 'warning' | 'critical';
 
 export interface AgentLiveStatus {
   state: AgentStateHint | null;

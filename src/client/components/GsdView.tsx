@@ -4,7 +4,7 @@ import { useGsdHookFeed } from '../hooks/useGsdHookFeed.js';
 import { useActiveInstances } from '../hooks/useActiveInstances.js';
 import { useAgentLiveStatus } from '../hooks/useAgentLiveStatus.js';
 import { useAgentStateFiles } from '../hooks/useAgentStateFiles.js';
-import type { AgentStateHint, PressureLevel } from '../hooks/useAgentLiveStatus.js';
+import type { AgentStateHint, PressureLevel } from '@shared/gsdTypes.js';
 import { SearchableSelect } from './SearchableSelect.js';
 
 // ─────────────────────────────────────────────────────────────────────────────

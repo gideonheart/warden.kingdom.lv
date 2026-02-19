@@ -8,6 +8,7 @@ import path from 'path';
 import { gsdRegistryService } from '../services/GsdRegistryService.js';
 import { gsdHookLogWatcher } from '../services/GsdHookLogWatcher.js';
 import { database } from '../database/DatabaseConnection.js';
+import type { AgentStateHint, PressureLevel } from '@shared/gsdTypes.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -22,11 +23,8 @@ const WORKDIR_PREFIX = '/home/forge/';
 const router = Router();
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Live-status types and helpers
+// Live-status helpers
 // ─────────────────────────────────────────────────────────────────────────────
-
-type AgentStateHint = 'working' | 'idle' | 'menu' | 'permission_prompt' | 'error';
-type PressureLevel = 'ok' | 'warning' | 'critical';
 
 function detectAgentState(pane: string): AgentStateHint {
   if (/enter to select|numbered.*option/i.test(pane)) return 'menu';
