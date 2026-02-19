@@ -14,9 +14,9 @@ Requirements for Code Hygiene milestone. Pure refactor — zero feature changes,
 
 ### DRY — Shared Component Extraction
 
-- [ ] **DRY-01**: Extract `STATUS_COLORS`, `STATE_BADGE_COLORS`, `STATE_LABELS`, `PRESSURE_COLORS` constants to shared module
-- [ ] **DRY-02**: Extract `StateBadge`, `PressureIndicator`, `PhaseProgress`, `CopyButton`, `BashHint` components to shared module
-- [ ] **DRY-03**: Update all consumers (`GsdView.tsx`, remaining plugin code) to import from shared module
+- [x] **DRY-01**: Extract `STATUS_COLORS`, `STATE_BADGE_COLORS`, `STATE_LABELS`, `PRESSURE_COLORS` constants to shared module
+- [x] **DRY-02**: Extract `StateBadge`, `PressureIndicator`, `PhaseProgress`, `CopyButton`, `BashHint` components to shared module
+- [x] **DRY-03**: Update all consumers (`GsdView.tsx`, remaining plugin code) to import from shared module
 
 ### SRP — View Decomposition
 
@@ -151,9 +151,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | TYPE-01 | Phase 15 | Complete |
 | TYPE-02 | Phase 15 | Complete |
 | TYPE-03 | Phase 15 | Complete |
-| DRY-01 | Phase 16 | Pending |
-| DRY-02 | Phase 16 | Pending |
-| DRY-03 | Phase 16 | Pending |
+| DRY-01 | Phase 16 | Complete |
+| DRY-02 | Phase 16 | Complete |
+| DRY-03 | Phase 16 | Complete |
 | SRP-01 | Phase 16 | Pending |
 | SRP-02 | Phase 16 | Pending |
 | SRP-03 | Phase 16 | Pending |

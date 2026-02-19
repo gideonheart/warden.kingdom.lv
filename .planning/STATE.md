@@ -6,16 +6,16 @@ See: .planning/PROJECT.md (updated 2026-02-18)
 
 **Core value:** Real-time visibility into all active Claude Code agent sessions from a single browser tab
 
-**Current focus:** v2.2 Code Hygiene — Phase 15: Foundation (Plan 01 complete)
+**Current focus:** v2.2 Code Hygiene — Phase 16: DRY/SRP (Plan 01 complete)
 
 ## Current Position
 
-Phase: 15 — Foundation
+Phase: 16 — DRY/SRP
 Plan: 01 complete
-Status: Phase 15 complete — ready for Phase 16
-Last activity: 2026-02-19 — 15-01 dead code removal complete
+Status: Plan 16-01 complete — gsdShared.tsx extracted, ready for Plan 02
+Last activity: 2026-02-19 — 16-01 extract shared GSD constants complete
 
-Progress: [##########] 100% (Phase 15 — 2/2 plans done)
+Progress: [#####-----] 50% (Phase 16 — 1/2 plans done)
 
 ## Performance Metrics
 
@@ -120,6 +120,8 @@ Key decisions for v2.2:
 - FIX bugs addressed in Phase 17 alongside PERF: same pass through the codebase, low risk changes
 - [Phase 15]: Dead GsdManagerPanelExpanded body deleted (not extracted) - content lives in GsdView.tsx from Quick-7
 - [Phase 15]: AgentsView.tsx deleted entirely - orphaned after Quick-6 created Agents tab inside GsdView.tsx
+- [Phase 16]: All 9 GSD shared symbols (4 constants + 5 components) extracted to single gsdShared.tsx module
+- [Phase 16]: AgentStateHint/PressureLevel type imports removed from GsdView.tsx since no direct references remain
 ### Quick Tasks Completed
 
 | # | Description | Date | Commit |
@@ -154,5 +156,5 @@ No active blockers for v2.2.
 ## Session Continuity
 
 Last session: 2026-02-19
-Stopped at: Completed 15-01-PLAN.md — dead code removal done
-Next step: `/gsd:execute-phase 16` (or plan Phase 16 first if needed)
+Stopped at: Completed 16-01-PLAN.md — gsdShared.tsx extraction done
+Next step: Execute 16-02-PLAN.md (SRP tab extraction)
