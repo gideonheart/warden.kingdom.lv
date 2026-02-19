@@ -261,5 +261,5 @@ See `.planning/milestones/v1.1-ROADMAP.md`
 | 13. Client Plugin | v2.1 | 1/1 | Complete | 2026-02-18 |
 | 14. Enhanced Agent Visibility | v2.1 | 1/1 | Complete | 2026-02-18 |
 | 15. Foundation | 2/2 | Complete    | 2026-02-19 | - |
-| 16. DRY + SRP | 2/2 | Complete   | 2026-02-19 | - |
+| 16. DRY + SRP | 2/2 | Complete    | 2026-02-19 | - |
 | 17. Polish | v2.2 | 0/? | Not started | - |
