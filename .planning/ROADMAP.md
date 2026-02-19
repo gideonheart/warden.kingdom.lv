@@ -54,7 +54,7 @@
 
 - [x] **Phase 15: Foundation** - Delete ~750 lines of dead code and create unified shared GSD types (completed 2026-02-19)
 - [x] **Phase 16: DRY + SRP** - Extract duplicated constants/components into shared module and decompose GsdView into tab sub-components (completed 2026-02-19)
-- [ ] **Phase 17: Polish** - Lazy-mount GSD tabs and fix four minor bugs (fd leak, setTimeout cleanup, Map re-creation, regex fragility)
+- [x] **Phase 17: Polish** - Lazy-mount GSD tabs and fix four minor bugs (fd leak, setTimeout cleanup, Map re-creation, regex fragility) (completed 2026-02-19)
 
 ## Phase Details
 
@@ -264,4 +264,4 @@ See `.planning/milestones/v1.1-ROADMAP.md`
 | 14. Enhanced Agent Visibility | v2.1 | 1/1 | Complete | 2026-02-18 |
 | 15. Foundation | 2/2 | Complete    | 2026-02-19 | - |
 | 16. DRY + SRP | 2/2 | Complete    | 2026-02-19 | - |
-| 17. Polish | v2.2 | 0/? | Not started | - |
+| 17. Polish | 2/2 | Complete   | 2026-02-19 | - |

@@ -10,12 +10,12 @@ See: .planning/PROJECT.md (updated 2026-02-19)
 
 ## Current Position
 
-Phase: 16 — DRY/SRP
+Phase: 17 — Polish
 Plan: 02 of 02 complete
-Status: Phase 16 complete — all GSD tabs extracted to standalone components, GsdView.tsx is 76-line router shell
-Last activity: 2026-02-19 — 16-02 SRP tab extraction complete
+Status: Phase 17 plan 02 complete — fd safety, anchored regex, stable Map reference
+Last activity: 2026-02-19 — 17-02 bug fixes complete
 
-Progress: [##########] 100% (Phase 16 — 2/2 plans done)
+Progress: [##########] 100% (Phase 17 — 2/2 plans done)
 
 ## Performance Metrics
 
@@ -67,6 +67,7 @@ Progress: [##########] 100% (Phase 16 — 2/2 plans done)
 | 14 | Enhanced Agent Visibility (live state, ctx pressure, GSD phase) | v2.1 | `01b447f` |
 | 15 | Foundation — Dead code removal (~740 LOC) | v2.2 | `f67ada3` |
 | 16 | DRY/SRP — shared module + tab extraction | v2.2 | `e423c67` |
+| 17 | Polish — fd safety, anchored regex, stable Map ref | v2.2 | `e28f109` |
 
 ## Accumulated Context
 
@@ -127,6 +128,10 @@ Key decisions for v2.2:
 - [Phase 16]: ControlsTab owns all spawn/dispatch state — GsdView passes only data props, zero form state
 - [Phase 16]: GSD_COMMANDS constant moved into ControlsTab since only Controls tab uses it
 - [Phase 16]: GsdView.tsx reduced from 489 to 76 lines — pure tab router shell
+- [Phase 17]: try/finally (not try/catch) for fd cleanup — ensures cleanup on both success and error paths
+- [Phase 17]: extractContextPressure filters to lines < 80 chars + anchors to Unicode block chars or "context" keyword
+- [Phase 17]: JSON.stringify of Map entries for useAgentLiveStatus shallow comparison — negligible cost for 3-8 agents
+
 ### Quick Tasks Completed
 
 | # | Description | Date | Commit |
@@ -161,5 +166,5 @@ No active blockers for v2.2.
 ## Session Continuity
 
 Last session: 2026-02-19
-Stopped at: Phase 16 complete, ready to plan Phase 17
-Next step: `/gsd:plan-phase 17` (lazy-mount tabs + 4 bug fixes)
+Stopped at: Phase 17 plan 02 complete — all bug fixes applied
+Next step: Execute 17-01 (lazy-mount tabs) or advance to next milestone

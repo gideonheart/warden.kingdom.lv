@@ -39,10 +39,10 @@ Requirements for Code Hygiene milestone. Pure refactor — zero feature changes,
 
 ### Bug Fixes
 
-- [ ] **FIX-01**: Wrap `openSync`/`closeSync` in spawn handler with `try/finally` for fd safety
+- [x] **FIX-01**: Wrap `openSync`/`closeSync` in spawn handler with `try/finally` for fd safety
 - [ ] **FIX-02**: Clean up `setTimeout` calls in form handlers on component unmount
-- [ ] **FIX-03**: Stabilize `useAgentLiveStatus` Map reference to prevent unnecessary re-renders
-- [ ] **FIX-04**: Improve `extractContextPressure()` to reduce false positives (anchor to Claude status bar format)
+- [x] **FIX-03**: Stabilize `useAgentLiveStatus` Map reference to prevent unnecessary re-renders
+- [x] **FIX-04**: Improve `extractContextPressure()` to reduce false positives (anchor to Claude status bar format)
 
 ## v2.1 Requirements (Complete)
 
@@ -161,10 +161,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SRP-05 | Phase 16 | Complete |
 | PERF-01 | Phase 17 | Pending |
 | PERF-02 | Phase 17 | Pending |
-| FIX-01 | Phase 17 | Pending |
+| FIX-01 | Phase 17 | Complete |
 | FIX-02 | Phase 17 | Pending |
-| FIX-03 | Phase 17 | Pending |
-| FIX-04 | Phase 17 | Pending |
+| FIX-03 | Phase 17 | Complete |
+| FIX-04 | Phase 17 | Complete |
 | GRID-01 | Phase 13 | Complete |
 | GRID-02 | Phase 13 | Complete |
 | GRID-03 | Phase 14 | Complete |
