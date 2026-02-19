@@ -1,38 +1,43 @@
+import { useMemo } from 'react';
 import { STATUS_COLORS, StateBadge, PressureIndicator, PhaseProgress } from './gsdShared.js';
-import type { RegistryAgent, AgentStateHint, PressureLevel } from '@shared/gsdTypes.js';
-import type { AgentInstance } from '@shared/types.js';
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Props
-// ─────────────────────────────────────────────────────────────────────────────
-
-export interface AgentsTabProps {
-  agents: RegistryAgent[];
-  instances: AgentInstance[];
-  liveStatus: Map<string, { state: AgentStateHint | null; contextPressure: number | null; contextPressureLevel: PressureLevel | null }>;
-  stateFiles: Map<string, { phase: string | null; progress: number | null }>;
-  getEffectiveEnabled: (agentId: string, serverEnabled: boolean) => boolean;
-  toggleEnabled: (agentId: string, currentEnabled: boolean) => void;
-  registryLoading: boolean;
-  registryError: string | null;
-}
+import { useGsdRegistry } from '../hooks/useGsdRegistry.js';
+import { useActiveInstances } from '../hooks/useActiveInstances.js';
+import { useAgentLiveStatus } from '../hooks/useAgentLiveStatus.js';
+import { useAgentStateFiles } from '../hooks/useAgentStateFiles.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // AgentsTab — responsive card grid with state badges, pressure, phase progress
 // ─────────────────────────────────────────────────────────────────────────────
 
-export function AgentsTab({
-  agents,
-  instances,
-  liveStatus,
-  stateFiles,
-  getEffectiveEnabled,
-  toggleEnabled,
-  registryLoading,
-  registryError,
-}: AgentsTabProps) {
+export function AgentsTab() {
+  const { registry, isLoading: registryLoading, error: registryError, getEffectiveEnabled, toggleEnabled } = useGsdRegistry();
+  const { instances } = useActiveInstances();
+  const liveStatus = useAgentLiveStatus();
+
+  const sessionNames = useMemo(
+    () => (registry?.agents ?? []).filter((a) => a.tmux_session_name).map((a) => a.tmux_session_name),
+    [registry],
+  );
+
+  const stateFiles = useAgentStateFiles(sessionNames);
+  const agents = registry?.agents ?? [];
+
   return (
     <div>
+      {/* Header badge/spinner/error — moved from GsdView */}
+      <div className="flex items-center gap-3 mb-4">
+        {!registryLoading && !registryError && (
+          <span className="text-xs text-warden-text-dim px-2 py-0.5 bg-warden-border/50 rounded">{agents.length} registered</span>
+        )}
+        {registryLoading && (
+          <span className="text-xs text-warden-text-dim flex items-center gap-1.5">
+            <span className="w-3 h-3 border border-warden-accent border-t-transparent rounded-full animate-spin inline-block" />
+            Loading...
+          </span>
+        )}
+        {registryError && <span className="text-xs text-warden-error">{registryError}</span>}
+      </div>
+
       {!registryLoading && !registryError && agents.length === 0 && (
         <div className="flex items-center justify-center py-24">
           <p className="text-warden-text-dim text-sm">No agents registered</p>

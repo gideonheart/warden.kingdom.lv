@@ -1,28 +1,12 @@
-import type { GsdRegistry } from '@shared/gsdTypes.js';
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Props
-// ─────────────────────────────────────────────────────────────────────────────
-
-export interface RegistryTabProps {
-  registry: GsdRegistry | null;
-  registryLoading: boolean;
-  registryError: string | null;
-  getEffectiveEnabled: (agentId: string, serverEnabled: boolean) => boolean;
-  toggleEnabled: (agentId: string, currentEnabled: boolean) => void;
-}
+import { useGsdRegistry } from '../hooks/useGsdRegistry.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // RegistryTab — registry table with enabled toggles
 // ─────────────────────────────────────────────────────────────────────────────
 
-export function RegistryTab({
-  registry,
-  registryLoading,
-  registryError,
-  getEffectiveEnabled,
-  toggleEnabled,
-}: RegistryTabProps) {
+export function RegistryTab() {
+  const { registry, isLoading: registryLoading, error: registryError, getEffectiveEnabled, toggleEnabled } = useGsdRegistry();
+
   return (
     <div>
       {registryLoading && <p className="text-sm text-warden-text-dim">Loading registry...</p>}

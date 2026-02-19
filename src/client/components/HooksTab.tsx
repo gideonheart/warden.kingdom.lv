@@ -1,18 +1,12 @@
-import type { HookEvent } from '../hooks/useGsdHookFeed.js';
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Props
-// ─────────────────────────────────────────────────────────────────────────────
-
-export interface HooksTabProps {
-  hookEvents: HookEvent[];
-}
+import { useGsdHookFeed } from '../hooks/useGsdHookFeed.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HooksTab — hook event feed table
 // ─────────────────────────────────────────────────────────────────────────────
 
-export function HooksTab({ hookEvents }: HooksTabProps) {
+export function HooksTab() {
+  const { hookEvents } = useGsdHookFeed();
+
   return (
     <div>
       {hookEvents.length === 0 ? (

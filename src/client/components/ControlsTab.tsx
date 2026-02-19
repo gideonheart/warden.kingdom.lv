@@ -1,8 +1,8 @@
 import { useState, useCallback, useEffect } from 'react';
 import { BashHint } from './gsdShared.js';
 import { SearchableSelect } from './SearchableSelect.js';
-import type { RegistryAgent } from '@shared/gsdTypes.js';
-import type { AgentInstance } from '@shared/types.js';
+import { useGsdRegistry } from '../hooks/useGsdRegistry.js';
+import { useActiveInstances } from '../hooks/useActiveInstances.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GSD slash commands for searchable dropdowns
@@ -28,19 +28,16 @@ const GSD_COMMANDS: string[] = [
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Props
-// ─────────────────────────────────────────────────────────────────────────────
-
-export interface ControlsTabProps {
-  agents: RegistryAgent[];
-  activeInstances: AgentInstance[];
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 // ControlsTab — spawn form + command dispatch form
 // ─────────────────────────────────────────────────────────────────────────────
 
-export function ControlsTab({ agents, activeInstances }: ControlsTabProps) {
+export function ControlsTab() {
+  const { registry } = useGsdRegistry();
+  const { instances } = useActiveInstances();
+
+  const agents = registry?.agents ?? [];
+  const activeInstances = instances.filter((i) => i.status === 'active' || i.status === 'idle');
+
   // Spawn form state
   const [agentName, setAgentName] = useState('');
   const [workdir, setWorkdir] = useState('');
