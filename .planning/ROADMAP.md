@@ -195,7 +195,9 @@ See `.planning/milestones/v1.1-ROADMAP.md`
   4. Server files (`gsdRoutes.ts`, `GsdRegistryService.ts`) import GSD types exclusively from `src/shared/gsdTypes.ts` — no local type redefinitions
   5. Client hooks and views import GSD types exclusively from `src/shared/gsdTypes.ts` — no duplicate type declarations
 
-**Plans**: TBD
+**Plans**: 2 plans
+- [ ] 15-01-PLAN.md — Delete dead GsdManagerPanelExpanded and orphaned AgentsView.tsx
+- [ ] 15-02-PLAN.md — Create shared gsdTypes.ts and update all server/client imports
 
 ---
 
@@ -256,6 +258,6 @@ See `.planning/milestones/v1.1-ROADMAP.md`
 | 12. Backend Foundation | v2.1 | 2/2 | Complete | 2026-02-18 |
 | 13. Client Plugin | v2.1 | 1/1 | Complete | 2026-02-18 |
 | 14. Enhanced Agent Visibility | v2.1 | 1/1 | Complete | 2026-02-18 |
-| 15. Foundation | v2.2 | 0/? | Not started | - |
+| 15. Foundation | v2.2 | 0/2 | Not started | - |
 | 16. DRY + SRP | v2.2 | 0/? | Not started | - |
 | 17. Polish | v2.2 | 0/? | Not started | - |
