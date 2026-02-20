@@ -2,15 +2,15 @@ import { useState } from 'react';
 import { AgentsTab } from './AgentsTab.js';
 import { ControlsTab } from './ControlsTab.js';
 import { RegistryTab } from './RegistryTab.js';
-import { HooksTab } from './HooksTab.js';
+import { EventsTab } from './EventsTab.js';
 
-type TabId = 'agents' | 'controls' | 'registry' | 'hooks';
+type TabId = 'agents' | 'controls' | 'registry' | 'events';
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'agents', label: 'Agents' },
   { id: 'controls', label: 'Controls' },
   { id: 'registry', label: 'Registry' },
-  { id: 'hooks', label: 'Hooks' },
+  { id: 'events', label: 'Events' },
 ];
 
 export function GsdView() {
@@ -40,7 +40,7 @@ export function GsdView() {
         {activeTab === 'agents' && <AgentsTab />}
         {activeTab === 'controls' && <ControlsTab />}
         {activeTab === 'registry' && <RegistryTab />}
-        {activeTab === 'hooks' && <HooksTab />}
+        {activeTab === 'events' && <EventsTab />}
       </div>
     </div>
   );
