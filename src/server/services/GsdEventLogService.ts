@@ -1,7 +1,7 @@
 import { open } from 'fs/promises';
 import { readdir, stat } from 'fs/promises';
 import path from 'path';
-import type { GsdRawEvent } from '@shared/gsdTypes.js';
+import type { GsdRawEvent, GsdEventSource } from '@shared/gsdTypes.js';
 import { GSD_NOISE_EVENTS } from '@shared/gsdTypes.js';
 
 const LOGS_DIR = '/home/forge/.openclaw/workspace/skills/gsd-code-skill/logs';
@@ -56,16 +56,72 @@ class GsdEventLogService {
     }
   }
 
-  async getRecentEvents(limit: number = 100): Promise<GsdRawEvent[]> {
-    let files: string[];
+  /**
+   * List all available JSONL log files in LOGS_DIR, returning metadata for each.
+   * Returns an empty array if LOGS_DIR does not exist or cannot be read.
+   */
+  async listLogFiles(): Promise<GsdEventSource[]> {
+    let dirEntries: string[];
     try {
-      const dirEntries = await readdir(LOGS_DIR);
-      files = dirEntries
-        .filter((name) => name.endsWith('-raw-events.jsonl'))
-        .map((name) => path.join(LOGS_DIR, name));
+      dirEntries = await readdir(LOGS_DIR);
     } catch {
       console.error('[GsdEventLogService] Failed to read logs directory:', LOGS_DIR);
       return [];
+    }
+
+    const jsonlFiles = dirEntries.filter((name) => name.endsWith('-raw-events.jsonl'));
+
+    const sources = await Promise.all(
+      jsonlFiles.map(async (filename): Promise<GsdEventSource | null> => {
+        try {
+          const fileStat = await stat(path.join(LOGS_DIR, filename));
+          const label = filename.replace(/-raw-events\.jsonl$/, '');
+          return { filename, label, sizeBytes: fileStat.size };
+        } catch {
+          return null;
+        }
+      }),
+    );
+
+    // Filter out any files that failed to stat, sort by label for stable ordering
+    const validSources = sources.filter((s): s is GsdEventSource => s !== null);
+    validSources.sort((a, b) => a.label.localeCompare(b.label));
+    return validSources;
+  }
+
+  /**
+   * Validate that a source filename is a safe JSONL filename (no path traversal).
+   * Returns true if the filename is valid, false otherwise.
+   */
+  private isValidSourceFilename(filename: string): boolean {
+    return (
+      filename.endsWith('-raw-events.jsonl') &&
+      !filename.includes('/') &&
+      !filename.includes('\\') &&
+      !filename.includes('..')
+    );
+  }
+
+  async getRecentEvents(limit: number = 100, source?: string): Promise<GsdRawEvent[]> {
+    let files: string[];
+
+    if (source) {
+      // Validate source filename to prevent directory traversal
+      if (!this.isValidSourceFilename(source)) {
+        console.error('[GsdEventLogService] Invalid source filename rejected:', source);
+        return [];
+      }
+      files = [path.join(LOGS_DIR, source)];
+    } else {
+      try {
+        const dirEntries = await readdir(LOGS_DIR);
+        files = dirEntries
+          .filter((name) => name.endsWith('-raw-events.jsonl'))
+          .map((name) => path.join(LOGS_DIR, name));
+      } catch {
+        console.error('[GsdEventLogService] Failed to read logs directory:', LOGS_DIR);
+        return [];
+      }
     }
 
     // Read all files in parallel

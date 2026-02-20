@@ -318,7 +318,20 @@ router.get('/api/gsd/sessions/:session/state', async (request, response) => {
   }
 });
 
+// GET /api/gsd/events/sources — list available JSONL log files
+router.get('/api/gsd/events/sources', async (_request, response) => {
+  try {
+    const sources = await gsdEventLogService.listLogFiles();
+    response.setHeader('Content-Type', 'application/json');
+    response.json({ sources });
+  } catch (error) {
+    console.error('[GsdRoutes] Failed to list event sources:', error);
+    response.status(500).json({ error: 'Failed to list event sources' });
+  }
+});
+
 // GET /api/gsd/events — return recent agent events from JSONL logs
+// Optional query params: limit (number, max 500), source (JSONL filename to filter to single file)
 router.get('/api/gsd/events', async (request, response) => {
   const rawLimit = request.query.limit;
   let limit = 100;
@@ -330,8 +343,12 @@ router.get('/api/gsd/events', async (request, response) => {
     }
   }
 
+  const rawSource = request.query.source;
+  const source = typeof rawSource === 'string' && rawSource ? rawSource : undefined;
+
   try {
-    const events = await gsdEventLogService.getRecentEvents(limit);
+    const events = await gsdEventLogService.getRecentEvents(limit, source);
+    response.setHeader('Content-Type', 'application/json');
     response.json({ events });
   } catch (error) {
     console.error('[GsdRoutes] Failed to get events:', error);

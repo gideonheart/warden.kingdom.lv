@@ -80,7 +80,7 @@ app.get('/api/health', (_request, response) => {
 if (CLIENT_DIST_PATH) {
   app.use(express.static(CLIENT_DIST_PATH));
   // SPA fallback (Express 5 / path-to-regexp v6: use RegExp instead of "*")
-  app.get(/.*/, (_request, response) => {
+  app.get(/^\/(?!api\/|socket\.io\/).*/, (_request, response) => {
     response.sendFile(path.join(CLIENT_DIST_PATH, 'index.html'));
   });
 } else if (IS_PRODUCTION) {

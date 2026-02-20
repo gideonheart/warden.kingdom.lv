@@ -42,6 +42,13 @@ export interface GsdRawEvent {
   payload: Record<string, unknown>;
 }
 
+// Metadata for a JSONL log file available as an event source
+export interface GsdEventSource {
+  filename: string;     // e.g. "agent_warden-kingdom_session_name-raw-events.jsonl"
+  label: string;        // human-friendly label derived from filename, e.g. "agent_warden-kingdom_session_name"
+  sizeBytes: number;    // file size in bytes
+}
+
 // Grouped display event — Pre+Post merged into one entry
 export interface GsdDisplayEvent {
   id: string;             // tool_use_id or timestamp-based unique key
