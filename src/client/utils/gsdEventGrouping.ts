@@ -66,6 +66,41 @@ function buildToolSummary(
       }
       return 'AskUserQuestion';
     }
+    case 'Skill': {
+      const skill = String(toolInput.skill ?? '').trim();
+      if (!skill) return 'Skill';
+      const args = String(toolInput.args ?? '').trim();
+      return truncate(args ? `${skill} ${args}` : skill, 80);
+    }
+    case 'Task': {
+      const subagentType = String(toolInput.subagent_type ?? '').trim();
+      const description = String(toolInput.description ?? '').trim();
+      if (subagentType && description) return truncate(`${subagentType} — ${description}`, 80);
+      if (description) return truncate(description, 80);
+      if (subagentType) return truncate(subagentType, 80);
+      return 'Task';
+    }
+    case 'Edit': {
+      const filePath = String(toolInput.file_path ?? '');
+      if (!filePath) return 'Edit';
+      return truncate(toRelativePath(filePath), 80);
+    }
+    case 'TaskCreate': {
+      const subject = String(toolInput.subject ?? '').trim();
+      return subject ? truncate(subject, 80) : 'TaskCreate';
+    }
+    case 'TaskUpdate': {
+      const taskId = String(toolInput.taskId ?? '').trim();
+      const status = String(toolInput.status ?? '').trim();
+      if (taskId && status) return `#${taskId} -> ${status}`;
+      if (taskId) return `#${taskId}`;
+      if (status) return `-> ${status}`;
+      return 'TaskUpdate';
+    }
+    case 'TaskOutput': {
+      const taskId = String(toolInput.task_id ?? '').trim();
+      return taskId ? truncate(`task: ${taskId}`, 60) : 'TaskOutput';
+    }
     default:
       return toolName;
   }
@@ -100,6 +135,44 @@ function buildToolDetail(
     case 'AskUserQuestion':
       // AskUserQuestion detail is rendered by QuestionDisplay component
       return undefined;
+    case 'Skill': {
+      const skill = String(toolInput.skill ?? '').trim();
+      const args = String(toolInput.args ?? '').trim();
+      if (!skill) return undefined;
+      return args ? `skill: ${skill}\nargs: ${args}` : `skill: ${skill}`;
+    }
+    case 'Task': {
+      const subagentType = String(toolInput.subagent_type ?? '').trim();
+      const model = String(toolInput.model ?? '').trim();
+      const description = String(toolInput.description ?? '').trim();
+      const parts: string[] = [];
+      if (subagentType) parts.push(`subagent: ${subagentType}`);
+      if (model) parts.push(`model: ${model}`);
+      if (description) parts.push(`description: ${description}`);
+      return parts.length > 0 ? parts.join('\n') : undefined;
+    }
+    case 'Edit':
+      return String(toolInput.file_path ?? '') || undefined;
+    case 'TaskCreate': {
+      const subject = String(toolInput.subject ?? '').trim();
+      const description = String(toolInput.description ?? '').trim();
+      const parts: string[] = [];
+      if (subject) parts.push(`subject: ${subject}`);
+      if (description) parts.push(`description: ${truncate(description, 200)}`);
+      return parts.length > 0 ? parts.join('\n') : undefined;
+    }
+    case 'TaskUpdate': {
+      const taskId = String(toolInput.taskId ?? '').trim();
+      const status = String(toolInput.status ?? '').trim();
+      const parts: string[] = [];
+      if (taskId) parts.push(`taskId: ${taskId}`);
+      if (status) parts.push(`status: ${status}`);
+      return parts.length > 0 ? parts.join('\n') : undefined;
+    }
+    case 'TaskOutput': {
+      const taskId = String(toolInput.task_id ?? '').trim();
+      return taskId ? `task_id: ${taskId}` : undefined;
+    }
     default:
       return undefined;
   }
