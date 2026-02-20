@@ -33,45 +33,71 @@ interface QuestionDisplayProps {
 
 function QuestionDisplay({ questions }: QuestionDisplayProps) {
   return (
-    <div className="mt-2 space-y-3 pl-2 border-l-2 border-purple-700/40">
+    <ol className="mt-2 space-y-4 list-none pl-0">
       {questions.map((q, index) => {
         const selectedAnswers = q.answer
           ? (q.multiSelect ? q.answer.split(', ') : [q.answer])
           : [];
 
         return (
-          <div key={index} className="space-y-1.5">
-            {q.header && (
-              <div className="text-xs font-semibold text-warden-text-dim uppercase tracking-wide">
-                {q.header}
-              </div>
-            )}
-            <div className="text-sm text-warden-text">{q.question}</div>
-            <div className="flex flex-wrap gap-1.5">
+          <li key={index} className="border-l-2 border-purple-700/40 pl-3">
+            {/* Question number + header */}
+            <div className="flex items-baseline gap-2 mb-1">
+              <span className="text-xs font-bold text-purple-400 shrink-0">
+                Q{index + 1}.
+              </span>
+              {q.header && (
+                <span className="text-xs font-semibold text-warden-text-dim uppercase tracking-wide">
+                  {q.header}
+                </span>
+              )}
+            </div>
+
+            {/* Question text */}
+            <div className="text-sm text-warden-text mb-2">{q.question}</div>
+
+            {/* Options as numbered list */}
+            <ol className="space-y-1 list-none pl-0">
               {q.options.map((option, optIndex) => {
                 const isSelected = selectedAnswers.includes(option.label);
                 return (
-                  <span
-                    key={optIndex}
-                    className={`px-2 py-0.5 rounded text-xs border ${
-                      isSelected
-                        ? 'bg-warden-accent/20 text-warden-accent border-warden-accent/40'
-                        : 'bg-warden-panel text-warden-text-dim border-warden-border'
-                    }`}
-                    title={option.description}
-                  >
-                    {option.label}
-                  </span>
+                  <li key={optIndex} className="flex items-start gap-2">
+                    <span className={`shrink-0 text-xs font-mono mt-0.5 ${isSelected ? 'text-warden-accent' : 'text-warden-text-dim'}`}>
+                      {isSelected ? '>' : ' '}{optIndex + 1}.
+                    </span>
+                    <div className="min-w-0">
+                      <span className={`text-sm ${isSelected ? 'text-warden-accent font-semibold' : 'text-warden-text-dim'}`}>
+                        {option.label}
+                      </span>
+                      {option.description && (
+                        <span className="text-xs text-warden-text-dim ml-2">
+                          — {option.description}
+                        </span>
+                      )}
+                    </div>
+                  </li>
                 );
               })}
-            </div>
-            {q.notes && (
-              <div className="text-xs text-warden-text-dim italic">{q.notes}</div>
+            </ol>
+
+            {/* Selected answer callout */}
+            {q.answer && (
+              <div className="mt-2 flex items-baseline gap-2 bg-warden-accent/10 border border-warden-accent/20 rounded px-2 py-1">
+                <span className="text-xs text-warden-accent font-semibold shrink-0">Selected:</span>
+                <span className="text-sm text-warden-accent">{q.answer}</span>
+              </div>
             )}
-          </div>
+
+            {/* User notes */}
+            {q.notes && (
+              <div className="mt-1 text-xs text-warden-text-dim italic bg-warden-panel/50 rounded px-2 py-1">
+                {q.notes}
+              </div>
+            )}
+          </li>
         );
       })}
-    </div>
+    </ol>
   );
 }
 
