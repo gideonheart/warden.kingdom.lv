@@ -13,7 +13,7 @@ See: .planning/PROJECT.md (updated 2026-02-19)
 Phase: 17 — Polish
 Plan: 02 of 02 complete
 Status: Phase 17 complete — lazy-mount tabs + fd safety + anchored regex + stable Map ref + setTimeout cleanup
-Last activity: 2026-02-20 - Completed quick task 10: Replace Hooks tab with Events tab (JSONL event log reader)
+Last activity: 2026-02-20 - Completed quick task 11: Fix Events tab SPA fallback + agent-selectable JSONL source filter
 
 Progress: [##########] 100% (Phase 17 — 2/2 plans done)
 
@@ -134,6 +134,10 @@ Key decisions for v2.2:
 - [Phase 17]: Header badge/spinner/error moved from GsdView into AgentsTab — only Agents tab needs registry status display
 - [Phase 17]: Each tab calls its own hooks independently (no shared state lifting) for clean unmount lifecycle
 - [Phase 17]: useRef + useEffect cleanup pattern for all setTimeout calls in ControlsTab and CopyButton
+- [Quick-11]: SPA fallback regex /^\/(?!api\/|socket\.io\/).*/ prevents index.html being served to API routes when dist/client exists
+- [Quick-11]: source filter validation in service layer (not route): must end with -raw-events.jsonl, no path separators, no ..
+- [Quick-11]: useGsdEventSources fetches once on mount (no polling) — file list stable between sessions
+- [Quick-11]: sourceSelector JSX variable computed once, included in all render branches so dropdown persists during loading/error/empty states
 
 ### Quick Tasks Completed
 
@@ -148,6 +152,7 @@ Key decisions for v2.2:
 | 8 | Searchable dropdowns for GSD Controls (agent name, commands) with auto-fill | 2026-02-18 | `b1ea88c` |
 | 9 | Delete unused tools/ directory | 2026-02-19 | `eeaa55b` |
 | 10 | Replace Hooks tab with Events tab (JSONL event log reader) | 2026-02-20 | `a25cce7` |
+| 11 | Fix Events tab: SPA fallback patch + agent-selectable JSONL source filter | 2026-02-20 | `1318417` |
 
 ### Roadmap Evolution
 
@@ -171,5 +176,5 @@ No active blockers for v2.2.
 ## Session Continuity
 
 Last session: 2026-02-20
-Stopped at: Completed quick-10: Replace Hooks tab with Events tab (JSONL event log reader + EventsTab component)
+Stopped at: Completed quick-11: Fix Events tab SPA fallback + agent-selectable JSONL source filter
 Next step: v2.2 milestone complete, no pending quick tasks
