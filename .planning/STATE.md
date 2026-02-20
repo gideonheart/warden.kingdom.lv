@@ -161,6 +161,7 @@ Key decisions for v2.2:
 | 10 | Replace Hooks tab with Events tab (JSONL event log reader) | 2026-02-20 | `a25cce7` |
 | 11 | Fix Events tab: SPA fallback patch + agent-selectable JSONL source filter | 2026-02-20 | `1318417` |
 | 12 | Improve Events tab: expandable rows, session filter, richer summaries, SRP extraction | 2026-02-20 | `8a38889` |
+| 13 | Enrich Events tab: Skill/Task/Edit/TaskCreate/TaskUpdate/TaskOutput tool summaries | 2026-02-20 | `ddade67` |
 
 ### Roadmap Evolution
 
@@ -184,5 +185,5 @@ No active blockers for v2.2.
 ## Session Continuity
 
 Last session: 2026-02-20
-Stopped at: Completed quick-12: Improve Events tab UI — expandable rows, session filter, richer summaries, SRP extraction
-Next step: v2.2 milestone complete, no pending quick tasks
+Stopped at: Completed quick-13: Enrich Events tab — Skill/Task/Edit/TaskCreate/TaskUpdate/TaskOutput tool summaries
+Next step: No pending quick tasks
