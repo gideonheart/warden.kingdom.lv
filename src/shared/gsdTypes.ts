@@ -57,6 +57,7 @@ export interface GsdDisplayEvent {
   eventType: 'tool' | 'tool_failure' | 'prompt' | 'ask_question' | 'lifecycle';
   toolName?: string;
   summary: string;        // one-line human-readable summary
+  detail?: string;        // full detail text shown in expanded view (full command, full path, etc.)
   error?: string;         // for PostToolUseFailure
   // AskUserQuestion specifics
   questions?: Array<{
