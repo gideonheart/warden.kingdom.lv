@@ -1,6 +1,5 @@
 import * as pty from 'node-pty';
 import type { Server as SocketIOServer, Socket } from 'socket.io';
-import { activityEventService } from './ActivityEventService.js';
 
 // How long to keep a PTY alive after the last subscriber disconnects.
 // This allows fast navigation away and back (e.g., switching views) to reuse the
@@ -65,6 +64,23 @@ export class TerminalStreamService {
       this.socketToSession.set(socket.id, sessionName);
 
       this.setupSocketInputHandlers(socket, existing);
+
+      // Force tmux to repaint the full screen for the new subscriber.
+      // A same-size resize is a no-op (tmux ignores SIGWINCH when dimensions haven't
+      // changed), so we must actually change the dimensions to guarantee a repaint.
+      // Strategy: resize to the new client's dimensions (likely different from the
+      // existing PTY's), with a +1 row nudge first to guarantee a size change even
+      // if the new client happens to match the existing PTY exactly.
+      socket.emit('terminal:reset');
+      const targetCols = Number.isFinite(initialCols) && initialCols > 0 ? initialCols : existing.ptyProcess.cols;
+      const targetRows = Number.isFinite(initialRows) && initialRows > 0 ? initialRows : existing.ptyProcess.rows;
+      try {
+        existing.ptyProcess.resize(targetCols, targetRows + 1);
+        existing.ptyProcess.resize(targetCols, targetRows);
+      } catch {
+        // PTY resize failed — not fatal, subscriber will see output on next activity
+      }
+
       return;
     }
 
@@ -107,11 +123,6 @@ export class TerminalStreamService {
           subscriberSocket.emit('terminal:output', terminalOutput);
         }
       }
-      // Non-blocking side-channel tap for activity event parsing.
-      const agentId = sessionName.split('-')[0];
-      setImmediate(() => {
-        activityEventService.processTerminalChunk(sessionName, agentId, terminalOutput);
-      });
     });
 
     ptyProcess.onExit(({ exitCode }) => {
@@ -131,9 +142,6 @@ export class TerminalStreamService {
         }
       }
 
-      // Flush activity event buffers.
-      activityEventService.clearSessionBuffer(sessionName);
-
       // Clean up.
       for (const subscriberId of session.subscribers) {
         this.socketToSession.delete(subscriberId);
@@ -148,9 +156,6 @@ export class TerminalStreamService {
     socket.on('terminal:input', (userInput: string) => {
       if (!session.isAlive) return;
       session.ptyProcess.write(userInput);
-      // Capture operator input as batched activity events.
-      const agentId = session.sessionName.split('-')[0];
-      activityEventService.captureOperatorInput(session.sessionName, agentId, userInput);
     });
 
     socket.on('terminal:resize', ({ cols, rows }: { cols: number; rows: number }) => {
@@ -207,8 +212,6 @@ export class TerminalStreamService {
     if (session.isAlive) {
       session.ptyProcess.kill();
     }
-
-    activityEventService.clearSessionBuffer(sessionName);
 
     for (const subscriberId of session.subscribers) {
       this.socketToSession.delete(subscriberId);

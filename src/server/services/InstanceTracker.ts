@@ -1,6 +1,5 @@
 import { database } from '../database/DatabaseConnection.js';
 import { tmuxSessionManager } from './TmuxSessionManager.js';
-import { activityEventService } from './ActivityEventService.js';
 import type { AgentInstance, AgentInstanceStatus } from '../../shared/types.js';
 
 const SYNC_INTERVAL_MS = 10_000;
@@ -24,11 +23,6 @@ export class InstanceTracker {
     const tmuxSessions = await tmuxSessionManager.listAgentSessions();
     const activeSessionNames = tmuxSessions.map(session => session.sessionName);
 
-    // Snapshot currently active session names before upsert to detect new sessions
-    const previouslyActiveNames = new Set(
-      database.listActiveInstances().map(instance => instance.tmuxSessionName)
-    );
-
     for (const session of tmuxSessions) {
       database.upsertInstance({
         agentId: session.agentId,
@@ -37,24 +31,6 @@ export class InstanceTracker {
         projectPath: '',
         telegramTopicId: undefined,
       });
-
-      // Capture session_start event for newly discovered sessions
-      if (!previouslyActiveNames.has(session.sessionName)) {
-        const instance = database.findInstanceBySessionName(session.sessionName);
-        activityEventService.captureSessionStart(
-          session.sessionName,
-          session.agentId,
-          instance?.id ?? null
-        );
-      }
-    }
-
-    // Identify sessions that are about to be stopped and capture session_stop events
-    const stoppingInstances = database.listActiveInstances().filter(
-      instance => !activeSessionNames.includes(instance.tmuxSessionName)
-    );
-    for (const instance of stoppingInstances) {
-      activityEventService.captureSessionStop(instance.tmuxSessionName, instance.agentId);
     }
 
     database.markMissingSessionsStopped(activeSessionNames);

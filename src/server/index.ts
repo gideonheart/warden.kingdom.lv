@@ -8,11 +8,9 @@ import { fileURLToPath } from 'url';
 import { instanceRoutes } from './routes/instanceRoutes.js';
 import { agentRoutes } from './routes/agentRoutes.js';
 import { historyRoutes } from './routes/historyRoutes.js';
-import { activityRoutes } from './routes/activityRoutes.js';
 import { gsdRoutes } from './routes/gsdRoutes.js';
 import { terminalStreamService } from './services/TerminalStreamService.js';
 import { instanceTracker } from './services/InstanceTracker.js';
-import { activityEventService } from './services/ActivityEventService.js';
 import { database } from './database/DatabaseConnection.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -65,7 +63,6 @@ app.use(express.json());
 app.use(instanceRoutes);
 app.use(agentRoutes);
 app.use(historyRoutes);
-app.use(activityRoutes);
 app.use(gsdRoutes);
 
 app.get('/api/health', (_request, response) => {
@@ -91,7 +88,6 @@ terminalStreamService.setSocketServer(socketServer);
 terminalStreamService.setupSocketNamespace(socketServer);
 
 instanceTracker.startPeriodicSync();
-activityEventService.startRetentionCleanup();
 
 httpServer.listen(PORT, HOST, () => {
   console.log(`[Warden] Server running at http://${HOST}:${PORT}`);
@@ -108,7 +104,6 @@ function handleShutdown(signal: string): void {
   forceExitTimeout.unref();
 
   instanceTracker.stopPeriodicSync();
-  activityEventService.stopRetentionCleanup();
   httpServer.close(() => {
     console.log('[Warden] HTTP server closed');
     terminalStreamService.killAllPtyProcesses();

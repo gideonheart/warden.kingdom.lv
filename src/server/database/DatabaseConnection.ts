@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import type { AgentInstance, AgentInstanceCreateParams, AgentInstanceStatus, ActivityEvent } from '../../shared/types.js';
+import type { AgentInstance, AgentInstanceCreateParams, AgentInstanceStatus } from '../../shared/types.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -81,7 +81,9 @@ class DatabaseConnection {
   upsertInstance(params: AgentInstanceCreateParams): AgentInstance {
     const existing = this.findInstanceBySessionName(params.tmuxSessionName);
     if (existing) {
-      this.updateInstanceStatus(existing.id, 'active');
+      this.db.prepare(
+        "UPDATE instances SET status = 'active', agent_id = ?, agent_name = ?, last_active_at = CURRENT_TIMESTAMP WHERE id = ?"
+      ).run(params.agentId, params.agentName, existing.id);
       return this.findInstanceById(existing.id)!;
     }
     return this.insertInstance(params);
@@ -180,107 +182,6 @@ class DatabaseConnection {
       GROUP BY agent_id
       ORDER BY totalCostUsd DESC
     `).all() as { agentId: string; totalInputTokens: number; totalOutputTokens: number; totalCostUsd: number; dayCount: number }[];
-  }
-
-  insertActivityEvent(params: {
-    instanceId: number | null;
-    agentId: string;
-    sessionName: string;
-    eventType: string;
-    summary: string;
-    detail?: string;
-    success?: boolean;
-    metadata?: string;
-  }): number {
-    const result = this.db.prepare(`
-      INSERT INTO activity_events
-        (instance_id, agent_id, session_name, event_type, summary, detail, success, metadata)
-      VALUES
-        (@instanceId, @agentId, @sessionName, @eventType, @summary, @detail, @success, @metadata)
-    `).run({
-      instanceId: params.instanceId ?? null,
-      agentId: params.agentId,
-      sessionName: params.sessionName,
-      eventType: params.eventType,
-      summary: params.summary,
-      detail: params.detail ?? null,
-      success: params.success === undefined ? null : params.success ? 1 : 0,
-      metadata: params.metadata ?? null,
-    });
-    return result.lastInsertRowid as number;
-  }
-
-  updateActivityEventSuccess(eventId: number, success: boolean): void {
-    this.db.prepare(
-      'UPDATE activity_events SET success = ? WHERE id = ?'
-    ).run(success ? 1 : 0, eventId);
-  }
-
-  queryActivityEvents(filters: {
-    agentId?: string;
-    eventType?: string;
-    dateFrom?: string;
-    dateTo?: string;
-    limit?: number;
-    offset?: number;
-  }): { events: ActivityEvent[]; total: number } {
-    const conditions: string[] = [];
-    const params: (string | number)[] = [];
-
-    if (filters.agentId) {
-      conditions.push('agent_id = ?');
-      params.push(filters.agentId);
-    }
-    if (filters.eventType) {
-      conditions.push('event_type = ?');
-      params.push(filters.eventType);
-    }
-    if (filters.dateFrom) {
-      conditions.push('timestamp >= ?');
-      params.push(filters.dateFrom);
-    }
-    if (filters.dateTo) {
-      conditions.push('timestamp <= ?');
-      params.push(filters.dateTo + ' 23:59:59');
-    }
-
-    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-    const limit = filters.limit ?? 50;
-    const offset = filters.offset ?? 0;
-
-    const total = (this.db.prepare(
-      `SELECT COUNT(*) as count FROM activity_events ${whereClause}`
-    ).get(...params) as { count: number }).count;
-
-    const rows = this.db.prepare(`
-      SELECT id, instance_id as instanceId, agent_id as agentId,
-             session_name as sessionName, event_type as eventType,
-             timestamp, summary, detail, success, metadata
-      FROM activity_events ${whereClause}
-      ORDER BY timestamp DESC, id DESC
-      LIMIT ? OFFSET ?
-    `).all(...params, limit, offset) as (Omit<ActivityEvent, 'success'> & { success: number | null })[];
-
-    // Convert SQLite INTEGER (0/1/NULL) to JavaScript boolean/null
-    const events: ActivityEvent[] = rows.map((row) => ({
-      ...row,
-      success: row.success === null ? null : row.success === 1,
-    }));
-
-    return { events, total };
-  }
-
-  getDistinctEventTypes(): string[] {
-    return (this.db.prepare(
-      'SELECT DISTINCT event_type FROM activity_events ORDER BY event_type'
-    ).all() as { event_type: string }[]).map(row => row.event_type);
-  }
-
-  purgeOldActivityEvents(): number {
-    const result = this.db.prepare(
-      `DELETE FROM activity_events WHERE timestamp < datetime('now', '-7 days')`
-    ).run();
-    return result.changes;
   }
 
   close(): void {
