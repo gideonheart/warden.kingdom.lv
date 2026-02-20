@@ -10,7 +10,7 @@ const READ_TAIL_BYTES = 64 * 1024; // 64KB per file — covers hundreds of recen
 class GsdEventLogService {
   /**
    * Read the last 64KB of a JSONL file, parse valid JSON lines, and return events.
-   * Uses open+read+close to read from a specific byte offset (mirrors GsdHookLogWatcher pattern).
+   * Uses open+read+close to read from a specific byte offset for performance.
    */
   private async readRecentEventsFromFile(filePath: string): Promise<GsdRawEvent[]> {
     let fileHandle;
