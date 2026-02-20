@@ -147,6 +147,7 @@ Key decisions for v2.2:
 | 7 | GSD Control Center as full-page 4-tab nav view (replaces bottom-panel plugin) | 2026-02-18 | `fc76d8b` |
 | 8 | Searchable dropdowns for GSD Controls (agent name, commands) with auto-fill | 2026-02-18 | `b1ea88c` |
 | 9 | Delete unused tools/ directory | 2026-02-19 | `eeaa55b` |
+| 10 | Replace Hooks tab with Events tab (JSONL event log reader) | 2026-02-20 | `432e3c3` |
 
 ### Roadmap Evolution
 
@@ -169,6 +170,6 @@ No active blockers for v2.2.
 
 ## Session Continuity
 
-Last session: 2026-02-19
-Stopped at: Phase 17 complete — all plans (17-01 lazy-mount + 17-02 bug fixes) executed
-Next step: v2.2 milestone complete, advance to next milestone
+Last session: 2026-02-20
+Stopped at: Completed quick-10: Replace Hooks tab with Events tab (JSONL event log reader + EventsTab component)
+Next step: v2.2 milestone complete, no pending quick tasks
