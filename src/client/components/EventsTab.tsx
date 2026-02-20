@@ -1,7 +1,7 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import type { GsdRawEvent, GsdDisplayEvent } from '@shared/gsdTypes.js';
 import { GSD_NOISE_EVENTS } from '@shared/gsdTypes.js';
-import { useGsdEventFeed } from '../hooks/useGsdEventFeed.js';
+import { useGsdEventFeed, useGsdEventSources } from '../hooks/useGsdEventFeed.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Summary generation helpers
@@ -289,32 +289,79 @@ function QuestionDisplay({ questions }: QuestionDisplayProps) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// File size formatter
+// ─────────────────────────────────────────────────────────────────────────────
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // EventsTab — main component
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function EventsTab() {
-  const { events: rawEvents, isLoading, error } = useGsdEventFeed();
+  const [selectedSource, setSelectedSource] = useState<string>('');
+  const { sources } = useGsdEventSources();
+  const { events: rawEvents, isLoading, error } = useGsdEventFeed(selectedSource || undefined);
 
   const displayEvents = useMemo(() => groupRawEvents(rawEvents), [rawEvents]);
 
+  const sourceSelector = sources.length > 0 ? (
+    <div className="flex items-center gap-3 mb-3">
+      <label className="text-sm text-warden-text-dim shrink-0">Source:</label>
+      <select
+        value={selectedSource}
+        onChange={(e) => setSelectedSource(e.target.value)}
+        className="bg-warden-panel border border-warden-border rounded px-2 py-1 text-sm text-warden-text"
+      >
+        <option value="">All agents</option>
+        {sources.map((s) => (
+          <option key={s.filename} value={s.filename}>
+            {s.label} ({formatBytes(s.sizeBytes)})
+          </option>
+        ))}
+      </select>
+    </div>
+  ) : null;
+
   if (isLoading && rawEvents.length === 0) {
-    return <p className="text-sm text-warden-text-dim">Loading events…</p>;
+    return (
+      <div>
+        {sourceSelector}
+        <p className="text-sm text-warden-text-dim">Loading events…</p>
+      </div>
+    );
   }
 
   if (error) {
-    return <p className="text-sm text-red-400">Error loading events: {error}</p>;
+    return (
+      <div>
+        {sourceSelector}
+        <p className="text-sm text-red-400">Error loading events: {error}</p>
+      </div>
+    );
   }
 
   if (displayEvents.length === 0) {
     return (
-      <p className="text-sm text-warden-text-dim">
-        No agent events found. Events appear as agents perform actions.
-      </p>
+      <div>
+        {sourceSelector}
+        <p className="text-sm text-warden-text-dim">
+          No agent events found. Events appear as agents perform actions.
+        </p>
+      </div>
     );
   }
 
   return (
-    <div className="space-y-1 divide-y divide-warden-border/30">
+    <div>
+      {sourceSelector}
+
+      {/* Event list */}
+      <div className="space-y-1 divide-y divide-warden-border/30">
       {displayEvents.map((event) => {
         let displayTime = event.timestamp;
         try {
@@ -375,6 +422,7 @@ export function EventsTab() {
           </div>
         );
       })}
+      </div>
     </div>
   );
 }
