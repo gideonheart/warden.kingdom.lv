@@ -162,6 +162,7 @@ Key decisions for v2.2:
 | 11 | Fix Events tab: SPA fallback patch + agent-selectable JSONL source filter | 2026-02-20 | `1318417` |
 | 12 | Improve Events tab: expandable rows, session filter, richer summaries, SRP extraction | 2026-02-20 | `8a38889` |
 | 13 | Enrich Events tab: Skill/Task/Edit/TaskCreate/TaskUpdate/TaskOutput tool summaries | 2026-02-20 | `ddade67` |
+| 14 | Remove Activity tab and ActivityEventService — dead code removal (~800 LOC) | 2026-02-20 | `cca98cf` |
 
 ### Roadmap Evolution
 
@@ -185,5 +186,5 @@ No active blockers for v2.2.
 ## Session Continuity
 
 Last session: 2026-02-20
-Stopped at: Completed quick-13: Enrich Events tab — Skill/Task/Edit/TaskCreate/TaskUpdate/TaskOutput tool summaries
+Stopped at: Completed quick-14: Remove Activity tab and ActivityEventService — ~800 LOC dead code removed
 Next step: No pending quick tasks
