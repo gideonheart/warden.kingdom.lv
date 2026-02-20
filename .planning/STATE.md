@@ -13,7 +13,7 @@ See: .planning/PROJECT.md (updated 2026-02-19)
 Phase: 17 — Polish
 Plan: 02 of 02 complete
 Status: Phase 17 complete — lazy-mount tabs + fd safety + anchored regex + stable Map ref + setTimeout cleanup
-Last activity: 2026-02-20 - Completed quick task 12: Improve Events tab UI — expandable rows, session filter, richer summaries, SRP extraction
+Last activity: 2026-02-20 - Completed quick task 14: Remove Activity tab and ActivityEventService — Events tab replaces it
 
 Progress: [##########] 100% (Phase 17 — 2/2 plans done)
 
