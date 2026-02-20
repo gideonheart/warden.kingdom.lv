@@ -6,7 +6,7 @@ import { openSync, closeSync } from 'fs';
 import { readFile } from 'fs/promises';
 import path from 'path';
 import { gsdRegistryService } from '../services/GsdRegistryService.js';
-import { gsdHookLogWatcher } from '../services/GsdHookLogWatcher.js';
+import { gsdEventLogService } from '../services/GsdEventLogService.js';
 import { database } from '../database/DatabaseConnection.js';
 import type { AgentStateHint, PressureLevel } from '@shared/gsdTypes.js';
 
@@ -318,20 +318,25 @@ router.get('/api/gsd/sessions/:session/state', async (request, response) => {
   }
 });
 
-// GET /api/gsd/hooks/log — return last N lines from the hook log file
-router.get('/api/gsd/hooks/log', (request, response) => {
-  const rawLines = request.query.lines;
-  let lineCount = 200;
+// GET /api/gsd/events — return recent agent events from JSONL logs
+router.get('/api/gsd/events', async (request, response) => {
+  const rawLimit = request.query.limit;
+  let limit = 100;
 
-  if (rawLines !== undefined) {
-    const parsed = parseInt(String(rawLines), 10);
+  if (rawLimit !== undefined) {
+    const parsed = parseInt(String(rawLimit), 10);
     if (!isNaN(parsed) && parsed > 0) {
-      lineCount = Math.min(parsed, 1000);
+      limit = Math.min(parsed, 500);
     }
   }
 
-  const lines = gsdHookLogWatcher.readLastLines(lineCount);
-  response.json({ lines });
+  try {
+    const events = await gsdEventLogService.getRecentEvents(limit);
+    response.json({ events });
+  } catch (error) {
+    console.error('[GsdRoutes] Failed to get events:', error);
+    response.status(500).json({ error: 'Failed to read event logs' });
+  }
 });
 
 export { router as gsdRoutes };

@@ -11,7 +11,6 @@ import { historyRoutes } from './routes/historyRoutes.js';
 import { activityRoutes } from './routes/activityRoutes.js';
 import { gsdRoutes } from './routes/gsdRoutes.js';
 import { terminalStreamService } from './services/TerminalStreamService.js';
-import { gsdHookLogWatcher } from './services/GsdHookLogWatcher.js';
 import { instanceTracker } from './services/InstanceTracker.js';
 import { activityEventService } from './services/ActivityEventService.js';
 import { database } from './database/DatabaseConnection.js';
@@ -93,8 +92,6 @@ terminalStreamService.setupSocketNamespace(socketServer);
 
 instanceTracker.startPeriodicSync();
 activityEventService.startRetentionCleanup();
-gsdHookLogWatcher.setupSocketNamespace(socketServer);
-gsdHookLogWatcher.startWatching();
 
 httpServer.listen(PORT, HOST, () => {
   console.log(`[Warden] Server running at http://${HOST}:${PORT}`);
@@ -112,7 +109,6 @@ function handleShutdown(signal: string): void {
 
   instanceTracker.stopPeriodicSync();
   activityEventService.stopRetentionCleanup();
-  gsdHookLogWatcher.stopWatching();
   httpServer.close(() => {
     console.log('[Warden] HTTP server closed');
     terminalStreamService.killAllPtyProcesses();

@@ -22,3 +22,42 @@ export interface GsdRegistry {
 export type AgentStateHint = 'working' | 'idle' | 'menu' | 'permission_prompt' | 'error';
 
 export type PressureLevel = 'ok' | 'warning' | 'critical';
+
+// --- GSD Event Log Types ---
+
+export type GsdEventType =
+  | 'SessionStart' | 'Stop' | 'SessionEnd'
+  | 'UserPromptSubmit'
+  | 'PreToolUse' | 'PostToolUse' | 'PostToolUseFailure'
+  | 'SubagentStart' | 'SubagentStop'
+  | 'Notification' | 'PermissionRequest';
+
+// Noise events to skip in display
+export const GSD_NOISE_EVENTS: Set<string> = new Set(['Notification', 'PermissionRequest']);
+
+export interface GsdRawEvent {
+  timestamp: string;
+  event: GsdEventType;
+  session: string;
+  payload: Record<string, unknown>;
+}
+
+// Grouped display event — Pre+Post merged into one entry
+export interface GsdDisplayEvent {
+  id: string;             // tool_use_id or timestamp-based unique key
+  timestamp: string;
+  session: string;        // short session name
+  eventType: 'tool' | 'tool_failure' | 'prompt' | 'ask_question' | 'lifecycle';
+  toolName?: string;
+  summary: string;        // one-line human-readable summary
+  error?: string;         // for PostToolUseFailure
+  // AskUserQuestion specifics
+  questions?: Array<{
+    question: string;
+    header?: string;
+    options: Array<{ label: string; description?: string }>;
+    multiSelect: boolean;
+    answer?: string;       // from PostToolUse response
+    notes?: string;        // from PostToolUse annotations
+  }>;
+}
