@@ -13,7 +13,7 @@ See: .planning/PROJECT.md (updated 2026-02-19)
 Phase: 17 — Polish
 Plan: 02 of 02 complete
 Status: Phase 17 complete — lazy-mount tabs + fd safety + anchored regex + stable Map ref + setTimeout cleanup
-Last activity: 2026-02-20 - Completed quick task 11: Fix Events tab SPA fallback + agent-selectable JSONL source filter
+Last activity: 2026-02-20 - Completed quick task 12: Improve Events tab UI — expandable rows, session filter, richer summaries, SRP extraction
 
 Progress: [##########] 100% (Phase 17 — 2/2 plans done)
 
@@ -138,6 +138,13 @@ Key decisions for v2.2:
 - [Quick-11]: source filter validation in service layer (not route): must end with -raw-events.jsonl, no path separators, no ..
 - [Quick-11]: useGsdEventSources fetches once on mount (no polling) — file list stable between sessions
 - [Quick-11]: sourceSelector JSX variable computed once, included in all render branches so dropdown persists during loading/error/empty states
+- [Quick-12]: groupRawEvents + helpers extracted to src/client/utils/gsdEventGrouping.ts — SRP: grouping logic separated from rendering
+- [Quick-12]: Bash buildToolSummary uses description field as primary summary — Claude Code always sets description as human-readable intent
+- [Quick-12]: toRelativePath strips /home/forge/ prefix for Read/Write summaries — shows project-relative path instead of just basename
+- [Quick-12]: AskUserQuestion summary shows first question text (60 chars) instead of static label
+- [Quick-12]: expandedId state (not per-row) — single expanded row at a time, standard accordion pattern
+- [Quick-12]: Q&A details and error details moved to expanded view only — removes always-visible clutter below every matching event
+- [Quick-12]: Session filter resets via useEffect when source changes — prevents stale filter after agent switch
 
 ### Quick Tasks Completed
 
@@ -153,6 +160,7 @@ Key decisions for v2.2:
 | 9 | Delete unused tools/ directory | 2026-02-19 | `eeaa55b` |
 | 10 | Replace Hooks tab with Events tab (JSONL event log reader) | 2026-02-20 | `a25cce7` |
 | 11 | Fix Events tab: SPA fallback patch + agent-selectable JSONL source filter | 2026-02-20 | `1318417` |
+| 12 | Improve Events tab: expandable rows, session filter, richer summaries, SRP extraction | 2026-02-20 | `8a38889` |
 
 ### Roadmap Evolution
 
@@ -176,5 +184,5 @@ No active blockers for v2.2.
 ## Session Continuity
 
 Last session: 2026-02-20
-Stopped at: Completed quick-11: Fix Events tab SPA fallback + agent-selectable JSONL source filter
+Stopped at: Completed quick-12: Improve Events tab UI — expandable rows, session filter, richer summaries, SRP extraction
 Next step: v2.2 milestone complete, no pending quick tasks
