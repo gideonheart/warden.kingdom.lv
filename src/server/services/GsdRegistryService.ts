@@ -3,7 +3,7 @@ import type { RegistryAgent, GsdRegistry } from '@shared/gsdTypes.js';
 
 export type { RegistryAgent, GsdRegistry } from '@shared/gsdTypes.js';
 
-const REGISTRY_PATH = '/home/forge/.openclaw/workspace/skills/gsd-code-skill/config/recovery-registry.json';
+const REGISTRY_PATH = '/home/forge/.openclaw/workspace/skills/gsd-code-skill/config/agent-registry.json';
 const CACHE_TTL_MS = 30_000;
 
 class GsdRegistryService {

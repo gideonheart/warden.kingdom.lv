@@ -209,23 +209,22 @@ export function TerminalView({ tmuxSessionName, onSessionExit }: TerminalViewPro
     terminalInstanceRef.current?.write(filtered);
   }, []);
 
-  // Called when the server spawns a fresh PTY (not reusing a keep-alive one).
-  // Clear the xterm.js display so stale content doesn't show through during the
-  // brief moment before the new PTY repaint arrives.
+  // Called when the server signals a fresh or reused PTY connection.
+  // Clear the xterm.js display and refit synchronously BEFORE the tmux screen
+  // dump arrives, so content renders at the correct dimensions (not garbled).
   const handleTerminalReset = useCallback(() => {
     const terminal = terminalInstanceRef.current;
     const fitAddon = fitAddonRef.current;
     if (!terminal) return;
     terminal.reset();
-    // Refit after reset to ensure correct dimensions are in sync.
+    // Fit synchronously — deferring to rAF creates a window where tmux output
+    // arrives and renders at stale dimensions, causing garbled/wrapped text.
     if (fitAddon) {
-      requestAnimationFrame(() => {
-        try {
-          fitAddon.fit();
-        } catch {
-          // Container may have zero dimensions
-        }
-      });
+      try {
+        fitAddon.fit();
+      } catch {
+        // Container may have zero dimensions
+      }
     }
   }, []);
 
@@ -308,14 +307,23 @@ export function TerminalView({ tmuxSessionName, onSessionExit }: TerminalViewPro
     terminal.open(terminalContainerRef.current);
     terminal.focus();
 
-    requestAnimationFrame(() => {
-      try {
-        fitAddon.fit();
-        sendResize(terminal.cols, terminal.rows);
-      } catch {
-        // Container may not have dimensions yet (zero-size layout)
-      }
-    });
+    // Fit synchronously so the terminal has correct dimensions before the server
+    // starts sending PTY output. Deferring to rAF creates a window where tmux dumps
+    // the screen at estimated dimensions, causing garbled/wrapped text.
+    try {
+      fitAddon.fit();
+      sendResize(terminal.cols, terminal.rows);
+    } catch {
+      // Container may not have dimensions yet (zero-size layout) — fall back to rAF
+      requestAnimationFrame(() => {
+        try {
+          fitAddon.fit();
+          sendResize(terminal.cols, terminal.rows);
+        } catch {
+          // Still no dimensions — accept default sizing
+        }
+      });
+    }
 
     terminal.onData((userInput: string) => {
       sendInput(userInput);

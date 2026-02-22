@@ -104,6 +104,18 @@ None - no external service configuration required.
 - All consumers of GSD types import from the shared module; no stale local declarations remain
 - Re-exports in service/hook files provide backward compatibility for any transitive importers
 
+## Self-Check: PASSED
+
+- FOUND: src/shared/gsdTypes.ts
+- FOUND: src/server/services/GsdRegistryService.ts (modified)
+- FOUND: src/server/routes/gsdRoutes.ts (modified)
+- FOUND: src/client/hooks/useGsdRegistry.ts (modified)
+- FOUND: src/client/hooks/useAgentLiveStatus.ts (modified)
+- FOUND: src/client/components/GsdView.tsx (modified)
+- FOUND: .planning/phases/15-foundation/15-02-SUMMARY.md
+- FOUND commit: 0c82738 (Task 1)
+- FOUND commit: 54a4707 (Task 2)
+
 ---
 *Phase: 15-foundation*
 *Completed: 2026-02-19*

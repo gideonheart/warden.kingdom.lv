@@ -5,7 +5,7 @@ import type { TmuxSessionInfo } from '../../shared/types.js';
 
 const execFileAsync = promisify(execFile);
 
-const KNOWN_AGENT_PREFIXES = ['gideon', 'warden', 'scout', 'builder', 'forge'];
+const KNOWN_AGENT_PREFIXES = ['agent', 'gideon', 'warden', 'scout', 'builder', 'forge'];
 
 export class TmuxSessionManager {
   async listAgentSessions(): Promise<TmuxSessionInfo[]> {
@@ -75,6 +75,11 @@ export class TmuxSessionManager {
   }
 
   extractAgentIdFromSessionName(sessionName: string): string {
+    // agent_warden-kingdom_session_name → warden
+    // warden-dashboard-uuid → warden
+    if (sessionName.startsWith('agent_')) {
+      return sessionName.slice('agent_'.length).split('-')[0];
+    }
     return sessionName.split('-')[0];
   }
 
@@ -85,7 +90,7 @@ export class TmuxSessionManager {
 
   private isAgentManagedSession(sessionName: string): boolean {
     return KNOWN_AGENT_PREFIXES.some(prefix =>
-      sessionName.startsWith(`${prefix}-`)
+      sessionName.startsWith(`${prefix}-`) || sessionName.startsWith(`${prefix}_`)
     );
   }
 
@@ -98,7 +103,7 @@ export class TmuxSessionManager {
         const [sessionName, windowCount, createdTimestamp, attachedCount] = line.split('|');
         return {
           sessionName,
-          agentId: sessionName.split('-')[0],
+          agentId: this.extractAgentIdFromSessionName(sessionName),
           windowCount: parseInt(windowCount, 10),
           createdAt: new Date(parseInt(createdTimestamp, 10) * 1000),
           isAttached: parseInt(attachedCount, 10) > 0,
