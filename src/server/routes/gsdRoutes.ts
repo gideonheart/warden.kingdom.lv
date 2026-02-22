@@ -8,7 +8,7 @@ import path from 'path';
 import { gsdRegistryService } from '../services/GsdRegistryService.js';
 import { gsdEventLogService } from '../services/GsdEventLogService.js';
 import { database } from '../database/DatabaseConnection.js';
-import type { AgentStateHint, PressureLevel } from '@shared/gsdTypes.js';
+import type { AgentStateHint, PressureLevel } from '../../shared/gsdTypes.js';
 
 const execFileAsync = promisify(execFile);
 

@@ -242,6 +242,15 @@ See `.planning/milestones/v1.1-ROADMAP.md`
 - [ ] 17-01-PLAN.md — Lazy-mount GSD tabs (move hooks into tabs) + setTimeout cleanup
 - [ ] 17-02-PLAN.md — fd safety (try/finally), Map stabilization, regex anchoring
 
+### Phase 18: Fix token usage — JSONL session reader and database population
+
+**Goal:** [To be planned]
+**Depends on:** Phase 17
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 18 to break down)
+
 ---
 
 ## Progress

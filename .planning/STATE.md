@@ -169,6 +169,7 @@ Key decisions for v2.2:
 - Phase 11.1 inserted after Phase 11: Fix tmux visibility when mobile keyboard opens (URGENT)
 - v2.1 roadmap created 2026-02-18: Phases 12-14 for GSD Manager Plugin
 - v2.2 roadmap created 2026-02-18: Phases 15-17 for Code Hygiene
+- Phase 18 added: Fix token usage — JSONL session reader and database population
 
 ### Pending Todos
 

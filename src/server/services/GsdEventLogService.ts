@@ -1,8 +1,8 @@
 import { open } from 'fs/promises';
 import { readdir, stat } from 'fs/promises';
 import path from 'path';
-import type { GsdRawEvent, GsdEventSource } from '@shared/gsdTypes.js';
-import { GSD_NOISE_EVENTS } from '@shared/gsdTypes.js';
+import type { GsdRawEvent, GsdEventSource } from '../../shared/gsdTypes.js';
+import { GSD_NOISE_EVENTS } from '../../shared/gsdTypes.js';
 
 const LOGS_DIR = '/home/forge/.openclaw/workspace/skills/gsd-code-skill/logs';
 const READ_TAIL_BYTES = 64 * 1024; // 64KB per file — covers hundreds of recent events
