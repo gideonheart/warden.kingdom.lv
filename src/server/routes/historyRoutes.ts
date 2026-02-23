@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { database } from '../database/DatabaseConnection.js';
 import { logTailService } from '../services/LogTailService.js';
+import { sessionUsageReader } from '../services/SessionUsageReader.js';
 
 export const historyRoutes = Router();
 
@@ -26,6 +27,16 @@ historyRoutes.get('/api/history/token-usage', (request, response) => {
   const summary = database.getTokenUsageSummary();
 
   response.json({ usage, summary });
+});
+
+historyRoutes.post('/api/history/token-usage/scan', async (_request, response) => {
+  try {
+    await sessionUsageReader.scanAllProjects();
+    response.json({ status: 'ok', message: 'Scan complete' });
+  } catch (error) {
+    console.error('[historyRoutes] Manual scan failed:', error);
+    response.status(500).json({ status: 'error', message: 'Scan failed' });
+  }
 });
 
 historyRoutes.get('/api/history/logs', async (request, response) => {

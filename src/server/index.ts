@@ -11,6 +11,7 @@ import { historyRoutes } from './routes/historyRoutes.js';
 import { gsdRoutes } from './routes/gsdRoutes.js';
 import { terminalStreamService } from './services/TerminalStreamService.js';
 import { instanceTracker } from './services/InstanceTracker.js';
+import { sessionUsageReader } from './services/SessionUsageReader.js';
 import { database } from './database/DatabaseConnection.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -88,6 +89,7 @@ terminalStreamService.setSocketServer(socketServer);
 terminalStreamService.setupSocketNamespace(socketServer);
 
 instanceTracker.startPeriodicSync();
+sessionUsageReader.startPeriodicScan();
 
 httpServer.listen(PORT, HOST, () => {
   console.log(`[Warden] Server running at http://${HOST}:${PORT}`);
@@ -103,6 +105,7 @@ function handleShutdown(signal: string): void {
   }, 10_000);
   forceExitTimeout.unref();
 
+  sessionUsageReader.stopPeriodicScan();
   instanceTracker.stopPeriodicSync();
   httpServer.close(() => {
     console.log('[Warden] HTTP server closed');
