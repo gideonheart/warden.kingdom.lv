@@ -259,8 +259,8 @@ See `.planning/milestones/v1.1-ROADMAP.md`
   6. Re-running the scanner does not create duplicates (upsert semantics)
 
 **Plans:** 2/2 plans complete
-- [ ] 18-01-PLAN.md — SessionUsageReader service + DB schema updates (cache token columns, upsert method)
-- [ ] 18-02-PLAN.md — Server lifecycle wiring, scan endpoint, and enhanced TokenUsageView UI
+- [x] 18-01-PLAN.md — SessionUsageReader service + DB schema updates (cache token columns, upsert method)
+- [x] 18-02-PLAN.md — Server lifecycle wiring, scan endpoint, and enhanced TokenUsageView UI
 
 ---
 
@@ -285,3 +285,4 @@ See `.planning/milestones/v1.1-ROADMAP.md`
 | 15. Foundation | 2/2 | Complete    | 2026-02-19 | - |
 | 16. DRY + SRP | 2/2 | Complete    | 2026-02-19 | - |
 | 17. Polish | 2/2 | Complete    | 2026-02-19 | - |
+| 18. Fix token usage | v2.3 | 2/2 | Complete | 2026-02-23 |
