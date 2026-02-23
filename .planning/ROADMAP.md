@@ -244,12 +244,23 @@ See `.planning/milestones/v1.1-ROADMAP.md`
 
 ### Phase 18: Fix token usage — JSONL session reader and database population
 
-**Goal:** [To be planned]
-**Depends on:** Phase 17
-**Plans:** 0 plans
+**Goal:** Operator can view real token usage data (input, output, cache write, cache read) with cost breakdowns in the Token Usage tab, populated automatically from Claude Code JSONL session files
 
-Plans:
-- [ ] TBD (run /gsd:plan-phase 18 to break down)
+**Depends on:** Phase 17
+
+**Requirements:** TOKN-01, TOKN-02, TOKN-03, TOKN-04, TOKN-05, TOKN-06
+
+**Success Criteria** (what must be TRUE):
+  1. SessionUsageReader scans all Claude Code JSONL session files (including subagent files) and extracts per-API-call token usage
+  2. token_usage table is populated with aggregated daily usage per project, including cache creation and cache read tokens
+  3. Cost is computed using per-model pricing (Opus, Sonnet, Haiku) with separate rates for input, output, cache write, and cache read tokens
+  4. Scanner runs automatically on server startup and every 5 minutes thereafter
+  5. Token Usage UI displays real data with cache token columns and a manual Scan Now button
+  6. Re-running the scanner does not create duplicates (upsert semantics)
+
+**Plans:** 2 plans
+- [ ] 18-01-PLAN.md — SessionUsageReader service + DB schema updates (cache token columns, upsert method)
+- [ ] 18-02-PLAN.md — Server lifecycle wiring, scan endpoint, and enhanced TokenUsageView UI
 
 ---
 

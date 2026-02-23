@@ -95,6 +95,22 @@ Requirements for Code Hygiene milestone. Pure refactor — zero feature changes,
 - [x] **ACTV-08**: System parses terminal output to extract structured events (tool calls, file edits, commands)
 - [x] **ACTV-09**: Events show success/failure indicators (parsed from exit codes, error patterns)
 
+## Phase 18 Requirements
+
+Requirements for Token Usage — JSONL session reader and database population.
+
+### Token Usage Data Pipeline
+
+- [ ] **TOKN-01**: SessionUsageReader service scans all Claude Code JSONL session files under ~/.claude/projects/ and extracts token usage from assistant messages
+- [ ] **TOKN-02**: token_usage table schema includes cache_creation_input_tokens and cache_read_input_tokens columns alongside existing input/output tokens
+- [ ] **TOKN-03**: Token usage is aggregated per project directory per day and upserted into SQLite with no duplicates on re-scan
+
+### Token Usage Display
+
+- [ ] **TOKN-04**: SessionUsageReader starts automatically on server boot and scans every 5 minutes
+- [ ] **TOKN-05**: POST /api/history/token-usage/scan endpoint allows manual scan trigger from the UI
+- [ ] **TOKN-06**: TokenUsageView displays cache creation and cache read tokens alongside input/output, with a Scan Now button for manual refresh
+
 ## Future Requirements
 
 Deferred to future release. Tracked but not in current roadmap.
@@ -188,12 +204,19 @@ Which phases cover which requirements. Updated during roadmap creation.
 | ACTV-01 | Phase 11 | Complete |
 | ACTV-08 | Phase 11 | Complete |
 | ACTV-09 | Phase 11 | Complete |
+| TOKN-01 | Phase 18 | Planned |
+| TOKN-02 | Phase 18 | Planned |
+| TOKN-03 | Phase 18 | Planned |
+| TOKN-04 | Phase 18 | Planned |
+| TOKN-05 | Phase 18 | Planned |
+| TOKN-06 | Phase 18 | Planned |
 
 **Coverage:**
 - v2.2 requirements: 19 total
-- Mapped to phases: 19 ✓
+- Phase 18 requirements: 6 total
+- Mapped to phases: 25 ✓
 - Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-02-16*
-*Last updated: 2026-02-18 — v2.2 traceability populated (Phases 15-17)*
+*Last updated: 2026-02-23 — Phase 18 token usage requirements added (TOKN-01 through TOKN-06)*
