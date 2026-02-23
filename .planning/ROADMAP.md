@@ -258,7 +258,7 @@ See `.planning/milestones/v1.1-ROADMAP.md`
   5. Token Usage UI displays real data with cache token columns and a manual Scan Now button
   6. Re-running the scanner does not create duplicates (upsert semantics)
 
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans complete
 - [ ] 18-01-PLAN.md — SessionUsageReader service + DB schema updates (cache token columns, upsert method)
 - [ ] 18-02-PLAN.md — Server lifecycle wiring, scan endpoint, and enhanced TokenUsageView UI
 

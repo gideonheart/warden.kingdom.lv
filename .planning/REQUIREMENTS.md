@@ -107,9 +107,9 @@ Requirements for Token Usage — JSONL session reader and database population.
 
 ### Token Usage Display
 
-- [ ] **TOKN-04**: SessionUsageReader starts automatically on server boot and scans every 5 minutes
-- [ ] **TOKN-05**: POST /api/history/token-usage/scan endpoint allows manual scan trigger from the UI
-- [ ] **TOKN-06**: TokenUsageView displays cache creation and cache read tokens alongside input/output, with a Scan Now button for manual refresh
+- [x] **TOKN-04**: SessionUsageReader starts automatically on server boot and scans every 5 minutes
+- [x] **TOKN-05**: POST /api/history/token-usage/scan endpoint allows manual scan trigger from the UI
+- [x] **TOKN-06**: TokenUsageView displays cache creation and cache read tokens alongside input/output, with a Scan Now button for manual refresh
 
 ## Future Requirements
 

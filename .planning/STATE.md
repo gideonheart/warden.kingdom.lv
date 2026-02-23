@@ -11,11 +11,11 @@ See: .planning/PROJECT.md (updated 2026-02-19)
 ## Current Position
 
 Phase: 18 — Fix token usage JSONL session reader and database population
-Plan: 01 of 02 complete
-Status: Phase 18 in progress — SessionUsageReader service created, token_usage schema updated
-Last activity: 2026-02-23 - Completed Phase 18 Plan 01: SessionUsageReader + token_usage cache column migration
+Plan: 02 of 02 complete
+Status: Phase 18 complete — full token usage pipeline integrated end-to-end
+Last activity: 2026-02-23 - Completed Phase 18 Plan 02: server lifecycle wiring, scan endpoint, enhanced TokenUsageView
 
-Progress: [##########] 50% (Phase 18 — 1/2 plans done)
+Progress: [####################] 100% (Phase 18 — 2/2 plans done)
 
 ## Performance Metrics
 
@@ -120,6 +120,10 @@ Key decisions for Phase 18 (token usage):
 - [Phase 18 Plan 01]: Model pricing map with fallback to sonnet-4-6 for unknown models — safe default for new variants
 - [Phase 18 Plan 01]: Idempotent ALTER TABLE migration wrapped in try/catch — SQLite errors on duplicate ADD COLUMN
 - [Phase 18 Plan 01]: COALESCE for cache columns in read queries — backward compatible with NULL values in old rows
+- [Phase 18 Plan 02]: Scan Now button calls POST then re-fetches — ensures UI reflects latest scan without manual page reload
+- [Phase 18 Plan 02]: isScanning state separate from isLoading — button-level spinner avoids full-page flicker during rescan
+- [Phase 18 Plan 02]: Cache sub-lines in summary cards only rendered when cache tokens > 0 — clean display for agents without cache usage
+- [Phase 18 Plan 02]: formatAgentId() strips home-forge- prefix to show readable project slug (e.g. warden-kingdom-lv)
 
 Key decisions for v2.2:
 - TYPE-01 must land before DRY/SRP work: shared types are the dependency anchor for all import path updates
@@ -194,5 +198,5 @@ No active blockers for v2.2.
 ## Session Continuity
 
 Last session: 2026-02-23
-Stopped at: Completed Phase 18 Plan 01 — SessionUsageReader service + token_usage schema
-Next step: Phase 18 Plan 02 — wire sessionUsageReader into server startup and expose scan API endpoint
+Stopped at: Completed Phase 18 Plan 02 — server lifecycle wiring, POST scan endpoint, enhanced TokenUsageView
+Next step: Phase 18 complete — begin next phase
