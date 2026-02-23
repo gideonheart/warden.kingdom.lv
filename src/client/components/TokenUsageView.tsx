@@ -5,6 +5,8 @@ interface TokenUsageEntry {
   date: string;
   inputTokens: number;
   outputTokens: number;
+  cacheCreationInputTokens: number;
+  cacheReadInputTokens: number;
   costUsd: number;
 }
 
@@ -12,8 +14,28 @@ interface TokenUsageSummary {
   agentId: string;
   totalInputTokens: number;
   totalOutputTokens: number;
+  totalCacheCreationInputTokens: number;
+  totalCacheReadInputTokens: number;
   totalCostUsd: number;
   dayCount: number;
+}
+
+/**
+ * Convert a Claude Code project directory name (e.g. "home-forge-warden-kingdom-lv")
+ * to a human-readable label. Extracts the last two meaningful path segments.
+ * e.g. "home-forge-warden-kingdom-lv" → "warden-kingdom-lv"
+ */
+function formatAgentId(agentId: string): string {
+  // Typical format: home-forge-<project-name>
+  // Split on '-' and try to identify the project slug (last 2-4 segments)
+  const parts = agentId.split('-');
+  if (parts.length > 3) {
+    // Drop "home" and "forge" prefix segments if present
+    if (parts[0] === 'home' && parts[1] === 'forge') {
+      return parts.slice(2).join('-');
+    }
+  }
+  return agentId;
 }
 
 export function TokenUsageView() {
@@ -21,6 +43,7 @@ export function TokenUsageView() {
   const [summary, setSummary] = useState<TokenUsageSummary[]>([]);
   const [agentFilter, setAgentFilter] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [isScanning, setIsScanning] = useState(false);
 
   const fetchUsage = useCallback(async () => {
     setIsLoading(true);
@@ -45,6 +68,18 @@ export function TokenUsageView() {
     fetchUsage();
   }, [fetchUsage]);
 
+  const handleScanNow = useCallback(async () => {
+    setIsScanning(true);
+    try {
+      await fetch('/api/history/token-usage/scan', { method: 'POST' });
+      await fetchUsage();
+    } catch (error) {
+      console.error('Failed to trigger token usage scan:', error);
+    } finally {
+      setIsScanning(false);
+    }
+  }, [fetchUsage]);
+
   const formatNumber = (num: number) => num.toLocaleString();
   const formatCost = (cost: number) => `$${cost.toFixed(4)}`;
 
@@ -58,6 +93,20 @@ export function TokenUsageView() {
           onChange={(e) => setAgentFilter(e.target.value)}
           className="bg-warden-bg border border-warden-border rounded px-2 py-1 min-h-[44px] text-sm text-warden-text w-40"
         />
+        <button
+          onClick={handleScanNow}
+          disabled={isScanning}
+          className="flex items-center gap-2 px-3 py-1.5 rounded text-sm bg-warden-accent/20 text-warden-accent hover:bg-warden-accent/30 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          {isScanning ? (
+            <>
+              <span className="w-3 h-3 border-2 border-warden-accent border-t-transparent rounded-full animate-spin" />
+              Scanning...
+            </>
+          ) : (
+            'Scan Now'
+          )}
+        </button>
       </div>
 
       {isLoading ? (
@@ -71,30 +120,46 @@ export function TokenUsageView() {
             <div>
               <h3 className="text-sm font-semibold text-warden-text mb-3">Per-Agent Summary</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {summary.map((entry) => (
-                  <div
-                    key={entry.agentId}
-                    className="bg-warden-border/20 rounded-lg p-3 space-y-2"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-warden-text">{entry.agentId}</span>
-                      <span className="text-xs text-warden-text-dim">{entry.dayCount} days</span>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2 text-xs">
-                      <div>
-                        <span className="text-warden-text-dim">Input</span>
-                        <p className="text-warden-text font-mono">{formatNumber(entry.totalInputTokens)}</p>
+                {summary.map((entry) => {
+                  const hasCacheTokens =
+                    entry.totalCacheCreationInputTokens > 0 || entry.totalCacheReadInputTokens > 0;
+                  return (
+                    <div
+                      key={entry.agentId}
+                      className="bg-warden-border/20 rounded-lg p-3 space-y-2"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-warden-text" title={entry.agentId}>
+                          {formatAgentId(entry.agentId)}
+                        </span>
+                        <span className="text-xs text-warden-text-dim">{entry.dayCount} days</span>
                       </div>
-                      <div>
-                        <span className="text-warden-text-dim">Output</span>
-                        <p className="text-warden-text font-mono">{formatNumber(entry.totalOutputTokens)}</p>
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div>
+                          <span className="text-warden-text-dim">Input</span>
+                          <p className="text-warden-text font-mono">{formatNumber(entry.totalInputTokens)}</p>
+                          {hasCacheTokens && (
+                            <p className="text-warden-text-dim font-mono text-xs">
+                              +{formatNumber(entry.totalCacheCreationInputTokens)} write
+                            </p>
+                          )}
+                          {hasCacheTokens && (
+                            <p className="text-warden-text-dim font-mono text-xs">
+                              +{formatNumber(entry.totalCacheReadInputTokens)} read
+                            </p>
+                          )}
+                        </div>
+                        <div>
+                          <span className="text-warden-text-dim">Output</span>
+                          <p className="text-warden-text font-mono">{formatNumber(entry.totalOutputTokens)}</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-sm font-mono text-warden-accent">{formatCost(entry.totalCostUsd)}</span>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <span className="text-sm font-mono text-warden-accent">{formatCost(entry.totalCostUsd)}</span>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
@@ -107,23 +172,29 @@ export function TokenUsageView() {
             <div className="hidden sm:block">
               <h3 className="text-sm font-semibold text-warden-text mb-3">Daily Breakdown</h3>
               <div className="space-y-1">
-                <div className="flex items-center gap-3 px-3 py-1.5 text-xs text-warden-text-dim font-medium border-b border-warden-border">
+                <div className="flex items-center gap-2 px-3 py-1.5 text-xs text-warden-text-dim font-medium border-b border-warden-border">
                   <span className="w-24">Date</span>
-                  <span className="w-20">Agent</span>
-                  <span className="w-28 text-right">Input Tokens</span>
-                  <span className="w-28 text-right">Output Tokens</span>
+                  <span className="w-24">Agent</span>
+                  <span className="w-24 text-right">Input</span>
+                  <span className="w-24 text-right">Cache Write</span>
+                  <span className="w-24 text-right">Cache Read</span>
+                  <span className="w-24 text-right">Output</span>
                   <span className="w-20 text-right">Cost</span>
                 </div>
                 {usage.map((entry, index) => (
                   <div
                     key={`${entry.agentId}-${entry.date}-${index}`}
-                    className="flex items-center gap-3 px-3 py-1.5 text-sm hover:bg-warden-border/20 transition-colors"
+                    className="flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-warden-border/20 transition-colors"
                   >
                     <span className="w-24 text-warden-text font-mono text-xs">{entry.date}</span>
-                    <span className="w-20 text-warden-text-dim">{entry.agentId}</span>
-                    <span className="w-28 text-right text-warden-text font-mono">{formatNumber(entry.inputTokens)}</span>
-                    <span className="w-28 text-right text-warden-text font-mono">{formatNumber(entry.outputTokens)}</span>
-                    <span className="w-20 text-right text-warden-accent font-mono">{formatCost(entry.costUsd)}</span>
+                    <span className="w-24 text-warden-text-dim text-xs truncate" title={entry.agentId}>
+                      {formatAgentId(entry.agentId)}
+                    </span>
+                    <span className="w-24 text-right text-warden-text font-mono text-xs">{formatNumber(entry.inputTokens)}</span>
+                    <span className="w-24 text-right text-warden-text-dim font-mono text-xs">{formatNumber(entry.cacheCreationInputTokens)}</span>
+                    <span className="w-24 text-right text-warden-text-dim font-mono text-xs">{formatNumber(entry.cacheReadInputTokens)}</span>
+                    <span className="w-24 text-right text-warden-text font-mono text-xs">{formatNumber(entry.outputTokens)}</span>
+                    <span className="w-20 text-right text-warden-accent font-mono text-xs">{formatCost(entry.costUsd)}</span>
                   </div>
                 ))}
               </div>
