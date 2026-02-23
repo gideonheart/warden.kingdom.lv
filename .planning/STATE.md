@@ -13,7 +13,7 @@ See: .planning/PROJECT.md (updated 2026-02-19)
 Phase: 18 — Fix token usage JSONL session reader and database population
 Plan: 02 of 02 complete
 Status: Phase 18 complete — full token usage pipeline integrated end-to-end
-Last activity: 2026-02-23 - Completed Phase 18 Plan 02: server lifecycle wiring, scan endpoint, enhanced TokenUsageView
+Last activity: 2026-02-23 - Completed quick task 15: Add runtime status reconciliation to resume-work
 
 Progress: [####################] 100% (Phase 18 — 2/2 plans done)
 
@@ -174,6 +174,7 @@ Key decisions for v2.2:
 | 12 | Improve Events tab: expandable rows, session filter, richer summaries, SRP extraction | 2026-02-20 | `8a38889` |
 | 13 | Enrich Events tab: Skill/Task/Edit/TaskCreate/TaskUpdate/TaskOutput tool summaries | 2026-02-20 | `ddade67` |
 | 14 | Remove Activity tab and ActivityEventService — dead code removal (~800 LOC) | 2026-02-20 | `cca98cf` |
+| 15 | Add runtime status reconciliation to resume-work: verify live deployment state before reporting gaps | 2026-02-23 | `79f274c` |
 
 ### Roadmap Evolution
 
