@@ -37,3 +37,13 @@ export interface TerminalExitPayload {
   sessionName: string;
   exitCode: number;
 }
+
+export interface TokenUsageRow {
+  agentId: string;
+  date: string;
+  inputTokens: number;
+  outputTokens: number;
+  cacheCreationInputTokens: number;
+  cacheReadInputTokens: number;
+  costUsd: number;
+}

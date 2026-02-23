@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import type { AgentInstance, AgentInstanceCreateParams, AgentInstanceStatus } from '../../shared/types.js';
+import type { AgentInstance, AgentInstanceCreateParams, AgentInstanceStatus, TokenUsageRow } from '../../shared/types.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -144,7 +144,28 @@ class DatabaseConnection {
     return { instances, total };
   }
 
-  getTokenUsage(filters: { agentId?: string; dateFrom?: string; dateTo?: string }): { agentId: string; date: string; inputTokens: number; outputTokens: number; costUsd: number }[] {
+  upsertTokenUsage(row: TokenUsageRow): void {
+    this.db.prepare(`
+      INSERT INTO token_usage (agent_id, date, input_tokens, output_tokens, cache_creation_input_tokens, cache_read_input_tokens, cost_usd)
+      VALUES (@agentId, @date, @inputTokens, @outputTokens, @cacheCreationInputTokens, @cacheReadInputTokens, @costUsd)
+      ON CONFLICT(agent_id, date) DO UPDATE SET
+        input_tokens = excluded.input_tokens,
+        output_tokens = excluded.output_tokens,
+        cache_creation_input_tokens = excluded.cache_creation_input_tokens,
+        cache_read_input_tokens = excluded.cache_read_input_tokens,
+        cost_usd = excluded.cost_usd
+    `).run({
+      agentId: row.agentId,
+      date: row.date,
+      inputTokens: row.inputTokens,
+      outputTokens: row.outputTokens,
+      cacheCreationInputTokens: row.cacheCreationInputTokens,
+      cacheReadInputTokens: row.cacheReadInputTokens,
+      costUsd: row.costUsd,
+    });
+  }
+
+  getTokenUsage(filters: { agentId?: string; dateFrom?: string; dateTo?: string }): { agentId: string; date: string; inputTokens: number; outputTokens: number; cacheCreationInputTokens: number; cacheReadInputTokens: number; costUsd: number }[] {
     const conditions: string[] = [];
     const params: string[] = [];
 
@@ -165,23 +186,28 @@ class DatabaseConnection {
 
     return this.db.prepare(`
       SELECT agent_id as agentId, date, input_tokens as inputTokens,
-             output_tokens as outputTokens, cost_usd as costUsd
+             output_tokens as outputTokens,
+             COALESCE(cache_creation_input_tokens, 0) as cacheCreationInputTokens,
+             COALESCE(cache_read_input_tokens, 0) as cacheReadInputTokens,
+             cost_usd as costUsd
       FROM token_usage ${whereClause}
       ORDER BY date DESC, agent_id
-    `).all(...params) as { agentId: string; date: string; inputTokens: number; outputTokens: number; costUsd: number }[];
+    `).all(...params) as { agentId: string; date: string; inputTokens: number; outputTokens: number; cacheCreationInputTokens: number; cacheReadInputTokens: number; costUsd: number }[];
   }
 
-  getTokenUsageSummary(): { agentId: string; totalInputTokens: number; totalOutputTokens: number; totalCostUsd: number; dayCount: number }[] {
+  getTokenUsageSummary(): { agentId: string; totalInputTokens: number; totalOutputTokens: number; totalCacheCreationInputTokens: number; totalCacheReadInputTokens: number; totalCostUsd: number; dayCount: number }[] {
     return this.db.prepare(`
       SELECT agent_id as agentId,
              SUM(input_tokens) as totalInputTokens,
              SUM(output_tokens) as totalOutputTokens,
+             SUM(COALESCE(cache_creation_input_tokens, 0)) as totalCacheCreationInputTokens,
+             SUM(COALESCE(cache_read_input_tokens, 0)) as totalCacheReadInputTokens,
              SUM(cost_usd) as totalCostUsd,
              COUNT(DISTINCT date) as dayCount
       FROM token_usage
       GROUP BY agent_id
       ORDER BY totalCostUsd DESC
-    `).all() as { agentId: string; totalInputTokens: number; totalOutputTokens: number; totalCostUsd: number; dayCount: number }[];
+    `).all() as { agentId: string; totalInputTokens: number; totalOutputTokens: number; totalCacheCreationInputTokens: number; totalCacheReadInputTokens: number; totalCostUsd: number; dayCount: number }[];
   }
 
   close(): void {
@@ -246,6 +272,18 @@ class DatabaseConnection {
       CREATE INDEX IF NOT EXISTS idx_activity_events_event_type ON activity_events(event_type);
       CREATE INDEX IF NOT EXISTS idx_activity_events_session ON activity_events(session_name);
     `);
+
+    // Migration: add cache token columns to token_usage (idempotent — SQLite errors on duplicate ADD COLUMN)
+    for (const columnDef of [
+      'cache_creation_input_tokens INTEGER DEFAULT 0',
+      'cache_read_input_tokens INTEGER DEFAULT 0',
+    ]) {
+      try {
+        this.db.exec(`ALTER TABLE token_usage ADD COLUMN ${columnDef}`);
+      } catch {
+        // Column already exists — safe to ignore
+      }
+    }
   }
 }
 
