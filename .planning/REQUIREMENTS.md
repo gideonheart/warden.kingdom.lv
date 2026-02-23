@@ -101,9 +101,9 @@ Requirements for Token Usage — JSONL session reader and database population.
 
 ### Token Usage Data Pipeline
 
-- [ ] **TOKN-01**: SessionUsageReader service scans all Claude Code JSONL session files under ~/.claude/projects/ and extracts token usage from assistant messages
-- [ ] **TOKN-02**: token_usage table schema includes cache_creation_input_tokens and cache_read_input_tokens columns alongside existing input/output tokens
-- [ ] **TOKN-03**: Token usage is aggregated per project directory per day and upserted into SQLite with no duplicates on re-scan
+- [x] **TOKN-01**: SessionUsageReader service scans all Claude Code JSONL session files under ~/.claude/projects/ and extracts token usage from assistant messages
+- [x] **TOKN-02**: token_usage table schema includes cache_creation_input_tokens and cache_read_input_tokens columns alongside existing input/output tokens
+- [x] **TOKN-03**: Token usage is aggregated per project directory per day and upserted into SQLite with no duplicates on re-scan
 
 ### Token Usage Display
 

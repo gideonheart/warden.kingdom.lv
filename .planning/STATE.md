@@ -6,16 +6,16 @@ See: .planning/PROJECT.md (updated 2026-02-19)
 
 **Core value:** Real-time visibility into all active Claude Code agent sessions from a single browser tab
 
-**Current focus:** v2.2 Code Hygiene — Phase 17: Polish (lazy-mount + bug fixes)
+**Current focus:** v2.3 Token Usage — Phase 18: JSONL session reader and database population
 
 ## Current Position
 
-Phase: 17 — Polish
-Plan: 02 of 02 complete
-Status: Phase 17 complete — lazy-mount tabs + fd safety + anchored regex + stable Map ref + setTimeout cleanup
-Last activity: 2026-02-20 - Completed quick task 14: Remove Activity tab and ActivityEventService — Events tab replaces it
+Phase: 18 — Fix token usage JSONL session reader and database population
+Plan: 01 of 02 complete
+Status: Phase 18 in progress — SessionUsageReader service created, token_usage schema updated
+Last activity: 2026-02-23 - Completed Phase 18 Plan 01: SessionUsageReader + token_usage cache column migration
 
-Progress: [##########] 100% (Phase 17 — 2/2 plans done)
+Progress: [##########] 50% (Phase 18 — 1/2 plans done)
 
 ## Performance Metrics
 
@@ -114,6 +114,13 @@ Key decisions from v2.1 research (apply from Phase 12 onwards):
 - [Quick-8]: onMouseDown (not onClick) on SearchableSelect dropdown options — fires before blur timeout closes dropdown
 - [Quick-8]: GSD_COMMANDS as static module-level constant — commands are stable, no server API needed
 
+Key decisions for Phase 18 (token usage):
+- [Phase 18 Plan 01]: Upsert replaces full daily totals (not accumulates) — scanner always computes correct aggregate, making re-runs idempotent and safe
+- [Phase 18 Plan 01]: agentId derived by stripping leading dash from Claude project dir name (-home-forge-X → home-forge-X)
+- [Phase 18 Plan 01]: Model pricing map with fallback to sonnet-4-6 for unknown models — safe default for new variants
+- [Phase 18 Plan 01]: Idempotent ALTER TABLE migration wrapped in try/catch — SQLite errors on duplicate ADD COLUMN
+- [Phase 18 Plan 01]: COALESCE for cache columns in read queries — backward compatible with NULL values in old rows
+
 Key decisions for v2.2:
 - TYPE-01 must land before DRY/SRP work: shared types are the dependency anchor for all import path updates
 - DEAD code deleted first: removes noise before extraction work begins, shrinks diff surface area
@@ -187,5 +194,5 @@ No active blockers for v2.2.
 ## Session Continuity
 
 Last session: 2026-02-23
-Stopped at: Session resumed, reviewing project state
-Next step: Phase 18 needs planning — token usage JSONL session reader
+Stopped at: Completed Phase 18 Plan 01 — SessionUsageReader service + token_usage schema
+Next step: Phase 18 Plan 02 — wire sessionUsageReader into server startup and expose scan API endpoint
