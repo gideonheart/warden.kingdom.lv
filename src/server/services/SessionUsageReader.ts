@@ -55,6 +55,7 @@ interface UsageAccumulator {
  */
 class SessionUsageReader {
   private scanIntervalHandle: ReturnType<typeof setInterval> | null = null;
+  private scanInProgress = false;
 
   /**
    * Start periodic scanning. Runs an immediate scan then rescans every 5 minutes.
@@ -88,17 +89,28 @@ class SessionUsageReader {
    * by (project_label, date), and upsert into the token_usage table.
    */
   async scanAllProjects(): Promise<void> {
-    let projectDirEntries: string[];
-    try {
-      projectDirEntries = await readdir(CLAUDE_PROJECTS_DIR);
-    } catch (error) {
-      console.error('[SessionUsageReader] Cannot read projects directory:', CLAUDE_PROJECTS_DIR, error);
+    if (this.scanInProgress) {
+      console.log('[SessionUsageReader] Scan already in progress, skipping');
       return;
     }
 
-    for (const projectDirName of projectDirEntries) {
-      const projectDirPath = path.join(CLAUDE_PROJECTS_DIR, projectDirName);
-      await this.scanProject(projectDirPath, projectDirName);
+    this.scanInProgress = true;
+
+    try {
+      let projectDirEntries: string[];
+      try {
+        projectDirEntries = await readdir(CLAUDE_PROJECTS_DIR);
+      } catch (error) {
+        console.error('[SessionUsageReader] Cannot read projects directory:', CLAUDE_PROJECTS_DIR, error);
+        return;
+      }
+
+      for (const projectDirName of projectDirEntries) {
+        const projectDirPath = path.join(CLAUDE_PROJECTS_DIR, projectDirName);
+        await this.scanProject(projectDirPath, projectDirName);
+      }
+    } finally {
+      this.scanInProgress = false;
     }
   }
 
