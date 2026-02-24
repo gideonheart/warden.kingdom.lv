@@ -13,7 +13,7 @@ See: .planning/PROJECT.md (updated 2026-02-19)
 Phase: 18 — Fix token usage JSONL session reader and database population
 Plan: 02 of 02 complete
 Status: Phase 18 complete — full token usage pipeline integrated end-to-end
-Last activity: 2026-02-24 - Completed quick task 18: Fix TOKN-01 through TOKN-06 traceability
+Last activity: 2026-02-24 - Completed quick task 19: Add requirements-completed frontmatter to 18-02-SUMMARY.md
 
 Progress: [####################] 100% (Phase 18 — 2/2 plans done)
 
