@@ -204,12 +204,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 | ACTV-01 | Phase 11 | Complete |
 | ACTV-08 | Phase 11 | Complete |
 | ACTV-09 | Phase 11 | Complete |
-| TOKN-01 | Phase 18 | Planned |
-| TOKN-02 | Phase 18 | Planned |
-| TOKN-03 | Phase 18 | Planned |
-| TOKN-04 | Phase 18 | Planned |
-| TOKN-05 | Phase 18 | Planned |
-| TOKN-06 | Phase 18 | Planned |
+| TOKN-01 | Phase 18 | Complete |
+| TOKN-02 | Phase 18 | Complete |
+| TOKN-03 | Phase 18 | Complete |
+| TOKN-04 | Phase 18 | Complete |
+| TOKN-05 | Phase 18 | Complete |
+| TOKN-06 | Phase 18 | Complete |
 
 **Coverage:**
 - v2.2 requirements: 19 total
@@ -219,4 +219,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-02-16*
-*Last updated: 2026-02-23 — Phase 18 token usage requirements added (TOKN-01 through TOKN-06)*
+*Last updated: 2026-02-24 — TOKN-01 through TOKN-06 marked Complete (Phase 18 done)*
