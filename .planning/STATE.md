@@ -135,7 +135,7 @@ Key decisions for v2.2:
 - [Phase 15]: AgentsView.tsx deleted entirely - orphaned after Quick-6 created Agents tab inside GsdView.tsx
 - [Phase 16]: All 9 GSD shared symbols (4 constants + 5 components) extracted to single gsdShared.tsx module
 - [Phase 16]: AgentStateHint/PressureLevel type imports removed from GsdView.tsx since no direct references remain
-- [Phase 16]: 4 GSD tabs extracted to standalone components (AgentsTab, ControlsTab, RegistryTab, HooksTab)
+- [Phase 16]: 4 GSD tabs extracted to standalone components (AgentsTab, ControlsTab, RegistryTab, EventsTab)
 - [Phase 16]: ControlsTab owns all spawn/dispatch state — GsdView passes only data props, zero form state
 - [Phase 16]: GSD_COMMANDS constant moved into ControlsTab since only Controls tab uses it
 - [Phase 16]: GsdView.tsx reduced from 489 to 76 lines — pure tab router shell

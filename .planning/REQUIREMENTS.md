@@ -23,7 +23,7 @@ Requirements for Code Hygiene milestone. Pure refactor — zero feature changes,
 - [x] **SRP-01**: Extract `AgentsTab` from `GsdView.tsx` into own component file
 - [x] **SRP-02**: Extract `ControlsTab` from `GsdView.tsx` into own component file
 - [x] **SRP-03**: Extract `RegistryTab` from `GsdView.tsx` into own component file
-- [x] **SRP-04**: Extract `HooksTab` from `GsdView.tsx` into own component file
+- [x] **SRP-04**: Extract `EventsTab` (originally `HooksTab`) from `GsdView.tsx` into own component file
 - [x] **SRP-05**: `GsdView.tsx` becomes thin shell: tab state + router, under 100 LOC
 
 ### Types — Shared Type Unification

@@ -42,7 +42,7 @@ Real-time visibility into all active Claude Code agent sessions from a single br
 - ✓ Delete ~750 lines of dead code (gutted plugin file, orphaned AgentsView) — Phase 15
 - ✓ Create `src/shared/gsdTypes.ts` — unify GSD types across client/server boundary — Phase 15
 - ✓ Extract 9 duplicated constants/components into shared GSD status module (`gsdShared.tsx`) — Phase 16
-- ✓ Decompose GsdView.tsx into 4 tab sub-components (AgentsTab, ControlsTab, RegistryTab, HooksTab) — Phase 16, GsdView now 76 lines
+- ✓ Decompose GsdView.tsx into 4 tab sub-components (AgentsTab, ControlsTab, RegistryTab, EventsTab) — Phase 16, GsdView now 76 lines
 - Lazy-mount tabs — only render active tab, eliminating ~18 HTTP req/min + 60 tmux subprocess/min waste
 - Fix minor issues: fd leak in spawn handler, setTimeout cleanup, Map re-creation, regex fragility
 
