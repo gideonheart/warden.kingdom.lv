@@ -11,7 +11,7 @@ provides:
   - AgentsTab standalone component with state badges, pressure indicators, phase progress
   - ControlsTab standalone component with spawn/dispatch forms and all local state
   - RegistryTab standalone component with registry table and enabled toggles
-  - HooksTab standalone component with hook event feed table
+  - EventsTab standalone component (originally HooksTab, renamed in quick-10) with event feed table
   - GsdView.tsx thin router shell (76 lines) with tab state and data hook orchestration
 affects: [17-perf, lazy-mount]
 
@@ -24,12 +24,12 @@ key-files:
     - src/client/components/AgentsTab.tsx
     - src/client/components/ControlsTab.tsx
     - src/client/components/RegistryTab.tsx
-    - src/client/components/HooksTab.tsx
+    - src/client/components/EventsTab.tsx  # originally HooksTab.tsx, renamed in quick-10
   modified:
     - src/client/components/GsdView.tsx
 
 key-decisions:
-  - "HooksTab uses HookEvent type from useGsdHookFeed hook instead of inline type — single source of truth"
+  - "EventsTab (originally HooksTab, renamed in quick-10) uses event types from hook instead of inline type — single source of truth"
   - "ControlsTab owns all spawn/dispatch state (useState/useCallback/useEffect) — GsdView passes only data props"
   - "GsdView reduced to 76 lines — well under 100 LOC target"
 
@@ -59,7 +59,7 @@ completed: 2026-02-19
 - Extracted AgentsTab with agent card grid, state badges, pressure indicators, and phase progress
 - Extracted ControlsTab as fully self-contained component owning all spawn/dispatch form state
 - Extracted RegistryTab with registry table and enabled toggles
-- Extracted HooksTab with hook event feed table
+- Extracted HooksTab (later renamed EventsTab in quick-10) with event feed table
 - GsdView.tsx reduced to 76-line thin router shell (tab state + data hooks + conditional rendering)
 
 ## Task Commits
@@ -67,17 +67,17 @@ completed: 2026-02-19
 Each task was committed atomically:
 
 1. **Task 1: Extract AgentsTab and ControlsTab** - `3bc098a` (feat)
-2. **Task 2: Extract RegistryTab and HooksTab, slim GsdView** - `e423c67` (refactor)
+2. **Task 2: Extract RegistryTab and HooksTab, slim GsdView** - `e423c67` (refactor) (note: HooksTab was later renamed to EventsTab in quick-10)
 
 ## Files Created/Modified
 - `src/client/components/AgentsTab.tsx` - Agent card grid with state badges, pressure, phase progress, enabled toggles
 - `src/client/components/ControlsTab.tsx` - Spawn form + command dispatch with SearchableSelect, BashHint, all local state
 - `src/client/components/RegistryTab.tsx` - Registry table with agent details and enabled toggles
-- `src/client/components/HooksTab.tsx` - Hook event feed table with time/hook/event/agent/session/state columns
+- `src/client/components/EventsTab.tsx` (renamed from HooksTab.tsx in quick-10) - Event feed table with time/hook/event/agent/session/state columns
 - `src/client/components/GsdView.tsx` - Thin tab router: tab state, 5 data hooks, conditional tab rendering (76 LOC)
 
 ## Decisions Made
-- HooksTab imports `HookEvent` type from `useGsdHookFeed` hook rather than duplicating the interface inline
+- EventsTab (originally HooksTab, renamed in quick-10) imports event types from hook rather than duplicating the interface inline
 - ControlsTab fully owns all spawn/dispatch state (10 useState calls, 2 useCallback, 1 useEffect) -- GsdView passes zero form state
 - GSD_COMMANDS constant moved into ControlsTab since it is only used by the Controls tab
 
