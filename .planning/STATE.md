@@ -13,7 +13,7 @@ See: .planning/PROJECT.md (updated 2026-02-19)
 Phase: 18 — Fix token usage JSONL session reader and database population
 Plan: 02 of 02 complete
 Status: Phase 18 complete — full token usage pipeline integrated end-to-end
-Last activity: 2026-02-23 - Completed quick task 15: Add runtime status reconciliation to resume-work
+Last activity: 2026-02-24 - Completed quick task 16: Refactor SessionUsageReader to stream JSONL
 
 Progress: [####################] 100% (Phase 18 — 2/2 plans done)
 
@@ -156,6 +156,9 @@ Key decisions for v2.2:
 - [Quick-12]: expandedId state (not per-row) — single expanded row at a time, standard accordion pattern
 - [Quick-12]: Q&A details and error details moved to expanded view only — removes always-visible clutter below every matching event
 - [Quick-12]: Session filter resets via useEffect when source changes — prevents stale filter after agent switch
+- [Quick-16]: readline createInterface with crlfDelay: Infinity for robust JSONL line splitting across OS line endings
+- [Quick-16]: Boolean flag mutex (not queue) for scan overlap: concurrent scans silently skip rather than queue
+- [Quick-16]: try/finally cleanup for both readline interface and read stream to prevent fd leaks
 
 ### Quick Tasks Completed
 
@@ -175,6 +178,7 @@ Key decisions for v2.2:
 | 13 | Enrich Events tab: Skill/Task/Edit/TaskCreate/TaskUpdate/TaskOutput tool summaries | 2026-02-20 | `ddade67` |
 | 14 | Remove Activity tab and ActivityEventService — dead code removal (~800 LOC) | 2026-02-20 | `cca98cf` |
 | 15 | Add runtime status reconciliation to resume-work: verify live deployment state before reporting gaps | 2026-02-23 | `79f274c` |
+| 16 | Refactor SessionUsageReader: streaming JSONL + scan overlap guard | 2026-02-24 | `c767a5b` |
 
 ### Roadmap Evolution
 
@@ -198,6 +202,6 @@ No active blockers for v2.2.
 
 ## Session Continuity
 
-Last session: 2026-02-23
-Stopped at: Completed Phase 18 Plan 02 — server lifecycle wiring, POST scan endpoint, enhanced TokenUsageView
+Last session: 2026-02-24
+Stopped at: Completed quick task 16 — SessionUsageReader streaming JSONL + scan overlap guard
 Next step: Phase 18 complete — begin next phase
