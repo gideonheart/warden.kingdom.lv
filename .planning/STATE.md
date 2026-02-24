@@ -13,7 +13,7 @@ See: .planning/PROJECT.md (updated 2026-02-19)
 Phase: 18 — Fix token usage JSONL session reader and database population
 Plan: 02 of 02 complete
 Status: Phase 18 complete — full token usage pipeline integrated end-to-end
-Last activity: 2026-02-24 - Completed quick task 16: Refactor SessionUsageReader to stream JSONL
+Last activity: 2026-02-24 - Completed quick task 17: Harden SessionUsageReader NaN guards
 
 Progress: [####################] 100% (Phase 18 — 2/2 plans done)
 
@@ -159,6 +159,9 @@ Key decisions for v2.2:
 - [Quick-16]: readline createInterface with crlfDelay: Infinity for robust JSONL line splitting across OS line endings
 - [Quick-16]: Boolean flag mutex (not queue) for scan overlap: concurrent scans silently skip rather than queue
 - [Quick-16]: try/finally cleanup for both readline interface and read stream to prevent fd leaks
+- [Quick-17]: Guards are pure additions — no structural changes to existing SessionUsageReader logic
+- [Quick-17]: warnedModels cleared per scan cycle (not per file) to deduplicate across all projects
+- [Quick-17]: ISO_DATE_REGEX validates timestamp prefix before accumulation to reject garbage date keys
 
 ### Quick Tasks Completed
 
@@ -179,6 +182,7 @@ Key decisions for v2.2:
 | 14 | Remove Activity tab and ActivityEventService — dead code removal (~800 LOC) | 2026-02-20 | `cca98cf` |
 | 15 | Add runtime status reconciliation to resume-work: verify live deployment state before reporting gaps | 2026-02-23 | `79f274c` |
 | 16 | Refactor SessionUsageReader: streaming JSONL + scan overlap guard | 2026-02-24 | `c767a5b` |
+| 17 | Harden SessionUsageReader: NaN guards, timestamp validation, unknown model warn-once | 2026-02-24 | `8fb98b8` |
 
 ### Roadmap Evolution
 
@@ -203,5 +207,5 @@ No active blockers for v2.2.
 ## Session Continuity
 
 Last session: 2026-02-24
-Stopped at: Completed quick task 16 — SessionUsageReader streaming JSONL + scan overlap guard
+Stopped at: Completed quick task 17 — SessionUsageReader NaN guards, timestamp validation, unknown model warn-once
 Next step: Phase 18 complete — begin next phase
