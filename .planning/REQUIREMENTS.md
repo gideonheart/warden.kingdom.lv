@@ -219,4 +219,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-02-16*
-*Last updated: 2026-02-24 — TOKN-01 through TOKN-06 marked Complete (Phase 18 done)*
+*Last updated: 2026-02-24 — SRP-04 description updated to reflect EventsTab rename (quick-20)*

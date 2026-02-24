@@ -13,7 +13,7 @@ See: .planning/PROJECT.md (updated 2026-02-19)
 Phase: 18 — Fix token usage JSONL session reader and database population
 Plan: 02 of 02 complete
 Status: Phase 18 complete — full token usage pipeline integrated end-to-end
-Last activity: 2026-02-24 - Completed quick task 19: Add requirements-completed frontmatter to 18-02-SUMMARY.md
+Last activity: 2026-02-24 - Completed quick task 20: Fix Phase 16 documentation HooksTab references to EventsTab
 
 Progress: [####################] 100% (Phase 18 — 2/2 plans done)
 
@@ -185,6 +185,7 @@ Key decisions for v2.2:
 | 17 | Harden SessionUsageReader: NaN guards, timestamp validation, unknown model warn-once | 2026-02-24 | `8fb98b8` |
 | 18 | Fix TOKN-01 through TOKN-06 traceability: mark Complete in REQUIREMENTS.md | 2026-02-24 | `5413480` |
 | 19 | Add requirements-completed frontmatter to 18-02-SUMMARY.md for TOKN-04/05/06 | 2026-02-24 | `4d3cb5e` |
+| 20 | Fix Phase 16 documentation HooksTab references to EventsTab | 2026-02-24 | `937a3d1` |
 
 ### Roadmap Evolution
 
@@ -209,5 +210,5 @@ No active blockers for v2.2.
 ## Session Continuity
 
 Last session: 2026-02-24
-Stopped at: Completed quick task 19 — Add requirements-completed frontmatter to 18-02-SUMMARY.md
+Stopped at: Completed quick task 20 — Fix Phase 16 documentation HooksTab references to EventsTab
 Next step: Phase 18 complete — begin next phase
