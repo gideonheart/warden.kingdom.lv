@@ -39,6 +39,8 @@ key-decisions:
   - "formatAgentId() strips home-forge prefix: home-forge-warden-kingdom-lv → warden-kingdom-lv — readable without losing identity"
   - "Daily breakdown table uses gap-2 (not gap-3) to fit 7 columns without horizontal scroll on 1280px+ desktop"
 
+requirements-completed: [TOKN-04, TOKN-05, TOKN-06]
+
 # Metrics
 duration: 2min
 completed: 2026-02-23
