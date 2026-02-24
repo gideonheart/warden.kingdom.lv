@@ -1,4 +1,6 @@
-import { readdir, readFile } from 'fs/promises';
+import { createReadStream } from 'fs';
+import { readdir } from 'fs/promises';
+import { createInterface } from 'readline';
 import path from 'path';
 import { database } from '../database/DatabaseConnection.js';
 import type { TokenUsageRow } from '../../shared/types.js';
@@ -175,84 +177,86 @@ class SessionUsageReader {
 
   /**
    * Parse a single JSONL file and accumulate token usage from assistant messages
-   * into the provided dailyUsage map.
+   * into the provided dailyUsage map. Streams line-by-line via readline to avoid
+   * buffering entire file contents into memory.
    */
   private async processJsonlFile(
     filePath: string,
     dailyUsage: Map<string, UsageAccumulator>,
   ): Promise<void> {
-    let content: string;
+    const readStream = createReadStream(filePath, { encoding: 'utf-8' });
+    const rl = createInterface({ input: readStream, crlfDelay: Infinity });
+
     try {
-      content = await readFile(filePath, 'utf-8');
+      for await (const line of rl) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+
+        let record: Record<string, unknown>;
+        try {
+          record = JSON.parse(trimmed) as Record<string, unknown>;
+        } catch {
+          // Skip malformed lines (e.g. partial writes at end of file)
+          continue;
+        }
+
+        // Only process assistant messages that have usage data
+        if (record['type'] !== 'assistant') continue;
+
+        const message = record['message'] as Record<string, unknown> | undefined;
+        if (!message) continue;
+
+        const usage = message['usage'] as Record<string, unknown> | undefined;
+        if (!usage) continue;
+
+        const timestamp = record['timestamp'] as string | undefined;
+        if (!timestamp) continue;
+
+        // Extract date (YYYY-MM-DD) from ISO 8601 timestamp
+        const date = timestamp.slice(0, 10);
+
+        // Extract token counts (default to 0 if missing)
+        const inputTokens = Number(usage['input_tokens'] ?? 0);
+        const outputTokens = Number(usage['output_tokens'] ?? 0);
+        const cacheCreationInputTokens = Number(usage['cache_creation_input_tokens'] ?? 0);
+        const cacheReadInputTokens = Number(usage['cache_read_input_tokens'] ?? 0);
+
+        // Determine model pricing
+        const model = String(message['model'] ?? '');
+        const pricing = MODEL_PRICING[model] ?? FALLBACK_PRICING;
+
+        // Compute cost in USD
+        const costUsd =
+          (inputTokens * pricing.input +
+            outputTokens * pricing.output +
+            cacheCreationInputTokens * pricing.cacheWrite +
+            cacheReadInputTokens * pricing.cacheRead) /
+          1_000_000;
+
+        // Accumulate into daily totals
+        const existing = dailyUsage.get(date);
+        if (existing) {
+          existing.inputTokens += inputTokens;
+          existing.outputTokens += outputTokens;
+          existing.cacheCreationInputTokens += cacheCreationInputTokens;
+          existing.cacheReadInputTokens += cacheReadInputTokens;
+          existing.costUsd += costUsd;
+        } else {
+          dailyUsage.set(date, {
+            inputTokens,
+            outputTokens,
+            cacheCreationInputTokens,
+            cacheReadInputTokens,
+            costUsd,
+          });
+        }
+      }
     } catch {
-      // File unreadable — skip without logging (common for temp/lock files)
+      // File unreadable or stream error — skip without logging (common for temp/lock files)
       return;
-    }
-
-    const lines = content.split('\n');
-
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed) continue;
-
-      let record: Record<string, unknown>;
-      try {
-        record = JSON.parse(trimmed) as Record<string, unknown>;
-      } catch {
-        // Skip malformed lines (e.g. partial writes at end of file)
-        continue;
-      }
-
-      // Only process assistant messages that have usage data
-      if (record['type'] !== 'assistant') continue;
-
-      const message = record['message'] as Record<string, unknown> | undefined;
-      if (!message) continue;
-
-      const usage = message['usage'] as Record<string, unknown> | undefined;
-      if (!usage) continue;
-
-      const timestamp = record['timestamp'] as string | undefined;
-      if (!timestamp) continue;
-
-      // Extract date (YYYY-MM-DD) from ISO 8601 timestamp
-      const date = timestamp.slice(0, 10);
-
-      // Extract token counts (default to 0 if missing)
-      const inputTokens = Number(usage['input_tokens'] ?? 0);
-      const outputTokens = Number(usage['output_tokens'] ?? 0);
-      const cacheCreationInputTokens = Number(usage['cache_creation_input_tokens'] ?? 0);
-      const cacheReadInputTokens = Number(usage['cache_read_input_tokens'] ?? 0);
-
-      // Determine model pricing
-      const model = String(message['model'] ?? '');
-      const pricing = MODEL_PRICING[model] ?? FALLBACK_PRICING;
-
-      // Compute cost in USD
-      const costUsd =
-        (inputTokens * pricing.input +
-          outputTokens * pricing.output +
-          cacheCreationInputTokens * pricing.cacheWrite +
-          cacheReadInputTokens * pricing.cacheRead) /
-        1_000_000;
-
-      // Accumulate into daily totals
-      const existing = dailyUsage.get(date);
-      if (existing) {
-        existing.inputTokens += inputTokens;
-        existing.outputTokens += outputTokens;
-        existing.cacheCreationInputTokens += cacheCreationInputTokens;
-        existing.cacheReadInputTokens += cacheReadInputTokens;
-        existing.costUsd += costUsd;
-      } else {
-        dailyUsage.set(date, {
-          inputTokens,
-          outputTokens,
-          cacheCreationInputTokens,
-          cacheReadInputTokens,
-          costUsd,
-        });
-      }
+    } finally {
+      rl.close();
+      readStream.destroy();
     }
   }
 }
