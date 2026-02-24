@@ -183,6 +183,7 @@ Key decisions for v2.2:
 | 15 | Add runtime status reconciliation to resume-work: verify live deployment state before reporting gaps | 2026-02-23 | `79f274c` |
 | 16 | Refactor SessionUsageReader: streaming JSONL + scan overlap guard | 2026-02-24 | `c767a5b` |
 | 17 | Harden SessionUsageReader: NaN guards, timestamp validation, unknown model warn-once | 2026-02-24 | `8fb98b8` |
+| 18 | Fix TOKN-01 through TOKN-06 traceability: mark Complete in REQUIREMENTS.md | 2026-02-24 | `5413480` |
 
 ### Roadmap Evolution
 
@@ -207,5 +208,5 @@ No active blockers for v2.2.
 ## Session Continuity
 
 Last session: 2026-02-24
-Stopped at: Completed quick task 17 — SessionUsageReader NaN guards, timestamp validation, unknown model warn-once
+Stopped at: Completed quick task 18 — Fix TOKN-01 through TOKN-06 traceability in REQUIREMENTS.md
 Next step: Phase 18 complete — begin next phase
