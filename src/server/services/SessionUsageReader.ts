@@ -38,6 +38,8 @@ const MODEL_PRICING: Record<string, ModelPricing> = {
 
 const FALLBACK_PRICING = MODEL_PRICING['claude-sonnet-4-6'];
 
+const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}/;
+
 interface UsageAccumulator {
   inputTokens: number;
   outputTokens: number;
@@ -56,6 +58,7 @@ interface UsageAccumulator {
 class SessionUsageReader {
   private scanIntervalHandle: ReturnType<typeof setInterval> | null = null;
   private scanInProgress = false;
+  private warnedModels = new Set<string>();
 
   /**
    * Start periodic scanning. Runs an immediate scan then rescans every 5 minutes.
@@ -95,6 +98,7 @@ class SessionUsageReader {
     }
 
     this.scanInProgress = true;
+    this.warnedModels.clear();
 
     try {
       let projectDirEntries: string[];
@@ -227,15 +231,29 @@ class SessionUsageReader {
         // Extract date (YYYY-MM-DD) from ISO 8601 timestamp
         const date = timestamp.slice(0, 10);
 
+        if (!ISO_DATE_REGEX.test(date)) {
+          continue; // Skip records with non-ISO timestamps
+        }
+
         // Extract token counts (default to 0 if missing)
         const inputTokens = Number(usage['input_tokens'] ?? 0);
         const outputTokens = Number(usage['output_tokens'] ?? 0);
         const cacheCreationInputTokens = Number(usage['cache_creation_input_tokens'] ?? 0);
         const cacheReadInputTokens = Number(usage['cache_read_input_tokens'] ?? 0);
 
+        if (isNaN(inputTokens) || isNaN(outputTokens) || isNaN(cacheCreationInputTokens) || isNaN(cacheReadInputTokens)) {
+          console.warn('[SessionUsageReader] Skipping record with non-numeric token value in', filePath);
+          continue;
+        }
+
         // Determine model pricing
         const model = String(message['model'] ?? '');
         const pricing = MODEL_PRICING[model] ?? FALLBACK_PRICING;
+
+        if (!MODEL_PRICING[model] && model && !this.warnedModels.has(model)) {
+          this.warnedModels.add(model);
+          console.warn(`[SessionUsageReader] Unknown model "${model}", using fallback pricing`);
+        }
 
         // Compute cost in USD
         const costUsd =
