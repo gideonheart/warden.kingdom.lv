@@ -35,7 +35,7 @@ human_verification:
 | 4  | No 'state update on unmounted component' warnings possible from Controls tab setTimeout | VERIFIED | All 6 setTimeout calls in ControlsTab.tsx assigned to `spawnTimerRef.current` or `dispatchTimerRef.current`; cleanup useEffect cancels both on unmount |
 | 5  | setTimeout callbacks in CopyButton are cancelled on component unmount | VERIFIED | gsdShared.tsx CopyButton: `timerRef.current = setTimeout(...)` + `useEffect(() => { return () => { if (timerRef.current) clearTimeout(timerRef.current); }; }, [])` |
 | 6  | openSync/closeSync in spawn handler are wrapped in try/finally | VERIFIED | gsdRoutes.ts lines 220–230: `openSync` → `try { spawn(...); child.unref(); } finally { closeSync(logFd); }` |
-| 7  | openSync/closeSync in GsdHookLogWatcher readNewLines and readLastLines are wrapped in try/finally | VERIFIED | GsdHookLogWatcher.ts lines 66–71 (readNewLines) and 94–99 (readLastLines): both use `try { fs.readSync(...) } finally { fs.closeSync(...) }` |
+| 7  | openSync/closeSync in GsdHookLogWatcher readNewLines and readLastLines were wrapped in try/finally | VERIFIED (historical) | GsdHookLogWatcher.ts lines 66–71 and 94–99 had try/finally at Phase 17 time; file deleted in quick-10 when Hooks tab was replaced by Events tab — spawn handler fd pair in gsdRoutes.ts remains protected |
 | 8  | useAgentLiveStatus returns a stable Map reference when poll data is unchanged | VERIFIED | useAgentLiveStatus.ts: `previousDataRef = useRef<string>('')`; `JSON.stringify(Array.from(nextMap.entries()))` compared before calling `setStatusMap` |
 | 9  | extractContextPressure regex matches only Claude Code status bar format, not arbitrary percentages | VERIFIED | gsdRoutes.ts: filters to lines <80 chars, then `/(?:[\u2580-\u259F]|context).*?(\d{1,3})%/i` — anchored to Unicode block chars or "context" keyword |
 
@@ -59,7 +59,7 @@ human_verification:
 | Artifact | Expected | Status | Details |
 |----------|----------|--------|---------|
 | `src/server/routes/gsdRoutes.ts` | Spawn handler with try/finally fd safety and anchored regex | VERIFIED | try/finally wraps spawn call at lines 221–230; anchored extractContextPressure at lines 47–49 |
-| `src/server/services/GsdHookLogWatcher.ts` | readNewLines and readLastLines with try/finally fd safety | VERIFIED | Both methods wrap fs.readSync in try/finally with fs.closeSync in finally block |
+| `src/server/services/GsdHookLogWatcher.ts` | readNewLines and readLastLines with try/finally fd safety | VERIFIED (historical — file deleted in quick-10) | Both methods wrapped fs.readSync in try/finally at Phase 17 time; file deleted in quick-10 |
 | `src/client/hooks/useAgentLiveStatus.ts` | Stable Map reference via shallow comparison before setState | VERIFIED | `previousDataRef`, JSON.stringify comparison, early return guard, then `setStatusMap` |
 
 ---
@@ -88,7 +88,7 @@ human_verification:
 |-------------|-------------|-------------|--------|----------|
 | PERF-01 | 17-01-PLAN.md | Conditionally render only the active GSD tab (lazy mount), so hooks only run when tab is visible | SATISFIED | GsdView.tsx uses `{activeTab === 'x' && <XTab />}` pattern — unmount removes tab from DOM, stopping all hooks |
 | PERF-02 | 17-01-PLAN.md | Verify polling stops when switching away from Agents/Controls tabs | SATISFIED | useAgentLiveStatus, useGsdRegistry, useActiveInstances all use useEffect with cleanup — clearing intervals on unmount |
-| FIX-01 | 17-02-PLAN.md | Wrap openSync/closeSync in spawn handler with try/finally for fd safety | SATISFIED | gsdRoutes.ts spawn handler + GsdHookLogWatcher readNewLines and readLastLines — 3 pairs total wrapped in try/finally |
+| FIX-01 | 17-02-PLAN.md | Wrap openSync/closeSync in spawn handler with try/finally for fd safety | SATISFIED | gsdRoutes.ts spawn handler (still active) + GsdHookLogWatcher readNewLines and readLastLines (3 pairs at Phase 17 time; GsdHookLogWatcher.ts later deleted in quick-10) |
 | FIX-02 | 17-01-PLAN.md | Clean up setTimeout calls in form handlers on component unmount | SATISFIED | ControlsTab.tsx: 6 setTimeout calls all assigned to refs; CopyButton: 1 setTimeout assigned to ref; all have useEffect cleanup |
 | FIX-03 | 17-02-PLAN.md | Stabilize useAgentLiveStatus Map reference to prevent unnecessary re-renders | SATISFIED | previousDataRef + JSON.stringify comparison gate; setStatusMap only called when data actually changes |
 | FIX-04 | 17-02-PLAN.md | Improve extractContextPressure() to reduce false positives | SATISFIED | Lines filtered to <80 chars; regex anchored to Unicode block chars (U+2580–U+259F) or "context" keyword |
@@ -143,7 +143,7 @@ Phase 17 achieved its goal. All nine observable truths are verified by direct co
 
 - **FIX-02 (setTimeout cleanup):** All 7 setTimeout calls (6 in ControlsTab, 1 in CopyButton) are assigned to useRef-tracked slots with corresponding useEffect cleanup that calls clearTimeout on unmount.
 
-- **FIX-01 (fd safety):** All 3 openSync/closeSync pairs are wrapped in try/finally — 1 in gsdRoutes.ts spawn handler, 2 in GsdHookLogWatcher.ts (readNewLines, readLastLines).
+- **FIX-01 (fd safety):** All 3 openSync/closeSync pairs were wrapped in try/finally at Phase 17 time — 1 in gsdRoutes.ts spawn handler (still active), 2 in GsdHookLogWatcher.ts (readNewLines, readLastLines). GsdHookLogWatcher.ts was subsequently deleted in quick-10 when the Hooks tab was replaced by the Events tab.
 
 - **FIX-03 (stable Map):** useAgentLiveStatus uses a JSON.stringify comparison gate via useRef before calling setStatusMap, preventing re-renders when poll data is identical.
 
