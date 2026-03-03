@@ -13,7 +13,7 @@ See: .planning/PROJECT.md (updated 2026-02-19)
 Phase: 18 — Fix token usage JSONL session reader and database population
 Plan: 02 of 02 complete
 Status: Phase 18 complete — full token usage pipeline integrated end-to-end
-Last activity: 2026-02-24 - Completed quick task 20: Fix Phase 16 documentation HooksTab references to EventsTab
+Last activity: 2026-03-03 - Completed quick task 21: Stabilize terminal polling to prevent session disruption
 
 Progress: [####################] 100% (Phase 18 — 2/2 plans done)
 
