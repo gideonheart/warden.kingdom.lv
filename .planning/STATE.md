@@ -171,6 +171,7 @@ Key decisions for v2.2:
 - [Quick-17]: Guards are pure additions — no structural changes to existing SessionUsageReader logic
 - [Quick-17]: warnedModels cleared per scan cycle (not per file) to deduplicate across all projects
 - [Quick-17]: ISO_DATE_REGEX validates timestamp prefix before accumulation to reject garbage date keys
+- [Phase quick-2035]: v3.0 combines Operator Awareness + Terminal Power Tools — Phase 19 ships permission badge, context pressure badge, Ctrl+F search, keyboard shortcuts
 
 ### Quick Tasks Completed
 
