@@ -10,12 +10,12 @@ See: .planning/PROJECT.md (updated 2026-03-03)
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 19 — Operator Awareness Wiring
 Plan: —
-Status: Defining requirements
-Last activity: 2026-03-03 — Milestone v3.0 started
+Status: Roadmap created, ready for planning
+Last activity: 2026-03-03 — v3.0 roadmap finalized (Phases 19-20)
 
-Progress: [                    ] 0%
+Progress: [                    ] 0% (Phase 19 of 20 not started)
 
 ## Performance Metrics
 
@@ -128,7 +128,6 @@ Key decisions for Phase 18 (token usage):
 - [Phase 18 Plan 01]: agentId derived by stripping leading dash from Claude project dir name (-home-forge-X → home-forge-X)
 - [Phase 18 Plan 01]: Model pricing map with fallback to sonnet-4-6 for unknown models — safe default for new variants
 - [Phase 18 Plan 01]: Idempotent ALTER TABLE migration wrapped in try/catch — SQLite errors on duplicate ADD COLUMN
-- [Phase 18 Plan 01]: COALESCE for cache columns in read queries — backward compatible with NULL values in old rows
 - [Phase 18 Plan 02]: Scan Now button calls POST then re-fetches — ensures UI reflects latest scan without manual page reload
 - [Phase 18 Plan 02]: isScanning state separate from isLoading — button-level spinner avoids full-page flicker during rescan
 - [Phase 18 Plan 02]: Cache sub-lines in summary cards only rendered when cache tokens > 0 — clean display for agents without cache usage
@@ -171,7 +170,23 @@ Key decisions for v2.2:
 - [Quick-17]: Guards are pure additions — no structural changes to existing SessionUsageReader logic
 - [Quick-17]: warnedModels cleared per scan cycle (not per file) to deduplicate across all projects
 - [Quick-17]: ISO_DATE_REGEX validates timestamp prefix before accumulation to reject garbage date keys
-- [Phase quick-2035]: v3.0 combines Operator Awareness + Terminal Power Tools — Phase 19 ships permission badge, context pressure badge, Ctrl+F search, keyboard shortcuts
+- [Phase quick-2035]: v3.0 combines Operator Awareness + Terminal Power Tools — Phase 19 ships permission badge, context pressure badge, keyboard shortcuts; Phase 20 ships terminal search and browser notifications
+
+Key decisions for v3.0 (from research — apply from Phase 19 onwards):
+- [v3.0 Research]: useAgentLiveStatus already delivers all awareness data — Phase 19 is prop-wiring, not new data infrastructure
+- [v3.0 Research]: Call useAgentLiveStatus in App.tsx (not only in AgentsTab) — props-down to TerminalView and InstanceTabBar; safe because hook uses JSON comparison dedup
+- [v3.0 Research]: Permission detection via detectAgentState() polling (tmux capture-pane) — raw PTY stream regex produces false positives on ANSI output
+- [v3.0 Research]: Tighten detectAgentState() permission regex to /Do you want to proceed\?|❯\s+1\.\s+Yes/i — reduces badge noise from npm install and shell prompts
+- [v3.0 Research]: xterm-addon-search@0.13.0 (non-scoped) — project imports from 'xterm' (non-scoped v5.3.0); @xterm/addon-search requires @xterm/xterm (scoped, incompatible)
+- [v3.0 Research]: overviewRulerWidth: 15 must be added to Terminal constructor for scrollbar gutter markers — silently ignored without it
+- [v3.0 Research]: attachCustomKeyEventHandler for Ctrl+F requires both event.preventDefault() AND return false — missing either opens browser native find bar or injects to PTY
+- [v3.0 Research]: document.addEventListener + stopPropagation() defense for global shortcuts — xterm canvas events bubble to document; without guard, tab-switch shortcuts send escape sequences to PTY
+- [v3.0 Research]: requestAnimationFrame(() => terminal.focus()) on search overlay close — browser returns focus to document.body, not terminal, on unmount
+- [v3.0 Research]: highlightLimit at default 1000 + 300ms search debounce — 72k+ matches at 50k scrollback blocks main thread ~470ms without limit
+- [v3.0 Research]: Notification tag option deduplicates per-session browser notifications automatically
+- [v3.0 Research]: window.focus() in notification.onclick unreliable on macOS Chrome and blocked in Firefox — accept and document limitation
+- [v3.0 Research]: Notification.requestPermission() must be triggered by user gesture, not page load — browser silently blocks otherwise
+- [v3.0 Research]: Keyboard shortcuts do not fire when focus is in a text input or textarea — focus guard in useGlobalHotkeys
 
 ### Quick Tasks Completed
 
@@ -212,6 +227,7 @@ Key decisions for v2.2:
 - v2.1 roadmap created 2026-02-18: Phases 12-14 for GSD Manager Plugin
 - v2.2 roadmap created 2026-02-18: Phases 15-17 for Code Hygiene
 - Phase 18 added: Fix token usage — JSONL session reader and database population
+- v3.0 roadmap created 2026-03-03: Phases 19-20 for Operator Awareness & Terminal Power Tools
 
 ### Pending Todos
 
@@ -224,10 +240,14 @@ None
 - Options: (1) read-only mobile terminal, (2) budget 2-3 weeks debugging, (3) defer mobile terminal
 - Research flag: Needs testing on real iOS/Android devices before implementation
 
+**v3.0 Package verification (pre-Phase 20):**
+- Verify `xterm-addon-search@0.13.0` peer dependency before installing: `npm show xterm-addon-search@0.13.0 peerDependencies` must return `{ "xterm": "^5.0.0" }` (non-scoped), not `@xterm/xterm`
+- STACK.md finding is authoritative but contradicts two other research files — confirm before committing to Phase 20
+
 No active blockers.
 
 ## Session Continuity
 
 Last session: 2026-03-03
-Stopped at: v3.0 milestone initialization in progress
-Next step: Complete requirements definition and roadmap creation
+Stopped at: v3.0 roadmap created (Phases 19-20)
+Next step: `/gsd:plan-phase 19` — plan Phase 19: Operator Awareness Wiring

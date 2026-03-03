@@ -74,32 +74,32 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| AWARE-01 | — | Pending |
-| AWARE-02 | — | Pending |
-| AWARE-03 | — | Pending |
-| AWARE-04 | — | Pending |
-| AWARE-05 | — | Pending |
-| AWARE-06 | — | Pending |
-| AWARE-07 | — | Pending |
-| AWARE-08 | — | Pending |
-| SRCH-01 | — | Pending |
-| SRCH-02 | — | Pending |
-| SRCH-03 | — | Pending |
-| SRCH-04 | — | Pending |
-| SRCH-05 | — | Pending |
-| SRCH-06 | — | Pending |
-| SRCH-07 | — | Pending |
-| KB-01 | — | Pending |
-| KB-02 | — | Pending |
-| KB-03 | — | Pending |
-| KB-04 | — | Pending |
-| KB-05 | — | Pending |
+| AWARE-01 | Phase 19 | Pending |
+| AWARE-02 | Phase 19 | Pending |
+| AWARE-03 | Phase 19 | Pending |
+| AWARE-04 | Phase 19 | Pending |
+| AWARE-05 | Phase 19 | Pending |
+| AWARE-06 | Phase 20 | Pending |
+| AWARE-07 | Phase 20 | Pending |
+| AWARE-08 | Phase 20 | Pending |
+| SRCH-01 | Phase 20 | Pending |
+| SRCH-02 | Phase 20 | Pending |
+| SRCH-03 | Phase 20 | Pending |
+| SRCH-04 | Phase 20 | Pending |
+| SRCH-05 | Phase 20 | Pending |
+| SRCH-06 | Phase 20 | Pending |
+| SRCH-07 | Phase 20 | Pending |
+| KB-01 | Phase 19 | Pending |
+| KB-02 | Phase 19 | Pending |
+| KB-03 | Phase 19 | Pending |
+| KB-04 | Phase 19 | Pending |
+| KB-05 | Phase 19 | Pending |
 
 **Coverage:**
-- v3.0 requirements: 16 total
-- Mapped to phases: 0
-- Unmapped: 16
+- v3.0 requirements: 20 total
+- Mapped to phases: 20
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-03*
-*Last updated: 2026-03-03 after initial definition*
+*Last updated: 2026-03-03 — traceability filled after roadmap creation (Phases 19-20)*
