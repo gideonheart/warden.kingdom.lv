@@ -8,6 +8,9 @@ interface UseGlobalHotkeysParams {
   onToggleSidebar: () => void;
   terminalFocusRef: React.MutableRefObject<(() => void) | null>;
   currentView: string;
+  /** Callback invoked when Ctrl+F is pressed in the terminals view.
+   *  Opens the TerminalSearchOverlay for the active session. */
+  onOpenSearch?: () => void;
 }
 
 /** Returns true when the event target is a text input, textarea, or contentEditable element.
@@ -30,7 +33,7 @@ function isInTextInput(target: EventTarget | null): boolean {
  * - Ctrl+]: cycle to next tab with wrap-around (terminals view)
  * - Ctrl+B: toggle the AgentSidebar collapsed/expanded (any view)
  * - Escape: focus terminal canvas when it does not already have focus (terminals view)
- * - Ctrl+F: prevent browser native find bar, stub for Phase 20 search overlay (any view)
+ * - Ctrl+F: open terminal search overlay (terminals view)
  */
 export function useGlobalHotkeys({
   instances,
@@ -39,10 +42,13 @@ export function useGlobalHotkeys({
   onToggleSidebar,
   terminalFocusRef,
   currentView,
+  onOpenSearch,
 }: UseGlobalHotkeysParams): void {
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      // KB-05: do not fire when operator is typing in a text field
+      // KB-05: do not fire when operator is typing in a text field.
+      // This guard also ensures Escape while the search input is focused is handled
+      // by the overlay's own onKeyDown (not by this handler).
       if (isInTextInput(event.target)) return;
 
       // Escape: refocus terminal if it does not already have focus.
@@ -58,10 +64,15 @@ export function useGlobalHotkeys({
 
       if (!event.ctrlKey) return;
 
-      // Ctrl+F: prevent browser native find bar — stub for Phase 20 search overlay
+      // Ctrl+F: open terminal search overlay (terminals view only).
+      // preventDefault suppresses the browser native find bar.
+      // stopPropagation prevents the key from reaching the PTY.
       if (event.key === 'f' || event.key === 'F') {
         event.preventDefault();
         event.stopPropagation();
+        if (currentView === 'terminals') {
+          onOpenSearch?.();
+        }
         return;
       }
 
@@ -114,5 +125,5 @@ export function useGlobalHotkeys({
     return () => {
       document.removeEventListener('keydown', handleKeyDown, { capture: true });
     };
-  }, [instances, selectedSessionName, onSelectSession, onToggleSidebar, terminalFocusRef, currentView]);
+  }, [instances, selectedSessionName, onSelectSession, onToggleSidebar, terminalFocusRef, currentView, onOpenSearch]);
 }

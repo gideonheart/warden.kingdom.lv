@@ -74,6 +74,14 @@ export function App() {
   // Focus callback ref — Plan 02 keyboard shortcuts will call this to return focus to terminal.
   const terminalFocusRef = useRef<(() => void) | null>(null);
 
+  // Search open callback ref — registered by TerminalView; called by Ctrl+F handler.
+  const searchOpenRef = useRef<(() => void) | null>(null);
+
+  // Stable callback: routes Ctrl+F → whichever TerminalView is currently mounted.
+  const handleOpenSearch = useCallback(() => {
+    searchOpenRef.current?.();
+  }, []);
+
   // Stable callback for sidebar toggle — used by both the header button and useGlobalHotkeys.
   const handleToggleSidebar = useCallback(() => {
     setShowSidebar((prev) => !prev);
@@ -156,6 +164,7 @@ export function App() {
     onToggleSidebar: handleToggleSidebar,
     terminalFocusRef,
     currentView,
+    onOpenSearch: handleOpenSearch,
   });
 
   const handleViewChange = useCallback((view: AppView) => {
@@ -342,6 +351,7 @@ export function App() {
                     onSessionExit={handleSessionExit}
                     agentLiveStatus={sessionStatusMap.get(selectedSessionName ?? '') ?? null}
                     terminalFocusRef={terminalFocusRef}
+                    searchOpenRef={searchOpenRef}
                   />
                 </ErrorBoundary>
               ) : (
