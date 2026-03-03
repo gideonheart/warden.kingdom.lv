@@ -10,12 +10,12 @@ See: .planning/PROJECT.md (updated 2026-03-03)
 
 ## Current Position
 
-Phase: 19 — Operator Awareness Wiring
-Plan: 02 complete
-Status: Phase 19 complete (permission badge + state chip + pressure wiring + global keyboard shortcuts)
-Last activity: 2026-03-03 — Phase 19 Plan 02 executed
+Phase: 20 — Terminal Search & Browser Notifications
+Plan: 01 complete
+Status: Phase 20 Plan 01 complete (terminal scrollback search with xterm-addon-search, Ctrl+F overlay)
+Last activity: 2026-03-03 — Phase 20 Plan 01 executed
 
-Progress: [####################] 55% (Phase 19 of 20 — Plan 02/02 complete)
+Progress: [######################] 60% (Phase 20 of 20 — Plan 01/02 complete)
 
 ## Performance Metrics
 
@@ -188,6 +188,14 @@ Key decisions from Phase 19 Plan 02:
 - [Phase 19 Plan 02]: handleToggleSidebar useCallback unified for header button + Ctrl+B keyboard shortcut — DRY single source of truth for sidebar toggle
 - [Phase 19 Plan 02]: useGlobalHotkeys placed after handleSelectSession definition — avoid TDZ (const declarations not hoisted)
 
+Key decisions from Phase 20 Plan 01:
+- [Phase 20 Plan 01]: xterm-addon-search@0.13.0 (non-scoped) — confirmed peer-dep is xterm:^5.0.0 (not @xterm/xterm); @xterm/addon-search incompatible
+- [Phase 20 Plan 01]: searchOpenRef callback pattern mirrors terminalFocusRef from Phase 19 — App.tsx creates ref, TerminalView registers callback, App's handleOpenSearch calls searchOpenRef.current?.()
+- [Phase 20 Plan 01]: isInTextInput guard in useGlobalHotkeys prevents Escape double-handling when search overlay input is focused
+- [Phase 20 Plan 01]: Search query persists in TerminalView state across overlay close/reopen; resets on session switch (TerminalView keyed by tmuxSessionName)
+- [Phase 20 Plan 01]: overviewRulerWidth:15 must be in Terminal constructor options — silently ignored if set later
+- [Phase 20 Plan 01]: matchResultCount >= 1000 displays as "1000+" — SearchAddon default highlightLimit is 1000
+
 Key decisions for v3.0 (from research — apply from Phase 19 onwards):
 - [v3.0 Research]: useAgentLiveStatus already delivers all awareness data — Phase 19 is prop-wiring, not new data infrastructure
 - [v3.0 Research]: Call useAgentLiveStatus in App.tsx (not only in AgentsTab) — props-down to TerminalView and InstanceTabBar; safe because hook uses JSON comparison dedup
@@ -265,5 +273,5 @@ No active blockers.
 ## Session Continuity
 
 Last session: 2026-03-03
-Stopped at: Completed 19-02-PLAN.md (global keyboard shortcuts — useGlobalHotkeys + PTY suppression)
-Next step: Execute Phase 20 — Terminal Search Overlay (xterm-addon-search, Ctrl+F handler)
+Stopped at: Completed 20-01-PLAN.md (terminal scrollback search — xterm-addon-search, TerminalSearchOverlay, Ctrl+F handler)
+Next step: Execute Phase 20 Plan 02 — Browser Notifications

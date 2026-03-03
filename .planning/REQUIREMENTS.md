@@ -20,13 +20,13 @@ Requirements for v3.0 Operator Awareness & Terminal Power Tools. Each maps to ro
 
 ### Terminal Search
 
-- [ ] **SRCH-01**: Operator can open a search overlay with Ctrl+F in the terminal view
-- [ ] **SRCH-02**: Search finds and highlights matching text in the full terminal scrollback buffer (not just visible area)
-- [ ] **SRCH-03**: Operator can navigate between matches with Next/Previous buttons or Enter/Shift+Enter
-- [ ] **SRCH-04**: Search overlay shows match count ("3 / 47" or "1000+" for large result sets)
-- [ ] **SRCH-05**: Scrollbar gutter markers indicate where matches appear in the buffer
-- [ ] **SRCH-06**: Escape closes the search overlay and returns focus to the terminal
-- [ ] **SRCH-07**: Search input debounces at 300ms to prevent UI blocking on large buffers
+- [x] **SRCH-01**: Operator can open a search overlay with Ctrl+F in the terminal view
+- [x] **SRCH-02**: Search finds and highlights matching text in the full terminal scrollback buffer (not just visible area)
+- [x] **SRCH-03**: Operator can navigate between matches with Next/Previous buttons or Enter/Shift+Enter
+- [x] **SRCH-04**: Search overlay shows match count ("3 / 47" or "1000+" for large result sets)
+- [x] **SRCH-05**: Scrollbar gutter markers indicate where matches appear in the buffer
+- [x] **SRCH-06**: Escape closes the search overlay and returns focus to the terminal
+- [x] **SRCH-07**: Search input debounces at 300ms to prevent UI blocking on large buffers
 
 ### Keyboard Navigation
 
@@ -82,13 +82,13 @@ Which phases cover which requirements. Updated during roadmap creation.
 | AWARE-06 | Phase 20 | Pending |
 | AWARE-07 | Phase 20 | Pending |
 | AWARE-08 | Phase 20 | Pending |
-| SRCH-01 | Phase 20 | Pending |
-| SRCH-02 | Phase 20 | Pending |
-| SRCH-03 | Phase 20 | Pending |
-| SRCH-04 | Phase 20 | Pending |
-| SRCH-05 | Phase 20 | Pending |
-| SRCH-06 | Phase 20 | Pending |
-| SRCH-07 | Phase 20 | Pending |
+| SRCH-01 | Phase 20 | Complete |
+| SRCH-02 | Phase 20 | Complete |
+| SRCH-03 | Phase 20 | Complete |
+| SRCH-04 | Phase 20 | Complete |
+| SRCH-05 | Phase 20 | Complete |
+| SRCH-06 | Phase 20 | Complete |
+| SRCH-07 | Phase 20 | Complete |
 | KB-01 | Phase 19 | Complete |
 | KB-02 | Phase 19 | Complete |
 | KB-03 | Phase 19 | Complete |
