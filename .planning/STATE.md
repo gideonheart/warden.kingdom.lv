@@ -11,11 +11,11 @@ See: .planning/PROJECT.md (updated 2026-03-03)
 ## Current Position
 
 Phase: 19 — Operator Awareness Wiring
-Plan: —
-Status: Roadmap created, ready for planning
-Last activity: 2026-03-03 — v3.0 roadmap finalized (Phases 19-20)
+Plan: 01 complete
+Status: Plan 01 complete (permission badge + state chip + pressure wiring)
+Last activity: 2026-03-03 — Phase 19 Plan 01 executed
 
-Progress: [                    ] 0% (Phase 19 of 20 not started)
+Progress: [####################] 50% (Phase 19 of 20 — Plan 01/02 complete)
 
 ## Performance Metrics
 
@@ -172,6 +172,14 @@ Key decisions for v2.2:
 - [Quick-17]: ISO_DATE_REGEX validates timestamp prefix before accumulation to reject garbage date keys
 - [Phase quick-2035]: v3.0 combines Operator Awareness + Terminal Power Tools — Phase 19 ships permission badge, context pressure badge, keyboard shortcuts; Phase 20 ships terminal search and browser notifications
 
+Key decisions from Phase 19 Plan 01:
+- [Phase 19 Plan 01]: useAgentLiveStatus lifted to App.tsx — single poll interval feeds TerminalView and InstanceTabBar via sessionStatusMap useMemo
+- [Phase 19 Plan 01]: sessionStatusMap bridges agentId (hook key) → tmuxSessionName (component lookup) via useMemo with [liveStatus, activeInstances] deps
+- [Phase 19 Plan 01]: terminalFocusRef: MutableRefObject<(() => void) | null> registered in TerminalView useEffect — Plan 02 keyboard shortcuts call without xterm instance access
+- [Phase 19 Plan 01]: headerPressureText module-scope helper uses text-[10px] — distinct from text-sm PressureIndicator used in AgentsTab cards
+- [Phase 19 Plan 01]: Permission regex tightened to /Do you want to proceed?|❯ 1. Yes/ — eliminates npm/git false positives
+- [Phase 19 Plan 01]: Pressure thresholds corrected: critical >=90%, warning >=70% (was 80%/50%) to match UX spec
+
 Key decisions for v3.0 (from research — apply from Phase 19 onwards):
 - [v3.0 Research]: useAgentLiveStatus already delivers all awareness data — Phase 19 is prop-wiring, not new data infrastructure
 - [v3.0 Research]: Call useAgentLiveStatus in App.tsx (not only in AgentsTab) — props-down to TerminalView and InstanceTabBar; safe because hook uses JSON comparison dedup
@@ -249,5 +257,5 @@ No active blockers.
 ## Session Continuity
 
 Last session: 2026-03-03
-Stopped at: v3.0 roadmap created (Phases 19-20)
-Next step: `/gsd:plan-phase 19` — plan Phase 19: Operator Awareness Wiring
+Stopped at: Completed 19-01-PLAN.md (permission badge + state chip + pressure wiring)
+Next step: Execute Phase 19 Plan 02 — keyboard shortcuts (Ctrl+Tab, Ctrl+F, global hotkeys)

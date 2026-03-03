@@ -9,11 +9,11 @@ Requirements for v3.0 Operator Awareness & Terminal Power Tools. Each maps to ro
 
 ### Operator Awareness
 
-- [ ] **AWARE-01**: Operator sees a pulsing amber badge on the session tab when an agent is waiting for permission input
-- [ ] **AWARE-02**: Badge clears automatically when operator sends input to the waiting session
-- [ ] **AWARE-03**: Operator sees context window pressure percentage in the terminal view header for the active session
-- [ ] **AWARE-04**: Context pressure badge shows green (<70%), amber (70-89%), or pulsing red (>=90%) based on threshold
-- [ ] **AWARE-05**: Operator sees the agent state (working/idle/error/permission) as a chip in the terminal view header
+- [x] **AWARE-01**: Operator sees a pulsing amber badge on the session tab when an agent is waiting for permission input
+- [x] **AWARE-02**: Badge clears automatically when operator sends input to the waiting session
+- [x] **AWARE-03**: Operator sees context window pressure percentage in the terminal view header for the active session
+- [x] **AWARE-04**: Context pressure badge shows green (<70%), amber (70-89%), or pulsing red (>=90%) based on threshold
+- [x] **AWARE-05**: Operator sees the agent state (working/idle/error/permission) as a chip in the terminal view header
 - [ ] **AWARE-06**: Operator can opt in to browser notifications for permission prompts via a settings toggle
 - [ ] **AWARE-07**: Browser notification fires when permission prompt is detected and the browser tab is not focused
 - [ ] **AWARE-08**: Browser notification does not fire repeatedly while same permission state persists (state-transition only)
@@ -74,11 +74,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| AWARE-01 | Phase 19 | Pending |
-| AWARE-02 | Phase 19 | Pending |
-| AWARE-03 | Phase 19 | Pending |
-| AWARE-04 | Phase 19 | Pending |
-| AWARE-05 | Phase 19 | Pending |
+| AWARE-01 | Phase 19 | Complete |
+| AWARE-02 | Phase 19 | Complete |
+| AWARE-03 | Phase 19 | Complete |
+| AWARE-04 | Phase 19 | Complete |
+| AWARE-05 | Phase 19 | Complete |
 | AWARE-06 | Phase 20 | Pending |
 | AWARE-07 | Phase 20 | Pending |
 | AWARE-08 | Phase 20 | Pending |

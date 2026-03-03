@@ -116,7 +116,7 @@ See `.planning/milestones/v2.3-ROADMAP.md`
   4. Pressing Ctrl+1 through Ctrl+9 switches to the corresponding session tab; Ctrl+[ and Ctrl+] cycle tabs; Ctrl+B toggles the AgentSidebar; Escape moves focus to the terminal canvas when search is not open
   5. Keyboard shortcuts do not fire when the operator's cursor is inside a text input or textarea (prompt panel, search inputs, etc.)
 
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 
 Plans:
 - [ ] 19-01-PLAN.md — Server-side fixes (permission regex, pressure thresholds) + lift useAgentLiveStatus to App.tsx + permission badge on tabs + state chip and pressure in terminal header
@@ -163,5 +163,5 @@ Plans:
 | 16. DRY + SRP | v2.3 | 2/2 | Complete | 2026-02-19 |
 | 17. Polish | v2.3 | 2/2 | Complete | 2026-02-19 |
 | 18. Fix token usage | v2.3 | 2/2 | Complete | 2026-02-23 |
-| 19. Operator Awareness Wiring | v3.0 | 0/2 | Planned | — |
+| 19. Operator Awareness Wiring | 1/2 | In Progress|  | — |
 | 20. Terminal Search & Browser Notifications | v3.0 | 0/? | Not started | — |
