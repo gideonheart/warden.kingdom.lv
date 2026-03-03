@@ -124,6 +124,13 @@ export function useSessionSelection({
   // re-run when activeSessionNamesKey or isLoading changes (i.e., on poll cycle or
   // initial load completion), not on every selection change. Manual selection changes
   // go through selectSession() which sets the state directly and resets the miss count.
+  //
+  // RISK-3 (stale-closure safety): Effects run AFTER React commits state updates to the
+  // DOM, not during the batched render phase. When selectSession('B') and a poll arrive
+  // in the same React batch, React commits the selectSession state update first, then runs
+  // effects. The closure captures the post-commit value ('B'), not the pre-selection value.
+  // Adding selectedSessionName to deps would break hysteresis: every manual selection would
+  // re-trigger the effect, potentially undoing the selection if the poll list hasn't updated.
 
   const selectSession = useCallback((sessionName: string) => {
     consecutiveMissCountRef.current = 0;
