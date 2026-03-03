@@ -12,6 +12,7 @@ import { GsdView } from './components/GsdView.js';
 import { useActiveInstances } from './hooks/useActiveInstances.js';
 import { useAgentConfig } from './hooks/useAgentConfig.js';
 import { usePluginRegistry } from './hooks/usePluginRegistry.js';
+import { useSessionSelection } from './hooks/useSessionSelection.js';
 
 type AppView = 'terminals' | 'history' | 'plugins' | 'agents';
 
@@ -36,13 +37,35 @@ export function App() {
   const { instances, isLoading, error, refetch } = useActiveInstances();
   const { agents, topicMappings } = useAgentConfig();
   const { plugins, enabledState, enabledPlugins, togglePlugin } = usePluginRegistry();
-  const [selectedSessionName, setSelectedSessionName] = useState<string | null>(
-    () => parseHash().session
-  );
   const [sidebarSelectedAgentId, setSidebarSelectedAgentId] = useState<string | null>(null);
   const [showSidebar, setShowSidebar] = useState(() => window.innerWidth >= 1024);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
+  const [currentView, setCurrentView] = useState<AppView>(() => parseHash().view);
+
+  const activeInstances = instances.filter(
+    (instance) => instance.status === 'active' || instance.status === 'idle'
+  );
+
+  // useSessionSelection manages all selection state: auto-select, fallback, hysteresis.
+  // No setState calls for session selection are allowed in the render body.
+  const { selectedSessionName, selectSession, clearSelection } = useSessionSelection({
+    activeInstances,
+    isLoading,
+    initialSessionName: parseHash().session,
+  });
+
+  // Auto-select first agent in sidebar when agents load (useEffect guard — not render body)
+  useEffect(() => {
+    if (sidebarSelectedAgentId === null && agents.length > 0) {
+      setSidebarSelectedAgentId(agents[0].id);
+    }
+  }, [agents, sidebarSelectedAgentId]);
+
+  // Keep URL hash in sync with selectedSessionName and currentView
+  useEffect(() => {
+    updateHash(currentView, selectedSessionName);
+  }, [currentView, selectedSessionName]);
 
   // Close mobile menu on click outside
   useEffect(() => {
@@ -81,16 +104,6 @@ export function App() {
     };
   }, []);
 
-  // Auto-select first agent in sidebar when agents load
-  if (sidebarSelectedAgentId === null && agents.length > 0) {
-    setSidebarSelectedAgentId(agents[0].id);
-  }
-  const [currentView, setCurrentView] = useState<AppView>(() => parseHash().view);
-
-  const activeInstances = instances.filter(
-    (instance) => instance.status === 'active' || instance.status === 'idle'
-  );
-
   // Derive agent ID from selected session for prompt panel sync
   const selectedInstance = activeInstances.find(
     (instance) => instance.tmuxSessionName === selectedSessionName
@@ -98,17 +111,12 @@ export function App() {
   const derivedAgentId = selectedInstance?.agentId ?? null;
 
   const handleSelectSession = useCallback((sessionName: string) => {
-    setSelectedSessionName(sessionName);
+    selectSession(sessionName);
     setCurrentView('terminals');
-    updateHash('terminals', sessionName);
-  }, []);
+  }, [selectSession]);
 
   const handleViewChange = useCallback((view: AppView) => {
     setCurrentView(view);
-    setSelectedSessionName((current) => {
-      updateHash(view, current);
-      return current;
-    });
   }, []);
 
   const handleSessionExit = useCallback(
@@ -135,31 +143,14 @@ export function App() {
       const { view, session } = parseHash();
       setCurrentView(view);
       if (session) {
-        setSelectedSessionName(session);
+        selectSession(session);
+      } else {
+        clearSelection();
       }
     };
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
-  }, []);
-
-  // Handle selected session disappearing (only after instances have loaded)
-  if (!isLoading && selectedSessionName && !activeInstances.some((i) => i.tmuxSessionName === selectedSessionName)) {
-    if (activeInstances.length > 0) {
-      const fallback = activeInstances[0].tmuxSessionName;
-      setSelectedSessionName(fallback);
-      updateHash(currentView, fallback);
-    } else {
-      setSelectedSessionName(null);
-      updateHash(currentView, null);
-    }
-  }
-
-  // Auto-select first session if none selected (only after loading)
-  if (!isLoading && !selectedSessionName && activeInstances.length > 0) {
-    const first = activeInstances[0].tmuxSessionName;
-    setSelectedSessionName(first);
-    updateHash(currentView, first);
-  }
+  }, [selectSession, clearSelection]);
 
   return (
     <div className="flex flex-col app-height bg-warden-bg overflow-x-hidden">
