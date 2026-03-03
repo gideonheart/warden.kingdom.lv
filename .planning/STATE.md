@@ -6,14 +6,14 @@ See: .planning/PROJECT.md (updated 2026-03-03)
 
 **Core value:** Real-time visibility into all active Claude Code agent sessions from a single browser tab
 
-**Current focus:** Planning next milestone
+**Current focus:** Planning v3.0 — Operator Awareness & Terminal Power Tools
 
 ## Current Position
 
-Phase: — (between milestones)
+Phase: — (scoping v3.0)
 Plan: —
-Status: v2.3 milestone complete — all 18 phases shipped
-Last activity: 2026-03-03 - Completed quick task 2033: Add targeted code comments for RISK-1/2/3/EDGE-2 from 2030 review
+Status: v3.0 milestone scoped — ready for /gsd:new-milestone
+Last activity: 2026-03-03 - Completed quick task 2035: Draft v3.0 milestone scope (combined Operator Awareness + Terminal Power Tools)
 
 Progress: [####################] 100% (v2.3 shipped)
 
@@ -203,6 +203,7 @@ Key decisions for v2.2:
 | 2032 | Add renderHook integration tests for useSessionSelection (8 new tests: manual selection persistence + polling interactions) | 2026-03-03 | `cae0592` |
 | 2033 | Add targeted code comments for RISK-1 (ref-in-render), RISK-2 (PTY-exit overlay), RISK-3 (stale-closure), EDGE-2 (double-timer guard) | 2026-03-03 | `e03797e` |
 | 2034 | Final readiness check: all 2030 review P1/P2 items confirmed resolved, 40 tests pass, build clean — 2030 review cycle closed | 2026-03-03 | `92dbc07` |
+| 2035 | Draft v3.0 milestone scope: combined Operator Awareness & Terminal Power Tools (permission alerts, context pressure, terminal search, keyboard nav) | 2026-03-03 | `6d0c2e5` |
 
 ### Roadmap Evolution
 
@@ -228,4 +229,4 @@ No active blockers.
 
 Last session: 2026-03-03
 Stopped at: Completed quick-2034 (final readiness check — 2030 review cycle closed, all P1/P2 items resolved)
-Next step: `/gsd:new-milestone` — start next milestone planning
+Next step: `/gsd:new-milestone` with `@.planning/milestones/v3.0-SCOPE.md` as input
