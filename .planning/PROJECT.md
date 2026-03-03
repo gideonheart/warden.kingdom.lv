@@ -43,7 +43,19 @@ Real-time visibility into all active Claude Code agent sessions from a single br
 
 ### Active
 
-(No active milestone — ready for `/gsd:new-milestone`)
+## Current Milestone: v3.0 Operator Awareness & Terminal Power Tools
+
+**Goal:** Make Warden a complete operator workstation — passive monitoring alerts (permission prompts, context pressure) and active investigation tools (terminal search, keyboard navigation).
+
+**Target features:**
+- Permission prompt detection with tab badge alert
+- Context window pressure badge in terminal view header
+- Terminal text search via xterm-addon-search (Ctrl+F)
+- Keyboard navigation shortcuts (tab switching, sidebar toggle)
+- Agent state chip in terminal header
+- Browser notifications for permission prompts (opt-in)
+- Search match count and highlight persistence
+- Scrollbar gutter markers for search results
 
 ### Out of Scope
 
@@ -102,4 +114,4 @@ tmux configured with mouse mode and 50,000-line scrollback buffer for monitoring
 | useSessionSelection hook | Centralize tab selection with polling dedup and hysteresis | ✓ Good — eliminated socket disruption on polls |
 
 ---
-*Last updated: 2026-03-03 after v2.3 milestone*
+*Last updated: 2026-03-03 after v3.0 milestone start*
