@@ -139,7 +139,11 @@ Plans:
   4. Search input is debounced at 300ms so typing quickly in a large buffer does not block the UI
   5. A settings toggle in the UI lets the operator opt in to browser notifications; when opted in and the browser tab is unfocused, a notification fires the first time an agent enters permission state; the notification does not repeat while the same agent stays in permission state (state-transition only)
 
-**Plans**: TBD
+**Plans:** 2 plans
+
+Plans:
+- [ ] 20-01-PLAN.md — Terminal search: xterm-addon-search integration, TerminalSearchOverlay, Ctrl+F wiring, match count, gutter markers, debounced input
+- [ ] 20-02-PLAN.md — Browser notifications: useBrowserNotifications hook, bell icon toggle, state-transition firing, localStorage opt-in persistence
 
 ## Progress
 
@@ -164,4 +168,4 @@ Plans:
 | 17. Polish | v2.3 | 2/2 | Complete | 2026-02-19 |
 | 18. Fix token usage | v2.3 | 2/2 | Complete | 2026-02-23 |
 | 19. Operator Awareness Wiring | 2/2 | Complete    | 2026-03-03 | — |
-| 20. Terminal Search & Browser Notifications | v3.0 | 0/? | Not started | — |
+| 20. Terminal Search & Browser Notifications | v3.0 | 0/2 | Not started | — |
