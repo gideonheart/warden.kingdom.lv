@@ -13,7 +13,7 @@ See: .planning/PROJECT.md (updated 2026-02-19)
 Phase: 18 — Fix token usage JSONL session reader and database population
 Plan: 02 of 02 complete
 Status: Phase 18 complete — full token usage pipeline integrated end-to-end
-Last activity: 2026-03-03 - Completed quick task 22: Delete dead script reconcile-deployment-gaps.ts
+Last activity: 2026-03-03 - Completed quick task 2029: Fix remaining tech debt — annotate GsdHookLogWatcher refs in Phase 17 docs
 
 Progress: [####################] 100% (Phase 18 — 2/2 plans done)
 
@@ -188,6 +188,7 @@ Key decisions for v2.2:
 | 20 | Fix Phase 16 documentation HooksTab references to EventsTab | 2026-02-24 | `937a3d1` |
 | 21 | Stabilize terminal polling: poll dedup + useSessionSelection hook with hysteresis | 2026-03-03 | `75d0d51` |
 | 22 | Delete dead script reconcile-deployment-gaps.ts (301 LOC) | 2026-03-03 | `d6e2663` |
+| 2029 | Fix remaining tech debt: annotate GsdHookLogWatcher refs in Phase 17 docs | 2026-03-03 | `c9c2190` |
 
 ### Roadmap Evolution
 
@@ -212,5 +213,5 @@ No active blockers for v2.2.
 ## Session Continuity
 
 Last session: 2026-03-03
-Stopped at: Completed quick task 2028 — deleted dead script reconcile-deployment-gaps.ts (301 LOC)
+Stopped at: Completed quick task 2029 — annotated GsdHookLogWatcher refs in Phase 17 docs, resolved v2.2 audit tech debt item
 Next step: Phase 18 complete — begin next phase
