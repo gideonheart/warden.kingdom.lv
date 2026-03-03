@@ -28,7 +28,7 @@ const router = Router();
 
 function detectAgentState(pane: string): AgentStateHint {
   if (/enter to select|numbered.*option/i.test(pane)) return 'menu';
-  if (/permission|allow|dangerous/i.test(pane)) return 'permission_prompt';
+  if (/Do you want to proceed\?|❯\s*1\.\s*Yes/i.test(pane)) return 'permission_prompt';
   if (/what can i help|waiting for/i.test(pane)) return 'idle';
   const lines = pane.split('\n');
   for (const line of lines) {
@@ -51,7 +51,7 @@ function extractContextPressure(pane: string): { contextPressure: number | null;
     return { contextPressure: null, contextPressureLevel: null };
   }
   const percentage = parseInt(match[1], 10);
-  const level: PressureLevel = percentage >= 80 ? 'critical' : percentage >= 50 ? 'warning' : 'ok';
+  const level: PressureLevel = percentage >= 90 ? 'critical' : percentage >= 70 ? 'warning' : 'ok';
   return { contextPressure: percentage, contextPressureLevel: level };
 }
 
