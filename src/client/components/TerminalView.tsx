@@ -2,10 +2,12 @@ import { useEffect, useRef, useCallback, useState } from 'react';
 import { Terminal } from 'xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
+import { SearchAddon } from 'xterm-addon-search';
 import { useTerminalSocket } from '../hooks/useTerminalSocket.js';
 import type { AgentLiveStatus } from '../hooks/useAgentLiveStatus.js';
 import type { PressureLevel } from '@shared/gsdTypes.js';
 import { StateBadge, PRESSURE_COLORS } from './gsdShared.js';
+import { TerminalSearchOverlay } from './TerminalSearchOverlay.js';
 import 'xterm/css/xterm.css';
 
 interface TerminalViewProps {
@@ -13,6 +15,9 @@ interface TerminalViewProps {
   onSessionExit: (sessionName: string, exitCode: number) => void;
   agentLiveStatus?: AgentLiveStatus | null;
   terminalFocusRef?: React.MutableRefObject<(() => void) | null>;
+  /** Ref for external callers (e.g. App.tsx Ctrl+F handler) to open the search overlay.
+   *  TerminalView registers a callback on mount and clears it on unmount. */
+  searchOpenRef?: React.MutableRefObject<(() => void) | null>;
 }
 
 // Strip mouse-tracking enable sequences so xterm.js uses native selection
@@ -178,10 +183,13 @@ function estimateTerminalDimensions(
   return { cols, rows };
 }
 
-export function TerminalView({ tmuxSessionName, onSessionExit, agentLiveStatus, terminalFocusRef }: TerminalViewProps) {
+export function TerminalView({ tmuxSessionName, onSessionExit, agentLiveStatus, terminalFocusRef, searchOpenRef }: TerminalViewProps) {
   const terminalContainerRef = useRef<HTMLDivElement>(null);
   const terminalInstanceRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
+  const searchAddonRef = useRef<SearchAddon | null>(null);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const [showCopiedToast, setShowCopiedToast] = useState(false);
   const [selectMode, setSelectMode] = useState(false);
   const [terminalText, setTerminalText] = useState('');
@@ -313,11 +321,18 @@ export function TerminalView({ tmuxSessionName, onSessionExit, agentLiveStatus, 
       cursorBlink: true,
       scrollback: 5000,
       allowProposedApi: true,
+      // overviewRulerWidth must be set at construction time — the overview ruler canvas
+      // is never created without it, so scrollbar gutter markers are silently ignored.
+      overviewRulerWidth: 15,
     });
 
     const fitAddon = new FitAddon();
     terminal.loadAddon(fitAddon);
     terminal.loadAddon(new WebLinksAddon());
+
+    const searchAddon = new SearchAddon();
+    terminal.loadAddon(searchAddon);
+    searchAddonRef.current = searchAddon;
     terminal.open(terminalContainerRef.current);
     terminal.focus();
 
@@ -534,6 +549,7 @@ export function TerminalView({ tmuxSessionName, onSessionExit, agentLiveStatus, 
       terminal.dispose();
       terminalInstanceRef.current = null;
       fitAddonRef.current = null;
+      searchAddonRef.current = null;
     };
   }, [tmuxSessionName, sendInput, sendResize]);
 
@@ -556,6 +572,16 @@ export function TerminalView({ tmuxSessionName, onSessionExit, agentLiveStatus, 
       }
     };
   }, [terminalFocusRef]);
+
+  // Register search-open callback so external callers (App.tsx Ctrl+F handler) can
+  // open the search overlay without holding internal TerminalView state.
+  useEffect(() => {
+    if (!searchOpenRef) return;
+    searchOpenRef.current = () => setIsSearchOpen(true);
+    return () => {
+      searchOpenRef.current = null;
+    };
+  }, [searchOpenRef]);
 
   return (
     <div className="flex flex-col h-full">
@@ -585,6 +611,19 @@ export function TerminalView({ tmuxSessionName, onSessionExit, agentLiveStatus, 
 
       {/* Terminal content area — overlays scoped here, toolbar stays outside */}
       <div className="relative flex-1 min-h-0 min-w-0">
+        {/* Search overlay — floats above the terminal in top-right corner.
+            Query persists across close/reopen within the same session.
+            Unmounts on session switch (TerminalView is keyed by tmuxSessionName). */}
+        {isSearchOpen && (
+          <TerminalSearchOverlay
+            searchAddonRef={searchAddonRef}
+            onClose={() => setIsSearchOpen(false)}
+            initialQuery={searchQuery}
+            onQueryChange={setSearchQuery}
+            terminalFocusRef={terminalFocusRef}
+          />
+        )}
+
         {showConnectingOverlay && (
           <div className="absolute inset-0 flex items-center justify-center bg-warden-bg/80 z-10">
             <div className="flex items-center gap-2">
