@@ -11,11 +11,11 @@ See: .planning/PROJECT.md (updated 2026-03-03)
 ## Current Position
 
 Phase: 20 — Terminal Search & Browser Notifications
-Plan: 01 complete
-Status: Phase 20 Plan 01 complete (terminal scrollback search with xterm-addon-search, Ctrl+F overlay)
-Last activity: 2026-03-03 — Phase 20 Plan 01 executed
+Plan: 02 complete (ALL PLANS COMPLETE)
+Status: Phase 20 complete — v3.0 Operator Awareness & Terminal Power Tools milestone achieved
+Last activity: 2026-03-03 — Phase 20 Plan 02 executed
 
-Progress: [######################] 60% (Phase 20 of 20 — Plan 01/02 complete)
+Progress: [############################] 100% (Phase 20 of 20 — Plan 02/02 complete)
 
 ## Performance Metrics
 
@@ -78,6 +78,7 @@ Progress: [######################] 60% (Phase 20 of 20 — Plan 01/02 complete)
 | 17 | Polish — lazy-mount tabs, fd safety, anchored regex, setTimeout cleanup | v2.3 | `673cf5a` |
 | 18 | Fix token usage — JSONL session reader + DB population | v2.3 | `4ad39dd` |
 | Phase 19 P02 | 2 | 2 tasks | 3 files |
+| Phase 20 P02 | 2 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -211,6 +212,9 @@ Key decisions for v3.0 (from research — apply from Phase 19 onwards):
 - [v3.0 Research]: window.focus() in notification.onclick unreliable on macOS Chrome and blocked in Firefox — accept and document limitation
 - [v3.0 Research]: Notification.requestPermission() must be triggered by user gesture, not page load — browser silently blocks otherwise
 - [v3.0 Research]: Keyboard shortcuts do not fire when focus is in a text input or textarea — focus guard in useGlobalHotkeys
+- [Phase 20]: [Phase 20 Plan 02]: State-transition detection via useRef<Set<string>> for browser notifications — fires only when session ENTERS permission_prompt, not while sustained
+- [Phase 20]: [Phase 20 Plan 02]: Notification tag warden-permission-{sessionName} provides browser-level deduplication as second defense layer
+- [Phase 20]: [Phase 20 Plan 02]: document.visibilityState === 'hidden' guard — notification only fires when tab is unfocused, no interruption if operator is watching
 
 ### Quick Tasks Completed
 
@@ -273,5 +277,5 @@ No active blockers.
 ## Session Continuity
 
 Last session: 2026-03-03
-Stopped at: Completed 20-01-PLAN.md (terminal scrollback search — xterm-addon-search, TerminalSearchOverlay, Ctrl+F handler)
-Next step: Execute Phase 20 Plan 02 — Browser Notifications
+Stopped at: Completed 20-02-PLAN.md (browser notifications — useBrowserNotifications hook, bell icon toggle, state-transition detection)
+Next step: v3.0 milestone complete. All phases complete.

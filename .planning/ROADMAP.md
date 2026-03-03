@@ -62,7 +62,7 @@
 ### v3.0 Operator Awareness & Terminal Power Tools (Phases 19-20)
 
 - [x] **Phase 19: Operator Awareness Wiring** — Permission badge, context pressure badge, agent state chip, keyboard navigation (Ctrl+1-9, Ctrl+[/], Ctrl+B, Escape), Ctrl+F stub (completed 2026-03-03)
-- [ ] **Phase 20: Terminal Search & Browser Notifications** — Full terminal text search (xterm-addon-search@0.13.0), match count, scrollbar gutter markers, browser notification opt-in for permission prompts
+- [x] **Phase 20: Terminal Search & Browser Notifications** — Full terminal text search (xterm-addon-search@0.13.0), match count, scrollbar gutter markers, browser notification opt-in for permission prompts (completed 2026-03-03)
 
 ## Phase Details
 
@@ -139,7 +139,7 @@ Plans:
   4. Search input is debounced at 300ms so typing quickly in a large buffer does not block the UI
   5. A settings toggle in the UI lets the operator opt in to browser notifications; when opted in and the browser tab is unfocused, a notification fires the first time an agent enters permission state; the notification does not repeat while the same agent stays in permission state (state-transition only)
 
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans complete
 
 Plans:
 - [ ] 20-01-PLAN.md — Terminal search: xterm-addon-search integration, TerminalSearchOverlay, Ctrl+F wiring, match count, gutter markers, debounced input
@@ -168,4 +168,4 @@ Plans:
 | 17. Polish | v2.3 | 2/2 | Complete | 2026-02-19 |
 | 18. Fix token usage | v2.3 | 2/2 | Complete | 2026-02-23 |
 | 19. Operator Awareness Wiring | 2/2 | Complete    | 2026-03-03 | — |
-| 20. Terminal Search & Browser Notifications | 1/2 | In Progress|  | — |
+| 20. Terminal Search & Browser Notifications | 2/2 | Complete   | 2026-03-03 | — |
