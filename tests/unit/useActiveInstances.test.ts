@@ -57,4 +57,64 @@ describe('computeInstanceSignature', () => {
     const instance2 = makeInstance({ id: 1, tmuxSessionName: 'session-a', status: 'active', lastActiveAt: '2026-01-02T12:00:00Z' });
     expect(computeInstanceSignature([instance1])).toBe(computeInstanceSignature([instance2]));
   });
+
+  it('produces same signature regardless of input array order (sort by id)', () => {
+    const instances1 = [
+      makeInstance({ id: 2, tmuxSessionName: 'session-b', status: 'active' }),
+      makeInstance({ id: 1, tmuxSessionName: 'session-a', status: 'idle' }),
+    ];
+    const instances2 = [
+      makeInstance({ id: 1, tmuxSessionName: 'session-a', status: 'idle' }),
+      makeInstance({ id: 2, tmuxSessionName: 'session-b', status: 'active' }),
+    ];
+    expect(computeInstanceSignature(instances1)).toBe(computeInstanceSignature(instances2));
+  });
+});
+
+describe('computeInstanceSignature — polling diff suppression contract', () => {
+  /**
+   * The signature dedup in useActiveInstances is the first line of defense against
+   * polling-triggered re-renders. If the signature is unchanged across two polls,
+   * setInstances is NOT called, preventing all downstream re-renders.
+   *
+   * This test suite documents the contract: which fields are included in the
+   * signature (and thus trigger re-renders when changed) vs. excluded (never
+   * trigger re-renders).
+   */
+
+  it('includes id in signature — different ids produce different signatures', () => {
+    const instance1 = makeInstance({ id: 1, tmuxSessionName: 'session-a', status: 'active' });
+    const instance2 = makeInstance({ id: 2, tmuxSessionName: 'session-a', status: 'active' });
+    expect(computeInstanceSignature([instance1])).not.toBe(computeInstanceSignature([instance2]));
+  });
+
+  it('includes tmuxSessionName in signature — name change produces different signature', () => {
+    const instance1 = makeInstance({ id: 1, tmuxSessionName: 'session-a', status: 'active' });
+    const instance2 = makeInstance({ id: 1, tmuxSessionName: 'session-b', status: 'active' });
+    expect(computeInstanceSignature([instance1])).not.toBe(computeInstanceSignature([instance2]));
+  });
+
+  it('includes status in signature — status change produces different signature', () => {
+    const instance1 = makeInstance({ id: 1, tmuxSessionName: 'session-a', status: 'active' });
+    const instance2 = makeInstance({ id: 1, tmuxSessionName: 'session-a', status: 'stopped' });
+    expect(computeInstanceSignature([instance1])).not.toBe(computeInstanceSignature([instance2]));
+  });
+
+  it('excludes agentName — agentName change does NOT produce different signature', () => {
+    const instance1 = makeInstance({ id: 1, tmuxSessionName: 'session-a', status: 'active', agentName: 'Forge' });
+    const instance2 = makeInstance({ id: 1, tmuxSessionName: 'session-a', status: 'active', agentName: 'ForgeRenamed' });
+    expect(computeInstanceSignature([instance1])).toBe(computeInstanceSignature([instance2]));
+  });
+
+  it('excludes projectPath — projectPath change does NOT produce different signature', () => {
+    const instance1 = makeInstance({ id: 1, tmuxSessionName: 'session-a', status: 'active', projectPath: '/old' });
+    const instance2 = makeInstance({ id: 1, tmuxSessionName: 'session-a', status: 'active', projectPath: '/new' });
+    expect(computeInstanceSignature([instance1])).toBe(computeInstanceSignature([instance2]));
+  });
+
+  it('excludes telegramTopicId — topic change does NOT produce different signature', () => {
+    const instance1 = makeInstance({ id: 1, tmuxSessionName: 'session-a', status: 'active', telegramTopicId: null });
+    const instance2 = makeInstance({ id: 1, tmuxSessionName: 'session-a', status: 'active', telegramTopicId: 42 });
+    expect(computeInstanceSignature([instance1])).toBe(computeInstanceSignature([instance2]));
+  });
 });

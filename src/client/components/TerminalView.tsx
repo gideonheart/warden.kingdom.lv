@@ -243,7 +243,7 @@ export function TerminalView({ tmuxSessionName, onSessionExit }: TerminalViewPro
     );
   }, []);
 
-  const { sendInput, sendResize, isConnected, isReconnecting } = useTerminalSocket({
+  const { sendInput, sendResize, isConnected, isReconnecting, showConnectingOverlay } = useTerminalSocket({
     sessionName: tmuxSessionName,
     onTerminalOutput: handleTerminalOutput,
     onTerminalReset: handleTerminalReset,
@@ -451,12 +451,21 @@ export function TerminalView({ tmuxSessionName, onSessionExit }: TerminalViewPro
     }
 
     // Resize handler — refit terminal on window resize AND visualViewport resize
-    // (iOS Safari fires visualViewport.resize when keyboard opens, not window.resize)
+    // (iOS Safari fires visualViewport.resize when keyboard opens, not window.resize).
+    // Guard against zero-dimension containers: if the container has been collapsed
+    // (e.g. keyboard-open layout transition in progress), skip the fit to avoid
+    // sending a degenerate resize to the PTY that corrupts tmux layout.
     let resizeDebounceTimer: ReturnType<typeof setTimeout> | null = null;
     const refitTerminal = () => {
       if (resizeDebounceTimer) clearTimeout(resizeDebounceTimer);
       resizeDebounceTimer = setTimeout(() => {
         requestAnimationFrame(() => {
+          const containerEl = terminalContainerRef.current;
+          if (!containerEl || containerEl.clientWidth < 20 || containerEl.clientHeight < 20) {
+            // Container is in a degenerate layout state (e.g. mid-transition).
+            // Skip this fit cycle — the next resize event will trigger another attempt.
+            return;
+          }
           try {
             fitAddon.fit();
           } catch {
@@ -517,7 +526,7 @@ export function TerminalView({ tmuxSessionName, onSessionExit }: TerminalViewPro
 
       {/* Terminal content area — overlays scoped here, toolbar stays outside */}
       <div className="relative flex-1 min-h-0 min-w-0">
-        {!isConnected && (
+        {showConnectingOverlay && (
           <div className="absolute inset-0 flex items-center justify-center bg-warden-bg/80 z-10">
             <div className="flex items-center gap-2">
               <div className={`w-4 h-4 border-2 ${isReconnecting ? 'border-warden-warning' : 'border-warden-accent'} border-t-transparent rounded-full animate-spin`} />

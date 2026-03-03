@@ -66,6 +66,12 @@ export function resolveSessionFallback(
  *
  * KEY INVARIANT: This hook NEVER calls setState during render.
  * All state mutations are inside useEffect or event handlers.
+ *
+ * KEY INVARIANT: Ref mutations happen OUTSIDE the setState functional updater.
+ * React may invoke functional updaters multiple times in concurrent mode.
+ * Mutating refs inside updaters can cause double-increments of the miss counter.
+ * Instead, the updater computes the new value; ref mutation happens after in the
+ * same effect body.
  */
 export function useSessionSelection({
   activeInstances,
@@ -82,30 +88,42 @@ export function useSessionSelection({
   useEffect(() => {
     const activeSessionNames = activeSessionNamesKey ? activeSessionNamesKey.split(',') : [];
 
-    setSelectedSessionName((currentSession) => {
-      const { selectedSession, resetMissCount } = resolveSessionFallback(
-        currentSession,
-        activeSessionNames,
-        consecutiveMissCountRef.current,
-        isLoading,
-      );
+    // Compute resolution BEFORE calling setState so we can update the ref
+    // after setState, safely outside the updater. This avoids the React
+    // anti-pattern of mutating refs inside functional updater callbacks
+    // (which React may call multiple times in concurrent/StrictMode).
+    const currentSession = selectedSessionName;
+    const { selectedSession, resetMissCount } = resolveSessionFallback(
+      currentSession,
+      activeSessionNames,
+      consecutiveMissCountRef.current,
+      isLoading,
+    );
 
-      // Update miss counter before returning
-      if (resetMissCount) {
-        consecutiveMissCountRef.current = 0;
-      } else if (
-        currentSession !== null &&
-        !activeSessionNames.includes(currentSession) &&
-        !isLoading
-      ) {
-        // Session is missing and we didn't reset — increment miss count
-        consecutiveMissCountRef.current += 1;
-      }
+    // Update miss counter BEFORE setState to keep the ref in sync with the
+    // decision we just made, regardless of whether the setState triggers a re-render.
+    if (resetMissCount) {
+      consecutiveMissCountRef.current = 0;
+    } else if (
+      currentSession !== null &&
+      !activeSessionNames.includes(currentSession) &&
+      !isLoading
+    ) {
+      // Session is missing and we didn't reset — increment miss count
+      consecutiveMissCountRef.current += 1;
+    }
 
-      return selectedSession;
-    });
+    // Only call setState if the session actually changes — avoids unnecessary renders.
+    if (selectedSession !== currentSession) {
+      setSelectedSessionName(selectedSession);
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSessionNamesKey, isLoading]);
+  // selectedSessionName is intentionally excluded from deps: we capture its current
+  // value at effect start from the variable above, and we only want this effect to
+  // re-run when activeSessionNamesKey or isLoading changes (i.e., on poll cycle or
+  // initial load completion), not on every selection change. Manual selection changes
+  // go through selectSession() which sets the state directly and resets the miss count.
 
   const selectSession = useCallback((sessionName: string) => {
     consecutiveMissCountRef.current = 0;
