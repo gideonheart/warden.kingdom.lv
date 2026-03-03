@@ -30,11 +30,11 @@ Requirements for v3.0 Operator Awareness & Terminal Power Tools. Each maps to ro
 
 ### Keyboard Navigation
 
-- [ ] **KB-01**: Ctrl+1 through Ctrl+9 switch to the corresponding session tab by index
-- [ ] **KB-02**: Ctrl+[ and Ctrl+] cycle through session tabs (previous/next)
-- [ ] **KB-03**: Ctrl+B toggles the AgentSidebar collapsed/expanded
-- [ ] **KB-04**: Escape focuses the terminal canvas when search overlay is not open
-- [ ] **KB-05**: Keyboard shortcuts do not fire when focus is in a text input or textarea (focus guard)
+- [x] **KB-01**: Ctrl+1 through Ctrl+9 switch to the corresponding session tab by index
+- [x] **KB-02**: Ctrl+[ and Ctrl+] cycle through session tabs (previous/next)
+- [x] **KB-03**: Ctrl+B toggles the AgentSidebar collapsed/expanded
+- [x] **KB-04**: Escape focuses the terminal canvas when search overlay is not open
+- [x] **KB-05**: Keyboard shortcuts do not fire when focus is in a text input or textarea (focus guard)
 
 ## Future Requirements
 
@@ -89,11 +89,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SRCH-05 | Phase 20 | Pending |
 | SRCH-06 | Phase 20 | Pending |
 | SRCH-07 | Phase 20 | Pending |
-| KB-01 | Phase 19 | Pending |
-| KB-02 | Phase 19 | Pending |
-| KB-03 | Phase 19 | Pending |
-| KB-04 | Phase 19 | Pending |
-| KB-05 | Phase 19 | Pending |
+| KB-01 | Phase 19 | Complete |
+| KB-02 | Phase 19 | Complete |
+| KB-03 | Phase 19 | Complete |
+| KB-04 | Phase 19 | Complete |
+| KB-05 | Phase 19 | Complete |
 
 **Coverage:**
 - v3.0 requirements: 20 total

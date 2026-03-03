@@ -61,7 +61,7 @@
 
 ### v3.0 Operator Awareness & Terminal Power Tools (Phases 19-20)
 
-- [ ] **Phase 19: Operator Awareness Wiring** — Permission badge, context pressure badge, agent state chip, keyboard navigation (Ctrl+1-9, Ctrl+[/], Ctrl+B, Escape), Ctrl+F stub
+- [x] **Phase 19: Operator Awareness Wiring** — Permission badge, context pressure badge, agent state chip, keyboard navigation (Ctrl+1-9, Ctrl+[/], Ctrl+B, Escape), Ctrl+F stub (completed 2026-03-03)
 - [ ] **Phase 20: Terminal Search & Browser Notifications** — Full terminal text search (xterm-addon-search@0.13.0), match count, scrollbar gutter markers, browser notification opt-in for permission prompts
 
 ## Phase Details
@@ -116,7 +116,7 @@ See `.planning/milestones/v2.3-ROADMAP.md`
   4. Pressing Ctrl+1 through Ctrl+9 switches to the corresponding session tab; Ctrl+[ and Ctrl+] cycle tabs; Ctrl+B toggles the AgentSidebar; Escape moves focus to the terminal canvas when search is not open
   5. Keyboard shortcuts do not fire when the operator's cursor is inside a text input or textarea (prompt panel, search inputs, etc.)
 
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans complete
 
 Plans:
 - [ ] 19-01-PLAN.md — Server-side fixes (permission regex, pressure thresholds) + lift useAgentLiveStatus to App.tsx + permission badge on tabs + state chip and pressure in terminal header
@@ -163,5 +163,5 @@ Plans:
 | 16. DRY + SRP | v2.3 | 2/2 | Complete | 2026-02-19 |
 | 17. Polish | v2.3 | 2/2 | Complete | 2026-02-19 |
 | 18. Fix token usage | v2.3 | 2/2 | Complete | 2026-02-23 |
-| 19. Operator Awareness Wiring | 1/2 | In Progress|  | — |
+| 19. Operator Awareness Wiring | 2/2 | Complete   | 2026-03-03 | — |
 | 20. Terminal Search & Browser Notifications | v3.0 | 0/? | Not started | — |

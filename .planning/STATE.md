@@ -11,11 +11,11 @@ See: .planning/PROJECT.md (updated 2026-03-03)
 ## Current Position
 
 Phase: 19 — Operator Awareness Wiring
-Plan: 01 complete
-Status: Plan 01 complete (permission badge + state chip + pressure wiring)
-Last activity: 2026-03-03 — Phase 19 Plan 01 executed
+Plan: 02 complete
+Status: Phase 19 complete (permission badge + state chip + pressure wiring + global keyboard shortcuts)
+Last activity: 2026-03-03 — Phase 19 Plan 02 executed
 
-Progress: [####################] 50% (Phase 19 of 20 — Plan 01/02 complete)
+Progress: [####################] 55% (Phase 19 of 20 — Plan 02/02 complete)
 
 ## Performance Metrics
 
@@ -77,6 +77,7 @@ Progress: [####################] 50% (Phase 19 of 20 — Plan 01/02 complete)
 | 16 | DRY/SRP — shared module + tab extraction | v2.3 | `e423c67` |
 | 17 | Polish — lazy-mount tabs, fd safety, anchored regex, setTimeout cleanup | v2.3 | `673cf5a` |
 | 18 | Fix token usage — JSONL session reader + DB population | v2.3 | `4ad39dd` |
+| Phase 19 P02 | 2 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -180,6 +181,13 @@ Key decisions from Phase 19 Plan 01:
 - [Phase 19 Plan 01]: Permission regex tightened to /Do you want to proceed?|❯ 1. Yes/ — eliminates npm/git false positives
 - [Phase 19 Plan 01]: Pressure thresholds corrected: critical >=90%, warning >=70% (was 80%/50%) to match UX spec
 
+Key decisions from Phase 19 Plan 02:
+- [Phase 19 Plan 02]: capture-phase addEventListener({ capture: true }) fires before xterm.js bubble-phase — mandatory for shortcut keys to not reach PTY
+- [Phase 19 Plan 02]: attachCustomKeyEventHandler returning false for Ctrl+F/B/1-9/[/] provides second defense layer — prevents PTY escape sequence injection even when terminal has focus
+- [Phase 19 Plan 02]: Escape not suppressed in attachCustomKeyEventHandler — TUI apps (vim, less) require Escape to work normally inside terminal
+- [Phase 19 Plan 02]: handleToggleSidebar useCallback unified for header button + Ctrl+B keyboard shortcut — DRY single source of truth for sidebar toggle
+- [Phase 19 Plan 02]: useGlobalHotkeys placed after handleSelectSession definition — avoid TDZ (const declarations not hoisted)
+
 Key decisions for v3.0 (from research — apply from Phase 19 onwards):
 - [v3.0 Research]: useAgentLiveStatus already delivers all awareness data — Phase 19 is prop-wiring, not new data infrastructure
 - [v3.0 Research]: Call useAgentLiveStatus in App.tsx (not only in AgentsTab) — props-down to TerminalView and InstanceTabBar; safe because hook uses JSON comparison dedup
@@ -257,5 +265,5 @@ No active blockers.
 ## Session Continuity
 
 Last session: 2026-03-03
-Stopped at: Completed 19-01-PLAN.md (permission badge + state chip + pressure wiring)
-Next step: Execute Phase 19 Plan 02 — keyboard shortcuts (Ctrl+Tab, Ctrl+F, global hotkeys)
+Stopped at: Completed 19-02-PLAN.md (global keyboard shortcuts — useGlobalHotkeys + PTY suppression)
+Next step: Execute Phase 20 — Terminal Search Overlay (xterm-addon-search, Ctrl+F handler)
