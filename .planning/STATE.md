@@ -13,7 +13,7 @@ See: .planning/PROJECT.md (updated 2026-03-03)
 Phase: — (between milestones)
 Plan: —
 Status: v2.3 milestone complete — all 18 phases shipped
-Last activity: 2026-03-03 - Completed quick task 2032: Add renderHook integration tests for useSessionSelection (8 new tests)
+Last activity: 2026-03-03 - Completed quick task 2033: Add targeted code comments for RISK-1/2/3/EDGE-2 from 2030 review
 
 Progress: [####################] 100% (v2.3 shipped)
 
@@ -201,6 +201,7 @@ Key decisions for v2.2:
 | 2030 | Review debug fix commit 6dd185d: identify risks, untested edge cases, and follow-up tasks | 2026-03-03 | `2609278` |
 | 2031 | Replace documentation-only useTerminalSocket tests with 9 real behavioral tests (fake timers, vi.mock socket.io-client) | 2026-03-03 | `63f1fbe` |
 | 2032 | Add renderHook integration tests for useSessionSelection (8 new tests: manual selection persistence + polling interactions) | 2026-03-03 | `cae0592` |
+| 2033 | Add targeted code comments for RISK-1 (ref-in-render), RISK-2 (PTY-exit overlay), RISK-3 (stale-closure), EDGE-2 (double-timer guard) | 2026-03-03 | `e03797e` |
 
 ### Roadmap Evolution
 
@@ -225,5 +226,5 @@ No active blockers.
 ## Session Continuity
 
 Last session: 2026-03-03
-Stopped at: Completed v2.3 milestone archival
+Stopped at: Completed quick-2033 (targeted code comments for 2030 review findings)
 Next step: `/gsd:new-milestone` — start next milestone planning
