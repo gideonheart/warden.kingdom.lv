@@ -186,6 +186,7 @@ Key decisions for v2.2:
 | 18 | Fix TOKN-01 through TOKN-06 traceability: mark Complete in REQUIREMENTS.md | 2026-02-24 | `5413480` |
 | 19 | Add requirements-completed frontmatter to 18-02-SUMMARY.md for TOKN-04/05/06 | 2026-02-24 | `4d3cb5e` |
 | 20 | Fix Phase 16 documentation HooksTab references to EventsTab | 2026-02-24 | `937a3d1` |
+| 21 | Stabilize terminal polling: poll dedup + useSessionSelection hook with hysteresis | 2026-03-03 | `75d0d51` |
 
 ### Roadmap Evolution
 
@@ -209,6 +210,6 @@ No active blockers for v2.2.
 
 ## Session Continuity
 
-Last session: 2026-02-24
-Stopped at: Completed quick task 20 — Fix Phase 16 documentation HooksTab references to EventsTab
-Next step: Phase 18 complete — begin next phase
+Last session: 2026-03-03
+Stopped at: Quick task 21 (2/3 tasks done) — awaiting human verification of terminal stability in browser
+Next step: After user confirms terminal stable, quick task 21 complete
