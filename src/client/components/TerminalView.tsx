@@ -18,6 +18,12 @@ interface TerminalViewProps {
   /** Ref for external callers (e.g. App.tsx Ctrl+F handler) to open the search overlay.
    *  TerminalView registers a callback on mount and clears it on unmount. */
   searchOpenRef?: React.MutableRefObject<(() => void) | null>;
+  /** Whether browser notifications are enabled. Controlled by useBrowserNotifications. */
+  notificationsEnabled?: boolean;
+  /** Callback to toggle notification opt-in. Requests permission on first enable. */
+  onToggleNotifications?: () => void;
+  /** Current browser notification permission state, or 'unsupported' if Notification API is unavailable. */
+  notificationPermission?: NotificationPermission | 'unsupported';
 }
 
 // Strip mouse-tracking enable sequences so xterm.js uses native selection
@@ -183,7 +189,16 @@ function estimateTerminalDimensions(
   return { cols, rows };
 }
 
-export function TerminalView({ tmuxSessionName, onSessionExit, agentLiveStatus, terminalFocusRef, searchOpenRef }: TerminalViewProps) {
+export function TerminalView({
+  tmuxSessionName,
+  onSessionExit,
+  agentLiveStatus,
+  terminalFocusRef,
+  searchOpenRef,
+  notificationsEnabled = false,
+  onToggleNotifications,
+  notificationPermission = 'unsupported',
+}: TerminalViewProps) {
   const terminalContainerRef = useRef<HTMLDivElement>(null);
   const terminalInstanceRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
@@ -597,6 +612,31 @@ export function TerminalView({ tmuxSessionName, onSessionExit, agentLiveStatus, 
               {headerPressureText(agentLiveStatus.contextPressure, agentLiveStatus.contextPressureLevel)}
               <span className="w-px h-3 bg-warden-border/50" />
             </>
+          )}
+          {/* Bell icon notification toggle — hidden when Notification API is unsupported */}
+          {notificationPermission !== 'unsupported' && onToggleNotifications && (
+            <button
+              onClick={onToggleNotifications}
+              className={`px-1.5 py-0.5 text-[10px] rounded transition-colors ${
+                notificationsEnabled
+                  ? 'text-warden-accent bg-warden-accent/10'
+                  : notificationPermission === 'denied'
+                    ? 'text-warden-text-dim/40 cursor-not-allowed'
+                    : 'text-warden-text-dim hover:text-warden-text bg-warden-border/30'
+              }`}
+              title={
+                notificationPermission === 'denied'
+                  ? 'Notifications blocked — enable in browser settings'
+                  : notificationsEnabled
+                    ? 'Disable browser notifications'
+                    : 'Enable browser notifications for permission prompts'
+              }
+              disabled={notificationPermission === 'denied'}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3 h-3">
+                <path d="M8 1.5A3.5 3.5 0 0 0 4.5 5v2.947c0 .346-.102.683-.294.97l-1.703 2.556a.018.018 0 0 0 .015.027h10.964a.018.018 0 0 0 .015-.027l-1.703-2.556a1.73 1.73 0 0 1-.294-.97V5A3.5 3.5 0 0 0 8 1.5ZM6.5 13a1.5 1.5 0 0 0 3 0h-3Z" />
+              </svg>
+            </button>
           )}
           <button
             onClick={cycleFontSize}
