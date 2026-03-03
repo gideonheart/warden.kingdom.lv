@@ -7,7 +7,7 @@ tags: [fd-safety, try-finally, regex, react-hooks, useRef, performance]
 # Dependency graph
 requires:
   - phase: 14-enhanced-visibility
-    provides: "extractContextPressure, useAgentLiveStatus, GsdHookLogWatcher"
+    provides: "extractContextPressure, useAgentLiveStatus, GsdHookLogWatcher (later deleted in quick-10)"
 provides:
   - "fd-safe openSync/closeSync pattern across all GSD server code"
   - "anchored extractContextPressure regex targeting Claude Code status bar format"
@@ -26,7 +26,7 @@ key-files:
   created: []
   modified:
     - src/server/routes/gsdRoutes.ts
-    - src/server/services/GsdHookLogWatcher.ts
+    - src/server/services/GsdHookLogWatcher.ts  # deleted in quick-10
     - src/client/hooks/useAgentLiveStatus.ts
 
 key-decisions:
@@ -58,7 +58,7 @@ completed: 2026-02-19
 - **Files modified:** 3
 
 ## Accomplishments
-- Wrapped all 3 openSync/closeSync pairs in try/finally (1 in gsdRoutes.ts spawn handler, 2 in GsdHookLogWatcher readNewLines/readLastLines)
+- Wrapped all 3 openSync/closeSync pairs in try/finally (1 in gsdRoutes.ts spawn handler, 2 in GsdHookLogWatcher readNewLines/readLastLines — GsdHookLogWatcher.ts later deleted in quick-10)
 - Anchored extractContextPressure regex to Claude Code status bar format using Unicode block char range and "context" keyword, with line length filter (<80 chars) to eliminate false positives
 - Stabilized useAgentLiveStatus Map reference using useRef + JSON.stringify comparison gate, preventing wasted re-renders when poll data is unchanged
 
@@ -71,7 +71,7 @@ Each task was committed atomically:
 
 ## Files Created/Modified
 - `src/server/routes/gsdRoutes.ts` - try/finally around spawn handler fd, anchored extractContextPressure regex
-- `src/server/services/GsdHookLogWatcher.ts` - try/finally around readNewLines and readLastLines fd operations
+- `src/server/services/GsdHookLogWatcher.ts` - try/finally around readNewLines and readLastLines fd operations (file later deleted in quick-10 when Hooks tab was replaced by Events tab)
 - `src/client/hooks/useAgentLiveStatus.ts` - useRef comparison gate before setStatusMap
 
 ## Decisions Made
@@ -99,7 +99,7 @@ None - no external service configuration required.
 ## Self-Check: PASSED
 
 - [x] src/server/routes/gsdRoutes.ts exists
-- [x] src/server/services/GsdHookLogWatcher.ts exists
+- [x] src/server/services/GsdHookLogWatcher.ts existed at Phase 17 time (later deleted in quick-10)
 - [x] src/client/hooks/useAgentLiveStatus.ts exists
 - [x] Commit be449cf found
 - [x] Commit e28f109 found
