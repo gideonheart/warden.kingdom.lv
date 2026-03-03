@@ -16,6 +16,7 @@ import { useSessionSelection } from './hooks/useSessionSelection.js';
 import { useAgentLiveStatus } from './hooks/useAgentLiveStatus.js';
 import type { AgentLiveStatus } from './hooks/useAgentLiveStatus.js';
 import { useGlobalHotkeys } from './hooks/useGlobalHotkeys.js';
+import { useBrowserNotifications } from './hooks/useBrowserNotifications.js';
 
 type AppView = 'terminals' | 'history' | 'plugins' | 'agents';
 
@@ -165,6 +166,15 @@ export function App() {
     terminalFocusRef,
     currentView,
     onOpenSearch: handleOpenSearch,
+  });
+
+  // Browser notification opt-in — fires when agent enters permission_prompt state
+  // and the browser tab is unfocused. Requires sessionStatusMap and handleSelectSession
+  // which are defined above.
+  const { notificationsEnabled, toggleNotifications, notificationPermission } = useBrowserNotifications({
+    sessionStatusMap,
+    instances: activeInstances,
+    onSelectSession: handleSelectSession,
   });
 
   const handleViewChange = useCallback((view: AppView) => {
@@ -352,6 +362,9 @@ export function App() {
                     agentLiveStatus={sessionStatusMap.get(selectedSessionName ?? '') ?? null}
                     terminalFocusRef={terminalFocusRef}
                     searchOpenRef={searchOpenRef}
+                    notificationsEnabled={notificationsEnabled}
+                    onToggleNotifications={toggleNotifications}
+                    notificationPermission={notificationPermission}
                   />
                 </ErrorBoundary>
               ) : (
