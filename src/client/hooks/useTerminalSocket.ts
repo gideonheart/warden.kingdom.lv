@@ -16,6 +16,13 @@ interface UseTerminalSocketParams {
  * Duration (ms) to wait after socket disconnects before showing the connecting overlay.
  * Brief transient disconnects (network hiccup, intentional reconnect) complete within
  * this window and the overlay never flashes. Only genuine prolonged disconnects show it.
+ *
+ * NOTE (RISK-2): PTY-exit reconnects take longer than this threshold and WILL show the
+ * overlay. The exit path is: socket.disconnect() → 2000ms setTimeout → new socket connects.
+ * Total >2000ms >> 500ms, so the overlay appears for ~1500ms after each PTY exit. This is
+ * intentional — a new PTY is genuinely being spawned and the overlay accurately reflects that.
+ * The 500ms delay only suppresses flashes for sub-500ms network hiccups where Socket.IO
+ * auto-reconnects before the timer fires.
  */
 const OVERLAY_DELAY_MS = 500;
 
@@ -52,6 +59,12 @@ export function useTerminalSocket({
   const onSessionExitRef = useRef(onSessionExit);
 
   // Keep refs current on every render without triggering socket reconnects.
+  // RISK-1 (accepted deviation): Assigning to ref.current in the render body is technically
+  // a side-effect during render. React's concurrent mode can discard and replay renders, so
+  // these assignments may run for uncommitted renders. In practice this is benign — the ref
+  // simply receives the same or a newer callback on replay, never a stale one. The strictly
+  // correct alternative is useLayoutEffect for ref sync, but the added complexity is not
+  // justified here. If <React.StrictMode> is ever enabled, verify no observable side effects.
   onTerminalOutputRef.current = onTerminalOutput;
   onTerminalResetRef.current = onTerminalReset;
   onSessionExitRef.current = onSessionExit;
@@ -67,6 +80,9 @@ export function useTerminalSocket({
       setShowConnectingOverlay(false);
     } else {
       // Disconnected — wait before showing overlay so brief reconnects are invisible.
+      // EDGE-2: The null guard ensures at most one overlay delay timer exists at any time.
+      // If React batches rapid isConnected false→true→false transitions, this prevents a
+      // second timer from being created while the first is still pending.
       if (overlayDelayTimerRef.current === null) {
         overlayDelayTimerRef.current = setTimeout(() => {
           overlayDelayTimerRef.current = null;
