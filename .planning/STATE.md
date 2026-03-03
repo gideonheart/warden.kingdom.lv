@@ -211,5 +211,5 @@ No active blockers for v2.2.
 ## Session Continuity
 
 Last session: 2026-03-03
-Stopped at: Quick task 21 (2/3 tasks done) — awaiting human verification of terminal stability in browser
-Next step: After user confirms terminal stable, quick task 21 complete
+Stopped at: Completed quick task 21 — terminal polling stabilization (poll dedup + useSessionSelection hook)
+Next step: Phase 18 complete — begin next phase
