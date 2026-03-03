@@ -94,10 +94,10 @@ describe('useTerminalSocket', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Suite 1 — 500ms overlay delay
+// Suite 1 — 1500ms overlay delay
 // ---------------------------------------------------------------------------
 
-describe('useTerminalSocket — 500ms overlay delay', () => {
+describe('useTerminalSocket — 1500ms overlay delay', () => {
   it('showConnectingOverlay is false immediately after disconnect', () => {
     const params = defaultParams();
     const { result } = renderHook(() => useTerminalSocket(params));
@@ -116,7 +116,7 @@ describe('useTerminalSocket — 500ms overlay delay', () => {
     expect(result.current.showConnectingOverlay).toBe(false);
   });
 
-  it('showConnectingOverlay becomes true after 500ms of disconnect', () => {
+  it('showConnectingOverlay becomes true after 1500ms of disconnect', () => {
     const params = defaultParams();
     const { result } = renderHook(() => useTerminalSocket(params));
 
@@ -127,14 +127,21 @@ describe('useTerminalSocket — 500ms overlay delay', () => {
       fireSocketEvent('disconnect');
     });
 
+    // Advance to just before the threshold — overlay still hidden
     act(() => {
-      vi.advanceTimersByTime(500);
+      vi.advanceTimersByTime(1499);
+    });
+    expect(result.current.showConnectingOverlay).toBe(false);
+
+    // Cross the 1500ms threshold — overlay should now appear
+    act(() => {
+      vi.advanceTimersByTime(1);
     });
 
     expect(result.current.showConnectingOverlay).toBe(true);
   });
 
-  it('showConnectingOverlay stays false if socket reconnects within 500ms', () => {
+  it('showConnectingOverlay stays false if socket reconnects within 1500ms', () => {
     const params = defaultParams();
     const { result } = renderHook(() => useTerminalSocket(params));
 
@@ -147,18 +154,18 @@ describe('useTerminalSocket — 500ms overlay delay', () => {
 
     // Advance partway — timer not yet elapsed
     act(() => {
-      vi.advanceTimersByTime(300);
+      vi.advanceTimersByTime(800);
     });
     expect(result.current.showConnectingOverlay).toBe(false);
 
-    // Socket reconnects before the 500ms timer fires
+    // Socket reconnects before the 1500ms timer fires
     act(() => {
       fireSocketEvent('connect');
     });
 
-    // Advance past original 500ms mark — timer was cancelled so overlay stays hidden
+    // Advance past original 1500ms mark — timer was cancelled so overlay stays hidden
     act(() => {
-      vi.advanceTimersByTime(300);
+      vi.advanceTimersByTime(1000);
     });
 
     expect(result.current.showConnectingOverlay).toBe(false);

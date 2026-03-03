@@ -1,5 +1,9 @@
 import * as pty from 'node-pty';
+import { execFile } from 'child_process';
+import { promisify } from 'util';
 import type { Server as SocketIOServer, Socket } from 'socket.io';
+
+const execFileAsync = promisify(execFile);
 
 // How long to keep a PTY alive after the last subscriber disconnects.
 // This allows fast navigation away and back (e.g., switching views) to reuse the
@@ -65,20 +69,41 @@ export class TerminalStreamService {
 
       this.setupSocketInputHandlers(socket, existing);
 
-      // Force tmux to repaint the full screen for the new subscriber.
-      // A same-size resize is a no-op (tmux ignores SIGWINCH when dimensions haven't
-      // changed), so we must actually change the dimensions to guarantee a repaint.
-      // Strategy: resize to the new client's dimensions (likely different from the
-      // existing PTY's), with a +1 row nudge first to guarantee a size change even
-      // if the new client happens to match the existing PTY exactly.
+      // Tell the new subscriber's client to clear stale xterm content before the
+      // repaint arrives. This event is intentionally scoped to the new socket only —
+      // existing subscribers must NOT receive a reset (they have a live terminal).
       socket.emit('terminal:reset');
-      const targetCols = Number.isFinite(initialCols) && initialCols > 0 ? initialCols : existing.ptyProcess.cols;
-      const targetRows = Number.isFinite(initialRows) && initialRows > 0 ? initialRows : existing.ptyProcess.rows;
-      try {
-        existing.ptyProcess.resize(targetCols, targetRows + 1);
-        existing.ptyProcess.resize(targetCols, targetRows);
-      } catch {
-        // PTY resize failed — not fatal, subscriber will see output on next activity
+
+      // Force tmux to repaint the full screen for the new subscriber.
+      // Strategy depends on whether any other subscribers are already active:
+      //
+      // CASE A — No other active subscribers (this is a re-attach after keep-alive):
+      //   Resize the PTY to the new subscriber's dimensions (likely unchanged) with a
+      //   +1 row nudge to guarantee a SIGWINCH even if dimensions are identical.
+      //   This is safe because there are no other subscribers to disrupt.
+      //
+      // CASE B — Other subscribers are already viewing this PTY:
+      //   Do NOT resize the PTY — that would disrupt the existing subscriber's layout by
+      //   sending a garbled repaint at potentially wrong dimensions. Instead, use
+      //   `tmux refresh-client` to request a repaint at the CURRENT PTY dimensions.
+      //   The new subscriber gets a repaint at the existing session's dimensions, which
+      //   may not perfectly fit their viewport, but avoids corrupting the live viewer.
+      const otherSubscriberCount = existing.subscribers.size - 1; // socket already added above
+      if (otherSubscriberCount === 0) {
+        // Case A: sole subscriber — resize to new client dimensions with +1 nudge.
+        const targetCols = Number.isFinite(initialCols) && initialCols > 0 ? initialCols : existing.ptyProcess.cols;
+        const targetRows = Number.isFinite(initialRows) && initialRows > 0 ? initialRows : existing.ptyProcess.rows;
+        try {
+          existing.ptyProcess.resize(targetCols, targetRows + 1);
+          existing.ptyProcess.resize(targetCols, targetRows);
+        } catch {
+          // PTY resize failed — not fatal, subscriber will see output on next activity
+        }
+      } else {
+        // Case B: other subscribers are live — use refresh-client to repaint without resize.
+        execFileAsync('tmux', ['refresh-client', '-t', sessionName]).catch(() => {
+          // refresh-client failed — not fatal, new subscriber will see output on next activity
+        });
       }
 
       return;

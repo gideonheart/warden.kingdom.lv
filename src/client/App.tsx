@@ -46,8 +46,13 @@ export function App() {
   const mobileMenuRef = useRef<HTMLDivElement>(null);
   const [currentView, setCurrentView] = useState<AppView>(() => parseHash().view);
 
-  const activeInstances = instances.filter(
-    (instance) => instance.status === 'active' || instance.status === 'idle'
+  // Memoize activeInstances so the array reference is stable when instances data is
+  // unchanged. Without this, Array.filter() creates a new reference on every App render
+  // (e.g., when liveStatus data changes), which invalidates the sessionStatusMap useMemo
+  // and causes unnecessary TerminalView re-renders every ~5s.
+  const activeInstances = useMemo(
+    () => instances.filter((instance) => instance.status === 'active' || instance.status === 'idle'),
+    [instances],
   );
 
   // Live status polling — runs once in App (not in AgentsTab) so TerminalView and

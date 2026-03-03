@@ -17,14 +17,17 @@ interface UseTerminalSocketParams {
  * Brief transient disconnects (network hiccup, intentional reconnect) complete within
  * this window and the overlay never flashes. Only genuine prolonged disconnects show it.
  *
+ * Set to 1500ms to absorb:
+ *   - Socket.IO initial connect latency (RTT + server handshake)
+ *   - Brief Socket.IO reconnect cycles after PTY exit
+ *   - Any transient disconnect that self-heals within the window
+ *
  * NOTE (RISK-2): PTY-exit reconnects take longer than this threshold and WILL show the
  * overlay. The exit path is: socket.disconnect() → 2000ms setTimeout → new socket connects.
- * Total >2000ms >> 500ms, so the overlay appears for ~1500ms after each PTY exit. This is
+ * Total >2000ms >> 1500ms, so the overlay appears for ~500ms after each PTY exit. This is
  * intentional — a new PTY is genuinely being spawned and the overlay accurately reflects that.
- * The 500ms delay only suppresses flashes for sub-500ms network hiccups where Socket.IO
- * auto-reconnects before the timer fires.
  */
-const OVERLAY_DELAY_MS = 500;
+const OVERLAY_DELAY_MS = 1500;
 
 export function useTerminalSocket({
   sessionName,
@@ -114,8 +117,17 @@ export function useTerminalSocket({
     const { cols, rows } = getDimensions();
     const query: Record<string, string | number> = { sessionName, cols, rows };
 
+    // Prefer WebSocket transport over HTTP long-polling. Socket.IO defaults to starting
+    // with HTTP long-polling then upgrading to WebSocket. During the polling phase,
+    // Socket.IO HTTP requests compete with /api/instances and /api/gsd/agents/live-status
+    // fetch requests for the browser's HTTP connection pool (6 connections per origin).
+    // A delayed polling response can trigger a spurious 'disconnect' event, causing the
+    // connecting overlay to flash. By listing 'websocket' first, Socket.IO attempts a
+    // direct WebSocket upgrade immediately. 'polling' remains as a fallback for environments
+    // where WebSocket upgrades are blocked (e.g., misconfigured proxies).
     const socket = io('/terminal', {
       query: query as Record<string, string>,
+      transports: ['websocket', 'polling'],
       reconnection: true,
       reconnectionDelay: 1_000,
       reconnectionAttempts: 10,
