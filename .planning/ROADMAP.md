@@ -168,4 +168,4 @@ Plans:
 | 17. Polish | v2.3 | 2/2 | Complete | 2026-02-19 |
 | 18. Fix token usage | v2.3 | 2/2 | Complete | 2026-02-23 |
 | 19. Operator Awareness Wiring | 2/2 | Complete    | 2026-03-03 | — |
-| 20. Terminal Search & Browser Notifications | 2/2 | Complete   | 2026-03-03 | — |
+| 20. Terminal Search & Browser Notifications | 2/2 | Complete    | 2026-03-03 | — |
