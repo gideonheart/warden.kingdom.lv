@@ -2,20 +2,20 @@
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-02-19)
+See: .planning/PROJECT.md (updated 2026-03-03)
 
 **Core value:** Real-time visibility into all active Claude Code agent sessions from a single browser tab
 
-**Current focus:** v2.3 Token Usage — Phase 18: JSONL session reader and database population
+**Current focus:** Planning next milestone
 
 ## Current Position
 
-Phase: 18 — Fix token usage JSONL session reader and database population
-Plan: 02 of 02 complete
-Status: Phase 18 complete — full token usage pipeline integrated end-to-end
-Last activity: 2026-03-03 - Completed quick task 2029: Fix remaining tech debt — annotate GsdHookLogWatcher refs in Phase 17 docs
+Phase: — (between milestones)
+Plan: —
+Status: v2.3 milestone complete — all 18 phases shipped
+Last activity: 2026-03-03 - Completed v2.3 milestone (Code Hygiene & Token Usage)
 
-Progress: [####################] 100% (Phase 18 — 2/2 plans done)
+Progress: [####################] 100% (v2.3 shipped)
 
 ## Performance Metrics
 
@@ -46,6 +46,14 @@ Progress: [####################] 100% (Phase 18 — 2/2 plans done)
 - Plans: 4
 - Timeline: 2026-02-18
 
+**v2.3 Code Hygiene & Token Usage:**
+- Phases: 4 (15-18)
+- Plans: 8
+- Commits: 97
+- Files modified: 37 (src/)
+- LOC: 6,650 TypeScript (net -486 LOC)
+- Timeline: 13 days (2026-02-19 → 2026-03-03)
+
 **Completed Phases:**
 
 | Phase | Description | Milestone | Commit |
@@ -65,9 +73,10 @@ Progress: [####################] 100% (Phase 18 — 2/2 plans done)
 | 12 | Backend Foundation (GSD Registry + Hooks + Routes) | v2.1 | `96be120` |
 | 13 | Client Plugin (GSD Manager 4-tab panel) | v2.1 | `648a5dd` |
 | 14 | Enhanced Agent Visibility (live state, ctx pressure, GSD phase) | v2.1 | `01b447f` |
-| 15 | Foundation — Dead code removal (~740 LOC) | v2.2 | `f67ada3` |
-| 16 | DRY/SRP — shared module + tab extraction | v2.2 | `e423c67` |
-| 17 | Polish — lazy-mount tabs, fd safety, anchored regex, setTimeout cleanup | v2.2 | `673cf5a` |
+| 15 | Foundation — Dead code removal (~740 LOC) | v2.3 | `f67ada3` |
+| 16 | DRY/SRP — shared module + tab extraction | v2.3 | `e423c67` |
+| 17 | Polish — lazy-mount tabs, fd safety, anchored regex, setTimeout cleanup | v2.3 | `673cf5a` |
+| 18 | Fix token usage — JSONL session reader + DB population | v2.3 | `4ad39dd` |
 
 ## Accumulated Context
 
@@ -208,10 +217,10 @@ None
 - Options: (1) read-only mobile terminal, (2) budget 2-3 weeks debugging, (3) defer mobile terminal
 - Research flag: Needs testing on real iOS/Android devices before implementation
 
-No active blockers for v2.2.
+No active blockers.
 
 ## Session Continuity
 
 Last session: 2026-03-03
-Stopped at: Completed quick task 2029 — annotated GsdHookLogWatcher refs in Phase 17 docs, resolved v2.2 audit tech debt item
-Next step: Phase 18 complete — begin next phase
+Stopped at: Completed v2.3 milestone archival
+Next step: `/gsd:new-milestone` — start next milestone planning

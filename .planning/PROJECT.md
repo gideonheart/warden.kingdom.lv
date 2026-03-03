@@ -31,20 +31,19 @@ Real-time visibility into all active Claude Code agent sessions from a single br
 - ✓ Prompt dropdown allows manual override to any configured agent — v1.1
 - ✓ Send button delivers prompts via Gateway API — v1.1
 - ✓ Ctrl+Enter sends prompts — v1.1
+- ✓ Dead code removal (~740 LOC deleted) — v2.3
+- ✓ Unified GSD types in src/shared/gsdTypes.ts — v2.3
+- ✓ Shared GSD UI module (gsdShared.tsx) with 9 extracted constants/components — v2.3
+- ✓ GsdView decomposed to 76-line router with 4 standalone tab components — v2.3
+- ✓ Lazy-mount GSD tabs eliminating idle polling waste — v2.3
+- ✓ fd safety, setTimeout cleanup, Map stabilization, anchored regex — v2.3
+- ✓ SessionUsageReader JSONL scanner with cache token tracking — v2.3
+- ✓ Auto-scan token usage on boot + every 5 minutes — v2.3
+- ✓ Enhanced TokenUsageView with cache columns and Scan Now button — v2.3
 
 ### Active
 
-#### Current Milestone: v2.2 Code Hygiene
-
-**Goal:** Eliminate dead code, extract shared components, unify types, decompose monolithic views, and add lazy tab mounting — pure refactor, net-negative ~500 LOC.
-
-**Target features:**
-- ✓ Delete ~750 lines of dead code (gutted plugin file, orphaned AgentsView) — Phase 15
-- ✓ Create `src/shared/gsdTypes.ts` — unify GSD types across client/server boundary — Phase 15
-- ✓ Extract 9 duplicated constants/components into shared GSD status module (`gsdShared.tsx`) — Phase 16
-- ✓ Decompose GsdView.tsx into 4 tab sub-components (AgentsTab, ControlsTab, RegistryTab, EventsTab) — Phase 16, GsdView now 76 lines
-- Lazy-mount tabs — only render active tab, eliminating ~18 HTTP req/min + 60 tmux subprocess/min waste
-- Fix minor issues: fd leak in spawn handler, setTimeout cleanup, Map re-creation, regex fragility
+(No active milestone — ready for `/gsd:new-milestone`)
 
 ### Out of Scope
 
@@ -55,13 +54,15 @@ Real-time visibility into all active Claude Code agent sessions from a single br
 - Multi-pane terminal splits — tmux handles layout within sessions
 - In-dashboard code editor — agents edit files, operator intervenes via prompts
 - Offline mode — real-time is core value
+- detectAgentState() rewrite — regex heuristics fragile but functional; deferred
 
 ## Context
 
-Shipped v1.1 with 2,644 LOC TypeScript (src + tests). Phase 9 added 185 LOC for plugin infrastructure.
-Tech stack: Express 5, Socket.IO 4, React 19, xterm.js 5, node-pty, SQLite (better-sqlite3), Tailwind CSS 4, Vite 6.
+Shipped v2.3 with 6,650 LOC TypeScript (src/). Net -486 LOC from v2.2 code hygiene pass.
+Tech stack: Express 5, Socket.IO 4, React 19, xterm.js 5, node-pty, SQLite (better-sqlite3), Tailwind CSS 4, Vite 6, Vitest.
+Features: live terminal streaming, GSD Manager (4-tab control center), plugin registry, activity timeline, token usage JSONL scanner with cache tracking.
 Runs on Ubuntu 24 server (Laravel Forge managed), same host as gideons.kingdom.lv.
-20 Playwright E2E tests passing (12 from v1.0 + 8 from v1.1). Production Nginx config with SSL + IP whitelist + WebSocket.
+20 Playwright E2E tests + Vitest unit tests. Production Nginx config with SSL + IP whitelist + WebSocket.
 tmux configured with mouse mode and 50,000-line scrollback buffer for monitoring workflows.
 
 ## Constraints
@@ -91,10 +92,14 @@ tmux configured with mouse mode and 50,000-line scrollback buffer for monitoring
 | Build-time satisfies for plugin validation | Catches invalid manifests at compile time, not runtime | ✓ Good — immediate feedback |
 | ErrorBoundary per plugin panel | Crashing plugin cannot break main dashboard | ✓ Good — isolates failures |
 
-| Lazy-mount GSD tabs | Conditional render active tab only; hooks auto-deactivate on unmount | — Pending |
+| Lazy-mount GSD tabs | Conditional render active tab only; hooks auto-deactivate on unmount | ✓ Good — eliminated ~18 req/min + 60 tmux/min idle waste |
 | Extract shared GSD status components | DRY — 9 constants/components duplicated across 3 files | ✓ Good — gsdShared.tsx, zero duplicates |
 | Unified gsdTypes.ts in src/shared/ | Follow established shared types pattern, eliminate client/server type drift | ✓ Good — Phase 15, all imports updated |
 | SRP tab extraction for GsdView.tsx | Each tab standalone, parent is pure router | ✓ Good — 76 LOC router, 4 tab files |
+| JSONL scanner for token usage | Read Claude Code session files directly instead of scraping | ✓ Good — idempotent upserts, cache token support |
+| Per-model pricing with fallback | Map known models, default to sonnet-4-6 for unknowns | ✓ Good — safe default, warn-once for new variants |
+| Streaming readline for JSONL | Replace readFile with readline stream for large files | ✓ Good — memory-efficient, fd-safe cleanup |
+| useSessionSelection hook | Centralize tab selection with polling dedup and hysteresis | ✓ Good — eliminated socket disruption on polls |
 
 ---
-*Last updated: 2026-02-19 after Phase 16*
+*Last updated: 2026-03-03 after v2.3 milestone*

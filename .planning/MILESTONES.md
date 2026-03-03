@@ -60,3 +60,36 @@ See `.planning/milestones/v1.1-ROADMAP.md` for full phase details.
 
 ---
 
+
+## v2.3 Code Hygiene & Token Usage (Shipped: 2026-03-03)
+
+**Phases:** 4 (Phases 15-18) | **Plans:** 8 | **Commits:** 97 | **LOC:** 6,650 TypeScript (net -486 LOC)
+**Timeline:** 13 days (2026-02-19 → 2026-03-03)
+**Git range:** `0c82738..16839b8`
+
+**Delivered:** Complete code hygiene pass — dead code deletion, shared type unification, UI component extraction, view decomposition, lazy tab mounting, and four bug fixes — followed by a real token usage data pipeline reading Claude Code JSONL session files with cache token tracking, auto-scan, and enhanced UI display.
+
+**Key accomplishments:**
+1. Deleted ~740 lines of dead code and orphaned components (gutted plugin file, removed AgentsView.tsx)
+2. Unified GSD types into `src/shared/gsdTypes.ts` eliminating client/server type drift
+3. Extracted 9 shared UI constants/components to `gsdShared.tsx` — single source of truth for GSD status rendering
+4. Decomposed GsdView.tsx from 489 to 76 lines with 4 standalone tab components (AgentsTab, ControlsTab, RegistryTab, EventsTab)
+5. Lazy-mount GSD tabs eliminating ~18 HTTP req/min + 60 tmux subprocess/min idle polling waste
+6. Built SessionUsageReader JSONL scanner with cache token tracking, per-model pricing, and auto-scan every 5 minutes
+
+**Phases:**
+- Phase 15: Foundation — Dead code removal + shared types (2/2 plans) — `f67ada3`
+- Phase 16: DRY + SRP — Shared module + tab extraction (2/2 plans) — `e423c67`
+- Phase 17: Polish — Lazy-mount, fd safety, regex, setTimeout cleanup (2/2 plans) — `673cf5a`
+- Phase 18: Fix token usage — JSONL session reader + DB population (2/2 plans) — `4ad39dd`
+
+**Quick tasks shipped during milestone:** 15-22, 2029 (terminal polling stability, streaming JSONL, NaN guards, doc fixes, dead script deletion)
+
+**Tech debt accepted:**
+- detectAgentState() regex heuristics remain fragile but functional (deferred)
+- xterm.js mobile touch support fundamentally broken (Phase 10 concern, deferred)
+
+See `.planning/milestones/v2.3-ROADMAP.md` for full phase details.
+
+---
+
