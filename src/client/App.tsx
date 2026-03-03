@@ -15,6 +15,7 @@ import { usePluginRegistry } from './hooks/usePluginRegistry.js';
 import { useSessionSelection } from './hooks/useSessionSelection.js';
 import { useAgentLiveStatus } from './hooks/useAgentLiveStatus.js';
 import type { AgentLiveStatus } from './hooks/useAgentLiveStatus.js';
+import { useGlobalHotkeys } from './hooks/useGlobalHotkeys.js';
 
 type AppView = 'terminals' | 'history' | 'plugins' | 'agents';
 
@@ -67,6 +68,11 @@ export function App() {
 
   // Focus callback ref — Plan 02 keyboard shortcuts will call this to return focus to terminal.
   const terminalFocusRef = useRef<(() => void) | null>(null);
+
+  // Stable callback for sidebar toggle — used by both the header button and useGlobalHotkeys.
+  const handleToggleSidebar = useCallback(() => {
+    setShowSidebar((prev) => !prev);
+  }, []);
 
   // useSessionSelection manages all selection state: auto-select, fallback, hysteresis.
   // No setState calls for session selection are allowed in the render body.
@@ -135,6 +141,17 @@ export function App() {
     selectSession(sessionName);
     setCurrentView('terminals');
   }, [selectSession]);
+
+  // Global keyboard shortcuts — capture phase registration prevents PTY forwarding.
+  // Placed here so handleSelectSession is defined before the hook is called.
+  useGlobalHotkeys({
+    instances: activeInstances,
+    selectedSessionName,
+    onSelectSession: handleSelectSession,
+    onToggleSidebar: handleToggleSidebar,
+    terminalFocusRef,
+    currentView,
+  });
 
   const handleViewChange = useCallback((view: AppView) => {
     setCurrentView(view);
@@ -218,7 +235,7 @@ export function App() {
           </button>
           <span className="w-px h-4 bg-warden-border" />
           <button
-            onClick={() => setShowSidebar(!showSidebar)}
+            onClick={handleToggleSidebar}
             className={`px-2 py-1 text-xs transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center ${showSidebar ? 'text-warden-accent' : 'text-warden-text-dim hover:text-warden-text'}`}
           >
             Sidebar
@@ -276,7 +293,7 @@ export function App() {
               </button>
               <div className="border-t border-warden-border" />
               <button
-                onClick={() => { setShowSidebar(!showSidebar); setShowMobileMenu(false); }}
+                onClick={() => { handleToggleSidebar(); setShowMobileMenu(false); }}
                 className={`w-full text-left px-4 py-3 min-h-[44px] text-sm transition-colors ${showSidebar ? 'text-warden-accent bg-warden-accent/10' : 'text-warden-text-dim hover:text-warden-text hover:bg-warden-border/30'}`}
               >
                 Sidebar
