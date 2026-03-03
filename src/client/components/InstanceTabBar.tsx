@@ -1,15 +1,17 @@
 import { useState } from 'react';
 import type { AgentInstance } from '../../shared/types.js';
 import { STATUS_COLORS } from './gsdShared.js';
+import type { AgentLiveStatus } from '../hooks/useAgentLiveStatus.js';
 
 interface InstanceTabBarProps {
   instances: AgentInstance[];
   selectedSessionName: string | null;
   onSelectSession: (sessionName: string) => void;
   onSessionStopped?: (sessionName: string) => void;
+  sessionStatusMap?: Map<string, AgentLiveStatus>;
 }
 
-export function InstanceTabBar({ instances, selectedSessionName, onSelectSession, onSessionStopped }: InstanceTabBarProps) {
+export function InstanceTabBar({ instances, selectedSessionName, onSelectSession, onSessionStopped, sessionStatusMap }: InstanceTabBarProps) {
   const [stoppingSession, setStoppingSession] = useState<string | null>(null);
 
   const handleStop = async (instance: AgentInstance) => {
@@ -42,16 +44,25 @@ export function InstanceTabBar({ instances, selectedSessionName, onSelectSession
         const isSelected = instance.tmuxSessionName === selectedSessionName;
         const statusColor = STATUS_COLORS[instance.status] ?? 'bg-warden-idle';
         const isStopping = stoppingSession === instance.tmuxSessionName;
+        const agentStatus = sessionStatusMap?.get(instance.tmuxSessionName);
+        const hasPermissionBadge = agentStatus?.state === 'permission_prompt';
 
         return (
           <div
             key={instance.tmuxSessionName}
-            className={`flex items-center gap-2 px-3 py-1.5 min-h-[44px] rounded-md text-sm whitespace-nowrap transition-colors ${
+            className={`relative flex items-center gap-2 px-3 py-1.5 min-h-[44px] rounded-md text-sm whitespace-nowrap transition-colors ${
               isSelected
                 ? 'bg-warden-accent/20 text-warden-accent border border-warden-accent/30'
                 : 'text-warden-text-dim hover:bg-warden-border/50 hover:text-warden-text border border-transparent'
             }`}
           >
+            {hasPermissionBadge && (
+              <span
+                className="absolute top-1 right-1 w-2 h-2 rounded-full bg-warden-warning animate-pulse"
+                aria-label="Waiting for permission"
+                title="Waiting for permission input"
+              />
+            )}
             <button
               onClick={() => onSelectSession(instance.tmuxSessionName)}
               className="flex items-center gap-2 flex-1"

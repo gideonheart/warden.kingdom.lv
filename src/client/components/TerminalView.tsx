@@ -3,11 +3,16 @@ import { Terminal } from 'xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import { useTerminalSocket } from '../hooks/useTerminalSocket.js';
+import type { AgentLiveStatus } from '../hooks/useAgentLiveStatus.js';
+import type { PressureLevel } from '@shared/gsdTypes.js';
+import { StateBadge, PRESSURE_COLORS } from './gsdShared.js';
 import 'xterm/css/xterm.css';
 
 interface TerminalViewProps {
   tmuxSessionName: string;
   onSessionExit: (sessionName: string, exitCode: number) => void;
+  agentLiveStatus?: AgentLiveStatus | null;
+  terminalFocusRef?: React.MutableRefObject<(() => void) | null>;
 }
 
 // Strip mouse-tracking enable sequences so xterm.js uses native selection
@@ -34,6 +39,15 @@ function getStoredFontSize(): string {
 
 function getResponsiveFontSize(): number {
   return FONT_SIZES[getStoredFontSize()] ?? 13;
+}
+
+/** Render a compact pressure percentage for the terminal header.
+ *  Uses text-[10px] to match the header's existing font-size budget. */
+function headerPressureText(percentage: number | null, level: PressureLevel | null) {
+  if (percentage === null) return <span className="text-[10px] text-warden-text-dim">—</span>;
+  const colorClass = level ? PRESSURE_COLORS[level] : 'text-warden-text-dim';
+  const pulseClass = level === 'critical' ? ' animate-pulse' : '';
+  return <span className={`text-[10px] font-mono ${colorClass}${pulseClass}`}>{percentage}%</span>;
 }
 
 const MOBILE_KEYS: Array<{ label: string; seq: string }> = [
@@ -164,7 +178,7 @@ function estimateTerminalDimensions(
   return { cols, rows };
 }
 
-export function TerminalView({ tmuxSessionName, onSessionExit }: TerminalViewProps) {
+export function TerminalView({ tmuxSessionName, onSessionExit, agentLiveStatus, terminalFocusRef }: TerminalViewProps) {
   const terminalContainerRef = useRef<HTMLDivElement>(null);
   const terminalInstanceRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
@@ -505,6 +519,20 @@ export function TerminalView({ tmuxSessionName, onSessionExit }: TerminalViewPro
     return () => clearTimeout(timer);
   }, [showCopiedToast]);
 
+  // Register a focus callback so external callers (Plan 02 keyboard shortcuts) can
+  // return keyboard focus to the terminal without holding a ref to the xterm instance.
+  useEffect(() => {
+    if (!terminalFocusRef) return;
+    terminalFocusRef.current = () => {
+      terminalInstanceRef.current?.focus();
+    };
+    return () => {
+      if (terminalFocusRef.current) {
+        terminalFocusRef.current = null;
+      }
+    };
+  }, [terminalFocusRef]);
+
   return (
     <div className="flex flex-col h-full">
       <div className="flex items-center justify-between px-3 py-1.5 bg-warden-panel border-b border-warden-border">
@@ -513,6 +541,13 @@ export function TerminalView({ tmuxSessionName, onSessionExit }: TerminalViewPro
           <span className="text-xs text-warden-text-dim font-mono">{tmuxSessionName}</span>
         </div>
         <div className="flex items-center gap-2">
+          {agentLiveStatus && (
+            <>
+              <StateBadge state={agentLiveStatus.state} />
+              {headerPressureText(agentLiveStatus.contextPressure, agentLiveStatus.contextPressureLevel)}
+              <span className="w-px h-3 bg-warden-border/50" />
+            </>
+          )}
           <button
             onClick={cycleFontSize}
             className="px-2 py-0.5 text-[10px] text-warden-text-dim hover:text-warden-text bg-warden-border/30 rounded transition-colors"

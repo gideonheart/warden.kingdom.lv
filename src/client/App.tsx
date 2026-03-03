@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { InstanceTabBar } from './components/InstanceTabBar.js';
 import { TerminalView } from './components/TerminalView.js';
 import { ErrorBoundary } from './components/ErrorBoundary.js';
@@ -13,6 +13,8 @@ import { useActiveInstances } from './hooks/useActiveInstances.js';
 import { useAgentConfig } from './hooks/useAgentConfig.js';
 import { usePluginRegistry } from './hooks/usePluginRegistry.js';
 import { useSessionSelection } from './hooks/useSessionSelection.js';
+import { useAgentLiveStatus } from './hooks/useAgentLiveStatus.js';
+import type { AgentLiveStatus } from './hooks/useAgentLiveStatus.js';
 
 type AppView = 'terminals' | 'history' | 'plugins' | 'agents';
 
@@ -46,6 +48,25 @@ export function App() {
   const activeInstances = instances.filter(
     (instance) => instance.status === 'active' || instance.status === 'idle'
   );
+
+  // Live status polling — runs once in App (not in AgentsTab) so TerminalView and
+  // InstanceTabBar can consume the data without adding a second poll interval.
+  const liveStatus = useAgentLiveStatus();
+
+  // Bridge agentId → tmuxSessionName so live status can be looked up by session name.
+  const sessionStatusMap = useMemo(() => {
+    const map = new Map<string, AgentLiveStatus>();
+    for (const instance of activeInstances) {
+      const status = liveStatus.get(instance.agentId);
+      if (status) {
+        map.set(instance.tmuxSessionName, status);
+      }
+    }
+    return map;
+  }, [liveStatus, activeInstances]);
+
+  // Focus callback ref — Plan 02 keyboard shortcuts will call this to return focus to terminal.
+  const terminalFocusRef = useRef<(() => void) | null>(null);
 
   // useSessionSelection manages all selection state: auto-select, fallback, hysteresis.
   // No setState calls for session selection are allowed in the render body.
@@ -277,6 +298,7 @@ export function App() {
           selectedSessionName={selectedSessionName}
           onSelectSession={handleSelectSession}
           onSessionStopped={handleSessionStopped}
+          sessionStatusMap={sessionStatusMap}
         />
       )}
 
@@ -296,6 +318,8 @@ export function App() {
                   <TerminalView
                     tmuxSessionName={selectedSessionName}
                     onSessionExit={handleSessionExit}
+                    agentLiveStatus={sessionStatusMap.get(selectedSessionName ?? '') ?? null}
+                    terminalFocusRef={terminalFocusRef}
                   />
                 </ErrorBoundary>
               ) : (
