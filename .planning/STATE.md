@@ -13,7 +13,7 @@ See: .planning/PROJECT.md (updated 2026-02-19)
 Phase: 18 — Fix token usage JSONL session reader and database population
 Plan: 02 of 02 complete
 Status: Phase 18 complete — full token usage pipeline integrated end-to-end
-Last activity: 2026-03-03 - Completed quick task 21: Stabilize terminal polling to prevent session disruption
+Last activity: 2026-03-03 - Completed quick task 22: Delete dead script reconcile-deployment-gaps.ts
 
 Progress: [####################] 100% (Phase 18 — 2/2 plans done)
 
@@ -187,7 +187,7 @@ Key decisions for v2.2:
 | 19 | Add requirements-completed frontmatter to 18-02-SUMMARY.md for TOKN-04/05/06 | 2026-02-24 | `4d3cb5e` |
 | 20 | Fix Phase 16 documentation HooksTab references to EventsTab | 2026-02-24 | `937a3d1` |
 | 21 | Stabilize terminal polling: poll dedup + useSessionSelection hook with hysteresis | 2026-03-03 | `75d0d51` |
-| 2028 | Delete dead script reconcile-deployment-gaps.ts (301 LOC, one-time utility from Quick-15) | 2026-03-03 | `d6e2663` |
+| 22 | Delete dead script reconcile-deployment-gaps.ts (301 LOC) | 2026-03-03 | `d6e2663` |
 
 ### Roadmap Evolution
 
