@@ -1,454 +1,307 @@
 # Stack Research
 
-**Domain:** GSD Manager Plugin — shell command proxying, real-time log tailing, process spawning, JSON config editing, tmux session management, STATE.md parsing
-**Researched:** 2026-02-18
+**Domain:** Warden Dashboard v3.0 — Operator Awareness & Terminal Power Tools (additive milestone)
+**Researched:** 2026-03-03
 **Confidence:** HIGH
 
 ---
 
-## Context: Milestone v2.1 — Additive Only
+## Context: Milestone v3.0 — Additive Only
 
-This file covers only the NEW technical capabilities needed for the GSD Manager plugin. The following are validated and in production — do not re-research or re-add them:
+This file covers ONLY the new technical capabilities needed for v3.0. The following are validated production stack — do not re-research:
 
 | Already Present | Version | Notes |
 |-----------------|---------|-------|
-| Express 5 | ^5.0.0 | Route module pattern: `src/server/routes/*.ts`, mounted in `index.ts` |
-| Socket.IO 4 | ^4.8.0 | `/terminal` namespace exists; adding `/gsd` follows the same pattern |
-| React 19 | ^19.0.0 | Plugin auto-discovered via `import.meta.glob('./*.tsx', {eager: true})` |
-| better-sqlite3 | ^11.0.0 | WAL mode SQLite; not needed for GSD plugin features |
-| node-pty | ^1.0.0 | Terminal streaming; not needed for GSD plugin |
-| Tailwind CSS 4 | ^4.0.0 | `warden-*` tokens established in `styles.css` |
-| TypeScript 5 | ^5.7.0 | Strict mode, ESM |
-| Node.js | v22.22.0 | Confirmed on this machine |
-| socket.io-client | ^4.8.0 | Already in devDependencies, used by client |
-
-**Result: Zero new npm dependencies required for this milestone.**
-
----
-
-## Capability Analysis
-
-### Capability 1: Shell Command Proxying (spawn.sh, menu-driver.sh)
-
-**Requirement:** Express routes that execute `spawn.sh <agent> <workdir> [cmd]` and `menu-driver.sh <session> <action> [args]` as subprocesses, capturing output and exit codes.
-
-**Decision: `child_process.execFile` (Node.js built-in) — already in codebase.**
-
-`TmuxSessionManager.ts` already uses `execFile` promisified via `util.promisify`. It is the established project pattern. `execFile` does not spawn a shell, so arguments cannot be injected through shell metacharacters — each argument is passed as a discrete array element to the OS exec syscall. This is the correct security model.
-
-Script paths confirmed on this machine:
-- `spawn.sh`: `/home/forge/.openclaw/workspace/skills/gsd-code-skill/scripts/spawn.sh`
-- `menu-driver.sh`: `/home/forge/.openclaw/workspace/skills/gsd-code-skill/scripts/menu-driver.sh`
-
-`spawn.sh` takes 15–30 seconds to complete (it polls for Claude TUI readiness). Use a 60-second timeout on `execFile`.
-
-Pattern (mirrors existing `TmuxSessionManager.ts`):
-
-```typescript
-import { execFile } from 'child_process';
-import { promisify } from 'util';
-
-const execFileAsync = promisify(execFile);
-
-const SPAWN_SCRIPT_PATH =
-  '/home/forge/.openclaw/workspace/skills/gsd-code-skill/scripts/spawn.sh';
-const MENU_DRIVER_SCRIPT_PATH =
-  '/home/forge/.openclaw/workspace/skills/gsd-code-skill/scripts/menu-driver.sh';
-
-async function spawnGsdAgent(
-  agentId: string,
-  workingDirectory: string,
-  firstCommand: string
-): Promise<{ stdout: string; stderr: string }> {
-  return execFileAsync(
-    SPAWN_SCRIPT_PATH,
-    [agentId, workingDirectory, firstCommand],
-    { timeout: 60_000 }
-  );
-}
-
-async function runMenuDriverAction(
-  sessionName: string,
-  action: string,
-  actionArgs: string[]
-): Promise<{ stdout: string; stderr: string }> {
-  return execFileAsync(
-    MENU_DRIVER_SCRIPT_PATH,
-    [sessionName, action, ...actionArgs],
-    { timeout: 10_000 }
-  );
-}
-```
-
-**Input validation** — manual TypeScript guards, same pattern as `agentRoutes.ts`:
-- `agentId`: must match `/^[a-z][a-z0-9-]{0,50}$/` (agent names are lowercase identifiers)
-- `workingDirectory`: must be absolute path starting with `/`; verify it exists with `fs.stat()` before calling script
-- `firstCommand`: string, reject if it contains null bytes
-- `sessionName` in route params: must match `/^[a-zA-Z0-9_-]+$/` before passing to execFile
-- `action` for menu-driver: validate against allowlist: `['snapshot', 'enter', 'esc', 'clear_then', 'choose', 'type', 'submit']`
-
-**Why not `child_process.exec`:** `exec` spawns `/bin/sh -c`, creating a shell injection vector. `execFile` bypasses the shell entirely. This is a principle, not just a performance concern.
-
-**Why not `child_process.spawn` for streaming:** `spawn.sh` runs to completion before the session is useful. `execFile` with timeout is simpler and the established pattern. No streaming of spawn output is needed.
-
-**Why not rewrite spawn.sh logic in TypeScript:** The script handles flock-based concurrent registry writes, TUI readiness polling (polling for `❯` character), system prompt composition, session name conflict resolution, and `jq`-based JSON manipulation. Rewriting creates maintenance divergence with a proven script. Call it; don't copy it.
+| Express 5 | ^5.0.0 | Stable, no changes needed |
+| Socket.IO 4 | ^4.8.0 | `/terminal` and `/gsd` namespaces active |
+| React 19 | ^19.0.0 | SPA, hook-based state |
+| xterm.js | 5.3.0 | `import { Terminal } from 'xterm'` — the non-scoped package |
+| @xterm/addon-fit | 0.10.0 | Loaded in TerminalView.tsx |
+| @xterm/addon-web-links | 0.11.0 | Loaded in TerminalView.tsx |
+| better-sqlite3 | ^11.0.0 | WAL-mode SQLite |
+| node-pty | ^1.0.0 | PTY bridge for tmux |
+| Tailwind CSS 4 | ^4.0.0 | `warden-*` tokens established |
+| TypeScript 5 | ^5.7.0 | Strict ESM |
+| socket.io-client | ^4.8.0 | Client-side Socket.IO |
+| useAgentLiveStatus | (hook) | Polls `/api/gsd/agents/live-status` every 5s |
+| detectAgentState() | (server fn) | Returns `AgentStateHint` incl. `permission_prompt` |
+| extractContextPressure() | (server fn) | Returns `{contextPressure, contextPressureLevel}` |
+| AgentStateHint | (shared type) | `'working' | 'idle' | 'menu' | 'permission_prompt' | 'error'` |
+| PressureLevel | (shared type) | `'ok' | 'warning' | 'critical'` |
 
 ---
 
-### Capability 2: Real-Time Log File Tailing (gsd-hooks.log)
+## New Capability Analysis
 
-**Requirement:** Push new lines from `/tmp/gsd-hooks.log` to the browser as they are appended — the "Hook Activity Feed" showing the last ~20 events.
+### Capability 1: Terminal Text Search (xterm-addon-search)
 
-**Decision: `fs.watch` (Node.js built-in) + new Socket.IO `/gsd` namespace — no new dependency.**
+**Requirement:** Ctrl+F opens a search bar in the terminal header. User types a term, matches highlight, navigation with Enter/Shift+Enter, match count shown (e.g. "3/12"), scrollbar gutter markers show match positions.
 
-On Linux, `fs.watch` uses inotify, which fires reliably on file appends without polling. Verified on this machine: `fs.watch` on `/tmp/gsd-hooks.log` registers correctly. Incremental reads from the last known byte offset capture only new content.
+**Decision: `xterm-addon-search@0.13.0` — ONE new npm dependency.**
 
-The log format is consistent line-by-line. Each entry:
-```
-[2026-02-17T22:21:21Z] [stop-hook.sh] FIRED — PID=2798 TMUX=/tmp/...
-[2026-02-17T22:21:21Z] [stop-hook.sh] tmux_session=warden-main-2
-[2026-02-17T22:21:21Z] [stop-hook.sh] state=permission_prompt
-```
+This is the only npm addition required for the entire milestone.
 
-For the initial page load, tail the last 100 lines via a GET endpoint (read whole file, split, slice last 100).
+**Why `xterm-addon-search` (non-scoped) not `@xterm/addon-search`:**
 
-For live updates, use a `GsdHookLogWatcher` service singleton that holds the `fs.watch` handle and emits to all `/gsd` namespace subscribers:
+The codebase imports `import { Terminal } from 'xterm'` (non-scoped, v5.3.0). `xterm-addon-search@0.13.0` has `peerDependency: { "xterm": "^5.0.0" }` — compatible. `@xterm/addon-search@0.16.0` has `peerDependency: { "@xterm/xterm": "^5.0.0" }` — the *scoped* package, which is a *separate* package that happens to also be installed as a transitive dependency of `@xterm/addon-fit`. Using `@xterm/addon-search` with `xterm@5.3.0` would require migrating all imports to `@xterm/xterm` first, which is out of scope.
+
+Verified: `xterm-addon-search@0.13.0` is the latest stable on npm as of 2026-03-03 (last published ~2 years ago; the library is maintained via the monorepo at `@xterm/addon-search` for xterm@6+ users).
+
+**API confirmed by reading typings directly:**
 
 ```typescript
-import { watch, statSync, openSync, readSync, closeSync } from 'fs';
-import type { Server as SocketIOServer } from 'socket.io';
+import { SearchAddon, ISearchOptions, ISearchDecorationOptions } from 'xterm-addon-search';
 
-const GSD_HOOKS_LOG_PATH = '/tmp/gsd-hooks.log';
+// Instantiate with highlight limit
+const searchAddon = new SearchAddon({ highlightLimit: 1000 });
+terminal.loadAddon(searchAddon);
 
-class GsdHookLogWatcher {
-  private lastFileOffset = 0;
-  private fileWatcher: ReturnType<typeof watch> | null = null;
+// Search options with decorations for highlighting + scrollbar gutter
+const searchOptions: ISearchOptions = {
+  caseSensitive: false,
+  regex: false,
+  wholeWord: false,
+  incremental: true,   // expands selection as user types
+  decorations: {
+    matchBackground: '#f59e0b33',       // amber tint for all matches
+    matchBorder: '#f59e0b80',
+    matchOverviewRuler: '#f59e0b',      // scrollbar gutter markers
+    activeMatchBackground: '#f59e0b',   // solid amber for active match
+    activeMatchBorder: '#f59e0bff',
+    activeMatchColorOverviewRuler: '#ef4444',  // red for active in ruler
+  },
+};
 
-  setupSocketNamespace(socketServer: SocketIOServer): void {
-    const gsdNamespace = socketServer.of('/gsd');
+searchAddon.findNext(term, searchOptions);    // returns boolean (found or not)
+searchAddon.findPrevious(term, searchOptions);
+searchAddon.clearDecorations();              // call on search close
+searchAddon.clearActiveDecoration();         // call on search blur
 
-    gsdNamespace.on('connection', () => {
-      // Client connected — tailing happens server-side, broadcast to all
-    });
+// Match count for display
+searchAddon.onDidChangeResults(({ resultIndex, resultCount }) => {
+  // e.g. resultIndex=2, resultCount=12 → show "3 / 12"
+  // resultIndex is -1 when count exceeds highlightLimit
+  setMatchInfo({ current: resultIndex + 1, total: resultCount });
+});
+```
 
-    this.startWatching((newLines) => {
-      gsdNamespace.emit('gsd:hook-lines', { lines: newLines });
-    });
-  }
+**Scrollbar gutter markers require `overviewRulerWidth` in Terminal constructor:**
 
-  private startWatching(onNewLines: (lines: string[]) => void): void {
-    // Start at end-of-file — don't replay history on server start
-    try {
-      this.lastFileOffset = statSync(GSD_HOOKS_LOG_PATH).size;
-    } catch {
-      this.lastFileOffset = 0;
+```typescript
+const terminal = new Terminal({
+  overviewRulerWidth: 15,   // ADD THIS — hidden when not set
+  // ... existing options
+});
+```
+
+This is a non-breaking addition to the existing `Terminal` instantiation in `TerminalView.tsx`.
+
+**Integration point:** `TerminalView.tsx` — add `searchAddonRef`, expose `searchAddon.findNext`/`findPrevious` via a `ref` handle or through a new `onSearch` prop. The search bar UI is a new component rendered in the terminal header area (conditionally shown when Ctrl+F pressed).
+
+---
+
+### Capability 2: Keyboard Navigation Shortcuts
+
+**Requirement:** Ctrl+1/2/3... switches tabs, Ctrl+[ / Ctrl+] navigates prev/next tab, Ctrl+B toggles sidebar, Ctrl+F opens terminal search.
+
+**Decision: Native `document.addEventListener('keydown', ...)` in a `useEffect` in App.tsx — zero new dependency.**
+
+This is the established project pattern. No keyboard shortcut library (hotkeys-js, mousetrap, react-hotkeys-hook) is needed. The pattern is safe with xterm.js: xterm.js only intercepts keyboard events when its canvas has focus. `document`-level listeners still fire for global shortcuts when the terminal has focus, but Ctrl+F/1/2/3 are NOT forwarded to the PTY — xterm.js forwards `event.key` characters, not control sequences from blocked events.
+
+**Ctrl+F conflict avoidance:** xterm.js does not capture `Ctrl+F` by default (it's not a standard terminal control sequence). The keydown handler must call `event.preventDefault()` on Ctrl+F to suppress the browser's native find dialog.
+
+```typescript
+// In App.tsx or a new useKeyboardShortcuts hook:
+useEffect(() => {
+  const handleKeyDown = (event: KeyboardEvent) => {
+    if (event.ctrlKey && event.key === 'f') {
+      event.preventDefault();
+      setSearchOpen(true);
+      return;
     }
-
-    this.fileWatcher = watch(GSD_HOOKS_LOG_PATH, (event) => {
-      if (event !== 'change') return;
-      try {
-        const currentSize = statSync(GSD_HOOKS_LOG_PATH).size;
-        if (currentSize <= this.lastFileOffset) {
-          // File truncated — reset offset
-          this.lastFileOffset = 0;
-          return;
-        }
-
-        const newByteCount = currentSize - this.lastFileOffset;
-        const buffer = Buffer.alloc(newByteCount);
-        const fd = openSync(GSD_HOOKS_LOG_PATH, 'r');
-        readSync(fd, buffer, 0, newByteCount, this.lastFileOffset);
-        closeSync(fd);
-        this.lastFileOffset = currentSize;
-
-        const newLines = buffer
-          .toString('utf-8')
-          .split('\n')
-          .filter((line) => line.trim().length > 0);
-
-        if (newLines.length > 0) onNewLines(newLines);
-      } catch {
-        // Log may not exist yet — ignore until it appears
-      }
-    });
-  }
-
-  stopWatching(): void {
-    this.fileWatcher?.close();
-    this.fileWatcher = null;
-  }
-}
-
-export const gsdHookLogWatcher = new GsdHookLogWatcher();
-```
-
-**Mount in `index.ts`:** Call `gsdHookLogWatcher.setupSocketNamespace(socketServer)` and `gsdHookLogWatcher.stopWatching()` in the shutdown handler.
-
-**Client-side:** In the plugin component, connect to `/gsd` namespace via `socket.io-client` (already installed). Listen for `gsd:hook-lines` event. Keep a rolling buffer of last 100 lines in React state. This mirrors the `useTerminalSocket` hook pattern.
-
-**Why not chokidar:** chokidar is a polling wrapper. On Linux it delegates to inotify (same as `fs.watch`). It adds ~100KB of transitive dependencies for zero benefit in this environment. The PRD explicitly states "No new dependencies required."
-
-**Why not SSE (EventSource):** Socket.IO is already the real-time transport for this project. The client already opens a Socket.IO connection. Adding `/gsd` namespace is 10 lines. SSE would require a new `EventSource` client setup and a new server-side paradigm.
-
-**Why not polling the log endpoint:** Polling every 1-2s creates unnecessary HTTP traffic and has latency. inotify is instant.
-
----
-
-### Capability 3: JSON Config File Reading and Editing (recovery-registry.json)
-
-**Requirement:** GET registry to display agent list (enabled/disabled, working directory, session name). PATCH individual agents to toggle `enabled`, update `working_directory`, etc.
-
-**Decision: `fs/promises` (Node.js built-in) with atomic write-then-rename — no new dependency.**
-
-The recovery-registry.json is **plain JSON** — not JSON5. Verified: `JSON.parse` works directly on the file. No comment stripping is needed (unlike `openclaw.json` which uses the existing `OpenClawConfigReader`).
-
-Registry structure (confirmed from live file):
-```json
-{
-  "global_status_openclaw_session_id": "...",
-  "global_status_openclaw_session_key": "...",
-  "agents": [
-    {
-      "agent_id": "forge",
-      "enabled": true,
-      "auto_wake": false,
-      "topic_id": 1,
-      "openclaw_session_id": "...",
-      "working_directory": "/home/forge",
-      "tmux_session_name": "forge-main",
-      "claude_resume_target": "",
-      "claude_launch_command": "claude --dangerously-skip-permissions",
-      "claude_post_launch_mode": "resume_then_agent_pick"
+    if (event.ctrlKey && event.key === 'b') {
+      event.preventDefault();
+      setShowSidebar((prev) => !prev);
+      return;
     }
-  ]
-}
-```
-
-Atomic write pattern (mirrors `spawn.sh`'s own `mv "$tmp_file" "$registry_file_path"` pattern):
-
-```typescript
-import { readFile, writeFile, rename } from 'fs/promises';
-import path from 'path';
-
-const REGISTRY_PATH =
-  '/home/forge/.openclaw/workspace/skills/gsd-code-skill/config/recovery-registry.json';
-
-interface RegistryAgent {
-  agent_id: string;
-  enabled: boolean;
-  auto_wake: boolean;
-  topic_id: number;
-  openclaw_session_id: string;
-  working_directory: string;
-  tmux_session_name: string;
-  claude_resume_target: string;
-  claude_launch_command: string;
-  claude_post_launch_mode: string;
-}
-
-interface RegistryData {
-  global_status_openclaw_session_id: string;
-  global_status_openclaw_session_key: string;
-  agents: RegistryAgent[];
-}
-
-class GsdRegistryService {
-  async readRegistry(): Promise<RegistryData> {
-    const content = await readFile(REGISTRY_PATH, 'utf-8');
-    return JSON.parse(content) as RegistryData;
-  }
-
-  async patchAgent(
-    agentId: string,
-    changes: Partial<Pick<RegistryAgent, 'enabled' | 'working_directory'>>
-  ): Promise<void> {
-    const registry = await this.readRegistry();
-    const agent = registry.agents.find((a) => a.agent_id === agentId);
-    if (!agent) throw new Error(`Agent not found: ${agentId}`);
-    Object.assign(agent, changes);
-    await this.writeRegistryAtomically(registry);
-  }
-
-  private async writeRegistryAtomically(data: RegistryData): Promise<void> {
-    const tempPath = REGISTRY_PATH + '.warden-tmp';
-    await writeFile(tempPath, JSON.stringify(data, null, 2), 'utf-8');
-    await rename(tempPath, REGISTRY_PATH); // atomic on same filesystem
-  }
-}
-
-export const gsdRegistryService = new GsdRegistryService();
-```
-
-**Concurrency:** The operator is a single user. `spawn.sh` uses `flock` on the registry file. To avoid conflicting with spawn.sh writes, Warden's PATCH endpoint should be quick (read-modify-write in <100ms). No file locking library is needed. If a race condition occurs (extremely rare — spawn takes 15+ seconds), the last writer wins and the registry remains valid JSON.
-
-**Why not json5 package:** The registry is plain JSON written by `jq`, not JSON5.
-
-**Why not a JSON schema validator (zod):** Single-operator trusted environment. TypeScript interface + `JSON.parse` type assertion is sufficient. Adding zod adds a dependency for no practical security gain in this context.
-
----
-
-### Capability 4: Tmux Session Spawning and Management
-
-**Requirement:** POST `/api/gsd/spawn` launches a new GSD session. POST `/api/gsd/sessions/:session/command` runs a menu-driver action. GET endpoints check session existence.
-
-**Decision: Extend `TmuxSessionManager` with a `spawnGsdSession` method + call scripts via `execFile` — no new dependency.**
-
-`TmuxSessionManager` already has:
-- `listAgentSessions()` — filtered session list
-- `sessionExists()` — check if a session is live
-- `destroySession()` — kill a session
-- `sendPromptToSession()` — send keystrokes via `tmux send-keys` (already usable for `/api/gsd/sessions/:session/prompt`)
-
-New methods to add to `TmuxSessionManager`:
-
-```typescript
-// Add to TmuxSessionManager class:
-
-async spawnGsdSession(
-  agentId: string,
-  workingDirectory: string,
-  firstCommand: string
-): Promise<{ sessionName: string; stdout: string }> {
-  const { stdout, stderr } = await execFileAsync(
-    SPAWN_SCRIPT_PATH,
-    [agentId, workingDirectory, firstCommand],
-    { timeout: 60_000 }
-  );
-  // spawn.sh logs "Attach: tmux attach -t <name>" at the end
-  const sessionMatch = stdout.match(/Attach: tmux attach -t (\S+)/);
-  const sessionName = sessionMatch?.[1] ?? `${agentId}-main`;
-  return { sessionName, stdout };
-}
-
-async runMenuDriverAction(
-  sessionName: string,
-  action: MenuDriverAction,
-  actionArgs: string[]
-): Promise<string> {
-  const { stdout } = await execFileAsync(
-    MENU_DRIVER_SCRIPT_PATH,
-    [sessionName, action, ...actionArgs],
-    { timeout: 10_000 }
-  );
-  return stdout;
-}
-```
-
-**Why not add a separate `GsdSessionSpawner` service:** The `TmuxSessionManager` already owns all tmux-related operations. Adding spawn and menu-driver methods keeps the service boundary clean (tmux operations in one place). If it grows too large later, extract — but don't pre-optimize.
-
----
-
-### Capability 5: STATE.md File Parsing
-
-**Requirement:** GET `/api/gsd/sessions/:session/state` reads `STATE.md` from the session's project's `.planning/` directory and returns parsed fields (phase, progress, status, last activity).
-
-**Decision: `fs/promises.readFile` + regex field extraction — no new dependency.**
-
-STATE.md structure is consistent across all GSD projects (verified against 3 live files on this machine: warden, gsd-code-skill, getcpsr). The `## Current Position` section always contains these fields:
-
-```
-Phase: 7 of 7 (Registration, Deployment, and Documentation)
-Plan: 2 of 2 in current phase
-Status: Complete
-Last activity: 2026-02-18 — Phase 7 complete, v2.0 milestone shipped
-Progress: [██████████] 100% (v1.0 complete, v2.0 complete)
-```
-
-Field values are on a single line after the label. No multi-line parsing needed.
-
-```typescript
-import { readFile } from 'fs/promises';
-import path from 'path';
-
-interface ParsedStateFile {
-  phase: string;
-  currentPhaseNumber: number | null;
-  totalPhases: number | null;
-  plan: string;
-  status: string;
-  lastActivity: string;
-  progressPercent: number | null;
-  progressBar: string;
-  rawContent: string;
-}
-
-function parseStateMdContent(content: string): ParsedStateFile {
-  const extractField = (label: string): string =>
-    content.match(new RegExp(`^${label}:\\s*(.+)$`, 'm'))?.[1]?.trim() ?? '';
-
-  const phaseRaw = extractField('Phase');
-  const phaseMatch = phaseRaw.match(/^(\d+)\s+of\s+(\d+)/);
-  const progressRaw = extractField('Progress');
-  const percentMatch = progressRaw.match(/(\d+)%/);
-
-  return {
-    phase: phaseRaw,
-    currentPhaseNumber: phaseMatch ? parseInt(phaseMatch[1], 10) : null,
-    totalPhases: phaseMatch ? parseInt(phaseMatch[2], 10) : null,
-    plan: extractField('Plan'),
-    status: extractField('Status'),
-    lastActivity: extractField('Last activity'),
-    progressPercent: percentMatch ? parseInt(percentMatch[1], 10) : null,
-    progressBar: progressRaw,
-    rawContent: content,
+    if (event.ctrlKey && event.key === ']') {
+      event.preventDefault();
+      selectNextTab();
+      return;
+    }
+    if (event.ctrlKey && event.key === '[') {
+      event.preventDefault();
+      selectPreviousTab();
+      return;
+    }
+    if (event.ctrlKey && /^[1-9]$/.test(event.key)) {
+      event.preventDefault();
+      const index = parseInt(event.key, 10) - 1;
+      selectTabAtIndex(index);
+      return;
+    }
   };
-}
+  document.addEventListener('keydown', handleKeyDown);
+  return () => document.removeEventListener('keydown', handleKeyDown);
+}, [selectNextTab, selectPreviousTab, selectTabAtIndex]);
+```
 
-class GsdStateReader {
-  async readSessionState(workingDirectory: string): Promise<ParsedStateFile | null> {
-    const statePath = path.join(workingDirectory, '.planning', 'STATE.md');
-    try {
-      const content = await readFile(statePath, 'utf-8');
-      return parseStateMdContent(content);
-    } catch {
-      return null; // Project may not have .planning/STATE.md yet
-    }
+**Scope:** Global shortcuts belong in `App.tsx` (or a `useKeyboardShortcuts` hook called from App). Search-specific shortcuts (Escape to close, Enter/Shift+Enter to navigate) belong in the search bar component's own `onKeyDown`.
+
+---
+
+### Capability 3: Browser Notifications for Permission Prompts
+
+**Requirement:** When `detectAgentState()` returns `permission_prompt`, fire an opt-in browser notification so the operator sees it even if the browser tab is in the background.
+
+**Decision: Native `Notification` Web API — zero new dependency, zero service worker.**
+
+The Notification API is available directly in the browser at `window.Notification`. No service worker, no push server, no Web Push subscription required. This is the correct approach for a single-operator local monitoring tool.
+
+**Browser support:** Fully supported in Chrome, Firefox, Edge, Safari 16.4+. Since Warden is IP-whitelisted and single-operator (desktop browser on server LAN), compatibility is not a concern.
+
+**Implementation pattern (no library needed):**
+
+```typescript
+// In a new usePermissionNotifications hook:
+
+function requestNotificationPermission(): void {
+  if (!('Notification' in window)) return;
+  if (Notification.permission === 'default') {
+    Notification.requestPermission();  // prompts user once
   }
 }
 
-export const gsdStateReader = new GsdStateReader();
+function firePermissionPromptNotification(agentId: string, sessionName: string): void {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  new Notification(`${agentId} needs permission`, {
+    body: `Session ${sessionName} is waiting for approval`,
+    tag: `warden-perm-${sessionName}`,  // deduplicates: one notif per session
+    icon: '/favicon.ico',
+  });
+}
 ```
 
-**Working directory resolution:** Look up `agent_id` (derived from session name prefix: `sessionName.split('-')[0]`) in `recovery-registry.json` to get `working_directory`. Then construct: `path.join(workingDirectory, '.planning', 'STATE.md')`.
+**Deduplication:** The `tag` option on `Notification` causes a new notification with the same tag to replace the previous one rather than stacking. Use `warden-perm-${sessionName}` as the tag — one notification per session at most.
 
-**Why not a markdown parser (marked, remark, unified):** STATE.md is not parsed for markdown structure — only for 5 specific key-value lines in a known section. Regex on a ~100-line file is instant and dependency-free. A markdown parser would add 50–300KB of dependencies and parse structure that isn't needed.
+**Opt-in flow:** Add a "Enable notifications" button to the terminal header or a settings area. Call `requestNotificationPermission()` only on explicit user gesture (button click) — browsers block `requestPermission()` calls not triggered by user interaction.
+
+**Integration point:** `useAgentLiveStatus` already returns `state` per agent. A new `usePermissionNotifications` hook consumes the status map and fires notifications when any agent transitions to `permission_prompt` state. Track previous states to fire only on transition (not on every 5-second poll).
+
+```typescript
+// Transition detection — fire once per state entry, not on every poll:
+const previousStatesRef = useRef<Map<string, AgentStateHint | null>>(new Map());
+
+useEffect(() => {
+  for (const [agentId, status] of liveStatusMap) {
+    const previous = previousStatesRef.current.get(agentId) ?? null;
+    if (status.state === 'permission_prompt' && previous !== 'permission_prompt') {
+      firePermissionPromptNotification(agentId, ...);
+    }
+    previousStatesRef.current.set(agentId, status.state);
+  }
+}, [liveStatusMap]);
+```
+
+---
+
+### Capability 4: Permission Prompt Tab Badges
+
+**Requirement:** When an agent's state is `permission_prompt`, show a visual badge on its `InstanceTabBar` tab.
+
+**Decision: Wire `useAgentLiveStatus` into `InstanceTabBar` — zero new dependency, pure React state.**
+
+`useAgentLiveStatus` is already called in `AgentsTab.tsx`. For the terminal view, `App.tsx` needs to call `useAgentLiveStatus()` and pass the resulting map to `InstanceTabBar` as a new `agentLiveStatus` prop. The badge is a `<span>` with the `warden-warning` color token.
+
+`InstanceTabBar` currently matches agents to instances by `tmuxSessionName`. The `useAgentLiveStatus` map is keyed by `agentId`. The join requires parsing `agentId` from `tmuxSessionName` (first segment before `-`), which is already the established pattern in the codebase (see `detectAgentState` caller).
+
+**Concern:** `useAgentLiveStatus` polls `/api/gsd/agents/live-status` which calls `tmux capture-pane` for each agent. This adds per-poll overhead to the terminals view (previously only active in AgentsTab). Verify the endpoint's 5s poll interval is acceptable when the terminals view is active. Based on Phase 14 research, the endpoint was designed to be called from the agents tab; adding it to the terminals view is fine as the underlying tmux calls are fast (<100ms each).
+
+---
+
+### Capability 5: Agent State Chip and Context Pressure Badge in Terminal Header
+
+**Requirement:** Show a small state chip (e.g. "working", "perm") and context pressure percentage (e.g. "72% ctx") in the `TerminalView` header area alongside the session name.
+
+**Decision: Props passed from `App.tsx` → `TerminalView` — zero new dependency.**
+
+`TerminalView` currently receives only `tmuxSessionName` and `onSessionExit`. Add `agentState?: AgentStateHint | null` and `contextPressure?: number | null` props. The parent (`App.tsx`) derives these from `useAgentLiveStatus()` by looking up the agentId extracted from `selectedSessionName`.
+
+Style guidance: use `gsdShared.tsx`'s existing `STATE_BADGE_COLORS` map and `STATE_BADGE_LABELS` map — these are already defined for the same `AgentStateHint` type. Import and reuse them in the terminal header to avoid duplicating color definitions.
+
+---
+
+### Capability 6: Search Match Count and Highlight Persistence
+
+**Requirement:** Show "3 / 12" match count in the search UI. Highlights persist while the search bar is open (navigating between matches keeps all highlights visible).
+
+**Decision: React state driven by `onDidChangeResults` event — zero new dependency.**
+
+`SearchAddon.onDidChangeResults` fires on every term change or navigation with `{resultIndex, resultCount}`. Feed this into local component state. Highlights persist automatically while `decorations` is set in the search options (the addon manages decoration lifecycle). Calling `clearDecorations()` only on search bar close removes all highlights — correct behavior.
+
+```typescript
+const [matchInfo, setMatchInfo] = useState<{ current: number; total: number } | null>(null);
+
+searchAddon.onDidChangeResults(({ resultIndex, resultCount }) => {
+  if (resultCount === 0) {
+    setMatchInfo(null);
+  } else {
+    setMatchInfo({
+      current: resultIndex === -1 ? resultCount : resultIndex + 1,  // -1 = exceeds limit
+      total: resultCount,
+    });
+  }
+});
+```
 
 ---
 
 ## Recommended Stack Summary
 
-### Zero New Dependencies
+### One New Dependency
 
-| Capability | Implementation | Node.js API |
-|------------|---------------|------------|
-| Shell command proxying | `execFile` (promisified) | `child_process` built-in |
-| Real-time log tailing | `fs.watch` + inotify | `fs` built-in |
-| JSON config read/write | `readFile` + `writeFile` + `rename` | `fs/promises` built-in |
-| Tmux session management | Extend `TmuxSessionManager` | Uses existing `execFile` |
-| STATE.md parsing | `readFile` + regex | `fs/promises` built-in |
-| Real-time push to client | Socket.IO `/gsd` namespace | `socket.io` already installed |
-| Plugin UI | `import.meta.glob` auto-discovery | Vite 6 built-in |
+| Package | Version | Purpose | Why |
+|---------|---------|---------|-----|
+| `xterm-addon-search` | `0.13.0` | Terminal buffer search with decorations and match count | Official xterm.js search addon; peers with `xterm@^5.0.0` (matches project's `xterm@5.3.0`); provides `ISearchDecorationOptions.matchOverviewRuler` for scrollbar gutter markers |
 
-### New Files Required
+### All Other Capabilities: Zero New Dependencies
 
-| File | Type | Purpose |
-|------|------|---------|
-| `src/server/services/GsdRegistryService.ts` | Service | Read/write `recovery-registry.json` atomically |
-| `src/server/services/GsdHookLogWatcher.ts` | Service | `fs.watch` on `/tmp/gsd-hooks.log`, emit to `/gsd` namespace |
-| `src/server/services/GsdStateReader.ts` | Service | Read + parse `.planning/STATE.md` from project directory |
-| `src/server/routes/gsdRoutes.ts` | Route module | Mount at `/api/gsd/`, wire services to endpoints |
-| `src/client/plugins/gsd-manager-plugin.tsx` | Plugin | Self-registering bottom-panel plugin component |
-| `src/client/hooks/useGsdSocket.ts` | Hook | Socket.IO `/gsd` namespace hook |
-| `src/client/hooks/useGsdRegistry.ts` | Hook | Fetch + mutate registry via REST |
-| `src/client/hooks/useGsdSessionState.ts` | Hook | Fetch parsed STATE.md for a session |
-| `src/shared/gsdTypes.ts` | Types | Shared TypeScript types for GSD plugin API responses |
+| Capability | Implementation | Uses |
+|------------|---------------|------|
+| Keyboard shortcuts | `document.addEventListener('keydown')` in `useEffect` | React + DOM built-ins |
+| Browser notifications | `window.Notification` constructor | Web API built-in |
+| Permission prompt badges | `useAgentLiveStatus` map → `InstanceTabBar` props | Existing hook + React |
+| Agent state chip | Props from `App.tsx` → `TerminalView` | Existing types + React |
+| Context pressure badge | Props from `App.tsx` → `TerminalView` | Existing data + React |
+| Match count display | `searchAddon.onDidChangeResults` + `useState` | React + xterm-addon-search event |
+| Highlight persistence | `decorations` option in `ISearchOptions` | xterm-addon-search built-in behavior |
+| Scrollbar gutter markers | `overviewRulerWidth: 15` + `matchOverviewRuler` color | xterm.js built-in + addon |
+| Notification dedup | `tag` option on `new Notification()` | Web API built-in |
+| State transition detection | `useRef` for previous state map | React built-in |
 
-### Extensions to Existing Files
+---
 
-| File | Change |
-|------|--------|
-| `src/server/services/TmuxSessionManager.ts` | Add `spawnGsdSession()` and `runMenuDriverAction()` methods |
-| `src/server/index.ts` | Import and mount `gsdRoutes`, initialize `GsdHookLogWatcher` |
+## Installation
+
+```bash
+# One new dependency
+npm install --save-dev xterm-addon-search@0.13.0
+```
+
+Note: `--save-dev` is correct — it matches the project's pattern of keeping `xterm`, `@xterm/addon-fit`, and `@xterm/addon-web-links` in devDependencies (they are bundled by Vite, not required at runtime on the server).
+
+---
+
+## Alternatives Considered
+
+| Recommended | Alternative | Why Not |
+|-------------|-------------|---------|
+| `xterm-addon-search@0.13.0` | `@xterm/addon-search@0.16.0` | Scoped package peers with `@xterm/xterm`, not `xterm`; migration to scoped imports is a separate refactor out of scope for v3.0 |
+| `xterm-addon-search@0.13.0` | Build custom search via `terminal.buffer.active` iteration | Terminal buffer has no text search API; character-by-character iteration is complex and slow; the addon is purpose-built and battle-tested |
+| `window.Notification` | `react-toastify` / `notistack` for in-app alerts | In-app notifications miss the "tab in background" use case entirely; native browser notifications work across tabs and browser minimize |
+| `window.Notification` | Web Push API | Requires service worker, push subscription, backend push server; massively overengineered for a single-operator LAN tool |
+| `document.addEventListener('keydown')` | `hotkeys-js` / `react-hotkeys-hook` | Unnecessary abstraction; project already uses raw event listeners; single hook file is <50 LOC |
+| `document.addEventListener('keydown')` | xterm.js `terminal.attachCustomKeyEventHandler` | Only fires for keys when terminal has focus; global shortcuts (tab switch, sidebar toggle) must work regardless of focus |
 
 ---
 
@@ -456,86 +309,72 @@ export const gsdStateReader = new GsdStateReader();
 
 | Avoid | Why | Use Instead |
 |-------|-----|-------------|
-| `chokidar` | Polling wrapper; on Linux delegates to inotify = same as `fs.watch`; adds ~100KB transitive deps | `fs.watch` built-in |
-| `zod` / `joi` / `yup` | No validation library in project; single-operator trust model; TypeScript interfaces + manual guards sufficient | Manual type guards (see `agentRoutes.ts` pattern) |
-| `json5` npm package | `recovery-registry.json` is plain JSON written by `jq`; `openclaw.json` already handled by existing `OpenClawConfigReader` | `JSON.parse` for registry |
-| `proper-lockfile` / `flock` npm packages | Single writer (operator); atomic rename pattern is correct for this concurrency level | `fs.rename` atomic pattern |
-| `child_process.exec` | Spawns `/bin/sh -c`, enabling argument injection via shell metacharacters | `child_process.execFile` (no shell) |
-| `child_process.spawn` for scripts | More complex API; scripts run to completion so streaming isn't needed | `execFile` with timeout |
-| Rewriting `spawn.sh` in TypeScript | Creates maintenance divergence; script handles edge cases (flock, TUI readiness, jq writes) | Call `spawn.sh` via `execFile` |
-| `marked` / `remark` / `unified` | Full markdown parsers; overkill for reading 5 key-value fields from STATE.md | Regex field extraction |
-| SSE (`EventSource`) | Project uses Socket.IO for all real-time; adding SSE creates a second paradigm | Socket.IO `/gsd` namespace |
-
----
-
-## Integration Points with Existing Services
-
-### `TmuxSessionManager`
-- `listAgentSessions()` — used by GSD routes to list sessions for the agent grid
-- `sessionExists()` — validate session before running menu-driver commands
-- `destroySession()` — called by stop action in GSD Manager
-- `sendPromptToSession()` — already usable for `/api/gsd/sessions/:session/prompt` (send GSD command via tmux send-keys)
-- **Add:** `spawnGsdSession()` and `runMenuDriverAction()` methods
-
-### `OpenClawConfigReader`
-- `getAgents()` — used to display agent display names alongside registry data (cross-reference by `agent_id`)
-- 30s cache is acceptable for agent names
-
-### `TerminalStreamService` / Socket.IO architecture
-- New `/gsd` namespace follows identical pattern to `/terminal` namespace
-- Instantiated in `index.ts`, passed `SocketIOServer` instance
-- `GsdHookLogWatcher` emits to all `/gsd` subscribers
-
-### `ActivityEventService`
-- Optional: GSD Manager spawn actions can call `activityEventService.capturePromptSent()` to log to the activity timeline
-- Not required for core functionality
+| `@xterm/addon-search@0.16.0` | Peer dependency mismatch — requires `@xterm/xterm` (scoped package), but project imports `xterm` (non-scoped 5.3.0) | `xterm-addon-search@0.13.0` which peers with `xterm@^5.0.0` |
+| Service workers for notifications | Requires registration, install events, cache strategy — overkill for local alerts | `new Notification()` directly via Web API |
+| `hotkeys-js` / `mousetrap` | Adds a dependency for functionality achievable in <50 LOC of vanilla JS | `document.addEventListener('keydown')` in a `useEffect` |
+| `react-hotkeys-hook` | External dependency; its `useHotkeys` API has React strict-mode edge cases | Plain `useEffect` + `document.addEventListener` — already used in project |
+| `chokidar` / `fs.watch` for notifications | Permission prompts are detected via tmux pane capture, not file system events | Poll `/api/gsd/agents/live-status` (already exists) |
+| A new `/api/permissions` endpoint | Permission state is already computed in live-status | Consume existing `useAgentLiveStatus` hook data |
 
 ---
 
 ## Version Compatibility
 
-All new capabilities use Node.js 22 built-in APIs. No version compatibility issues.
+| Package | Version | Peer Requirement | Status |
+|---------|---------|-----------------|--------|
+| `xterm-addon-search` | 0.13.0 | `xterm@^5.0.0` | Compatible — project has `xterm@5.3.0` |
+| `@xterm/addon-fit` | 0.10.0 | `@xterm/xterm@^5.0.0` | Already working — `@xterm/xterm@5.5.0` installed as transitive dep |
+| `xterm` | 5.3.0 | — | Client code imports from `'xterm'`, not `'@xterm/xterm'` |
+| `overviewRulerWidth` | xterm 5.x | xterm >= 4 | Confirmed in `node_modules/xterm/typings/xterm.d.ts` |
+| `Notification` Web API | — | HTTPS or localhost | Warden runs behind Nginx with SSL — satisfied |
+| `document.addEventListener` | — | All browsers | No compatibility concern |
 
-| Component | Version | Confirmed By |
-|-----------|---------|-------------|
-| Node.js | v22.22.0 | `node --version` on this machine |
-| `fs.watch` inotify backend | v22 built-in | Manual test on `/tmp/gsd-hooks.log` — fires on append |
-| `fs.rename` atomic semantics | v22 built-in | POSIX guarantee; confirmed in Node.js docs |
-| `execFile` promisified | v22 built-in | Already used in `TmuxSessionManager.ts` |
-| `JSON.parse` on registry | v22 built-in | Manual test — file is valid plain JSON |
-| Socket.IO namespace | 4.8.0 | Read existing `/terminal` namespace implementation |
-| Plugin auto-discovery | Vite 6 + `import.meta.glob` | Read `src/client/plugins/index.ts` |
-| STATE.md field format | — | Verified across 3 projects on this machine |
+**Critical note on xterm package split:** xterm.js v6+ migrated to `@xterm/xterm` (scoped). The project currently uses v5.3.0 (non-scoped `xterm`). The scoped addons `@xterm/addon-fit` and `@xterm/addon-web-links` happen to work because they also install `@xterm/xterm@5.5.0` as their own dep, but the client code still imports from `'xterm'`. For v3.0, stay on the non-scoped `xterm` ecosystem. Do not mix scoped `@xterm/*` addons with `xterm-addon-search`.
 
 ---
 
-## Installation
+## Integration Points with Existing Code
 
-```bash
-# No new dependencies required.
-# All capabilities use Node.js 22 built-ins and packages already installed.
-```
+### `TerminalView.tsx`
+- Add `searchAddonRef` alongside `fitAddonRef`
+- Add `overviewRulerWidth: 15` to Terminal constructor options
+- Load `SearchAddon` after `FitAddon` and `WebLinksAddon`
+- Add `agentState?: AgentStateHint | null` and `contextPressure?: number | null` props for header display
+- Add `searchOpen` state + search bar UI in the header (conditionally rendered)
+- Ctrl+F opens search: handled by global keydown listener, passed to TerminalView via ref or prop callback
+
+### `InstanceTabBar.tsx`
+- Add `agentLiveStatus?: Map<string, AgentLiveStatus>` prop
+- Derive `agentId` from `instance.tmuxSessionName.split('-')[0]` (established project pattern)
+- Show badge `span` when `liveStatus?.state === 'permission_prompt'`
+
+### `App.tsx`
+- Call `useAgentLiveStatus()` (currently only called in AgentsTab — move to App level or duplicate call)
+- Pass live status map to `InstanceTabBar` and `TerminalView`
+- Add global `useEffect` for keyboard shortcut handler
+- Add `usePermissionNotifications` hook invocation
+
+### New files
+- `src/client/hooks/usePermissionNotifications.ts` — wraps `window.Notification` with transition detection and opt-in management
+- `src/client/components/TerminalSearchBar.tsx` — search input, nav buttons, match count display
+- `src/client/hooks/useKeyboardShortcuts.ts` (optional) — extract global keydown logic from App.tsx for testability
 
 ---
 
 ## Sources
 
-- `/home/forge/warden.kingdom.lv/src/server/services/TmuxSessionManager.ts` — `execFile` promisify pattern (HIGH confidence, read directly)
-- `/home/forge/warden.kingdom.lv/src/server/services/LogTailService.ts` — `fs/promises.readFile` pattern (HIGH confidence, read directly)
-- `/home/forge/warden.kingdom.lv/src/server/services/TerminalStreamService.ts` — Socket.IO namespace pattern (HIGH confidence, read directly)
-- `/home/forge/warden.kingdom.lv/src/server/routes/agentRoutes.ts` — manual type guard validation pattern (HIGH confidence, read directly)
-- `/home/forge/.openclaw/workspace/skills/gsd-code-skill/config/recovery-registry.json` — plain JSON format confirmed (HIGH confidence, read directly + `JSON.parse` verified)
-- `/home/forge/.openclaw/workspace/skills/gsd-code-skill/scripts/spawn.sh` — interface `<agent> <workdir> [first-command]`, runtime ~15-30s, outputs `Attach: tmux attach -t <name>` (HIGH confidence, full read)
-- `/home/forge/.openclaw/workspace/skills/gsd-code-skill/scripts/menu-driver.sh` — actions allowlist: `snapshot|enter|esc|clear_then|choose|type|submit` (HIGH confidence, full read)
-- `node --version` → v22.22.0 (HIGH confidence, executed)
-- Manual test: `fs.watch` on `/tmp/gsd-hooks.log` registers without error; inotify-backed on Linux (HIGH confidence, executed)
-- Manual test: `execFile('tmux', ['list-sessions', ...])` returns session list (HIGH confidence, executed)
-- Manual test: `JSON.parse(fs.readFileSync(registry-path))` succeeds (HIGH confidence, executed)
-- Manual test: atomic `writeFile` + `rename` pattern works correctly (HIGH confidence, executed)
-- STATE.md verified in 3 projects (warden, gsd-code-skill, getcpsr): consistent `Phase:`, `Plan:`, `Status:`, `Progress:`, `Last activity:` fields (HIGH confidence, all 3 files read)
-- `/tmp/gsd-hooks.log` — line format `[ISO-TIMESTAMP] [script-name] message` confirmed (HIGH confidence, read directly)
+- `/home/forge/warden.kingdom.lv/node_modules/xterm/typings/xterm.d.ts` — confirmed `overviewRulerWidth` option, `IDecorationOverviewRulerOptions` (HIGH confidence, read directly)
+- `/tmp/package/typings/xterm-addon-search.d.ts` — extracted from `xterm-addon-search@0.13.0.tgz` via npm pack; confirmed full API: `ISearchOptions`, `ISearchDecorationOptions.matchOverviewRuler`, `onDidChangeResults`, `clearDecorations()`, `clearActiveDecoration()` (HIGH confidence, read directly)
+- `npm show @xterm/addon-search@0.16.0 peerDependencies` → `{ "@xterm/xterm": "^5.0.0" }` (HIGH confidence, executed)
+- `npm show xterm-addon-search@0.13.0 peerDependencies` → `{ "xterm": "^5.0.0" }` (HIGH confidence, executed)
+- `npm ls @xterm/xterm` → `@xterm/xterm@5.5.0` installed as transitive dep of addon-fit/addon-web-links (HIGH confidence, executed)
+- `/home/forge/warden.kingdom.lv/src/client/components/TerminalView.tsx` — confirmed import is `from 'xterm'` (non-scoped), FitAddon/WebLinksAddon loaded via `terminal.loadAddon()` (HIGH confidence, read directly)
+- `/home/forge/warden.kingdom.lv/src/server/routes/gsdRoutes.ts` — `detectAgentState()` returns `'permission_prompt'`, `extractContextPressure()` returns `{contextPressure, contextPressureLevel}` already implemented (HIGH confidence, read directly)
+- `/home/forge/warden.kingdom.lv/src/client/hooks/useAgentLiveStatus.ts` — confirmed polls `/api/gsd/agents/live-status` every 5s, returns `Map<string, AgentLiveStatus>` (HIGH confidence, read directly)
+- MDN Notifications API — `new Notification(title, options)` works without service worker on desktop; `tag` deduplicates; `Notification.requestPermission()` must be called from user gesture (MEDIUM confidence, WebSearch + MDN docs)
+- `window.Notification` browser support — Chrome, Firefox, Edge, Safari 16.4+ (HIGH confidence for desktop operator use case)
 
 ---
 
-*Stack research for: GSD Manager Plugin (milestone v2.1) on Warden Dashboard*
-*Researched: 2026-02-18*
+*Stack research for: Warden Dashboard v3.0 — Operator Awareness & Terminal Power Tools*
+*Researched: 2026-03-03*

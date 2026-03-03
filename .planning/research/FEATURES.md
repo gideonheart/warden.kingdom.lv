@@ -1,160 +1,143 @@
-# Feature Research: GSD Manager Plugin
+# Feature Research: Operator Awareness & Terminal Power Tools
 
-**Domain:** Process management control panel — GSD skill browser UI (agent spawning, command dispatch, hook monitoring, registry management, inline CLI reference)
-**Researched:** 2026-02-18
-**Milestone:** v2.1 GSD Manager Plugin
-**Confidence:** HIGH
+**Domain:** Browser-based terminal multiplexer operator workstation — passive monitoring alerts + active investigation tools
+**Researched:** 2026-03-03
+**Milestone:** v3.0 Operator Awareness & Terminal Power Tools
+**Confidence:** HIGH (all core libraries verified against official docs/type definitions)
 
 ---
 
 ## Context
 
-This research is scoped to the NEW features for the GSD Manager Plugin — a `bottom-panel` plugin that wraps GSD CLI tooling in a browser UI. It does NOT re-document features already built in v1.x / v2.0 (terminals, activity timeline, prompt panel, plugin system, etc.).
+This research is scoped to the NEW features for v3.0 only. It does NOT re-document
+features already built in v1.x / v2.x. Existing capabilities that v3.0 builds on:
 
-Existing Warden services this plugin can reuse:
-- `GatewayApiClient` — sends prompts to agents via OpenClaw Gateway (`POST /api/agents/:id/prompt`)
-- `TmuxSessionManager.sendPromptToSession()` — sends keys directly to tmux pane
-- `TmuxSessionManager.destroySession()` — kills a session
-- `instanceRoutes` — `/api/instances` for current session list
-- Plugin slot `bottom-panel` — rendered in terminals view below the terminal
-- Plugin manifest/registration — drop-in `.tsx` file auto-discovered by `import.meta.glob`
-
-New backend needed: `gsdRoutes.ts` at `/api/gsd/` — wraps `spawn.sh`, `menu-driver.sh`, `recovery-registry.json`, `STATE.md` reads, `/tmp/gsd-hooks.log` tail.
+- `useAgentLiveStatus` — polls `/api/gsd/agents/live-status` every 5s, returns `Map<agentId, { state, contextPressure, contextPressureLevel }>`
+- `detectAgentState()` in `gsdRoutes.ts` — regex heuristics on `tmux capture-pane` output: `permission|allow|dangerous` → `permission_prompt`
+- `AgentStateHint` type: `'working' | 'idle' | 'menu' | 'permission_prompt' | 'error'`
+- `StateBadge` + `PressureIndicator` components exist in `gsdShared.tsx` (GSD Agents tab only)
+- `TerminalStreamService` — PTY tap with `onData` callback; all terminal output flows through here
+- `TerminalView.tsx` — xterm.js 5 terminal with `@xterm/addon-fit` + `@xterm/addon-web-links` loaded
+- `InstanceTabBar.tsx` — session tabs with status dot + agent name + stop button
+- xterm package in use: `xterm@5.3.0` (legacy) + `@xterm/xterm@5.5.0` (monorepo), `@xterm/addon-fit@0.10.0`
+- `@xterm/addon-search` is NOT yet installed — needs to be added
 
 ---
 
 ## Feature Landscape
 
-### Table Stakes (Users Expect These)
+### Table Stakes (Operator Expects These)
 
-Features the operator will assume exist. Missing any of these = plugin feels incomplete.
+Features the operator assumes exist in a terminal monitoring workstation. Missing any of these means the product feels like a passive viewer only, not a workstation.
 
-| Feature | Why Expected | Complexity | Warden Dependency |
-|---------|--------------|------------|-------------------|
-| **Agent grid — session status display** | Operator needs to see which agents are live vs stopped at a glance | LOW | `/api/instances` (existing) |
-| **Agent grid — working directory display** | Registry entries store `working_directory`; operator needs to know which project each agent is working on | LOW | `/api/gsd/registry` (new) |
-| **Quick command — preset GSD slash commands** | The 6 core GSD commands (`/gsd:resume-work`, `/gsd:quick`, `/gsd:new-milestone`, `/gsd:execute-phase`, `/gsd:plan-phase`, `/gsd:progress`) are the main driver of agent behavior; operators run these constantly | LOW | `POST /api/gsd/sessions/:session/command` (new) |
-| **Quick command — custom command input** | Operator sometimes needs non-preset commands; must not be locked into presets | LOW | Same as above |
-| **Quick command — success/error feedback** | After sending a command, operator needs to know if it was delivered or if something failed | LOW | Response from command endpoint |
-| **Recovery registry viewer — agent list** | The registry is the source of truth for all managed agents; operator needs to see it | LOW | `/api/gsd/registry` (new) |
-| **Recovery registry viewer — enabled/disabled toggle** | Operators enable/disable agents to control auto-wake behavior; hand-editing JSON is error-prone | MEDIUM | `PATCH /api/gsd/registry/agents/:id` (new, writes JSON file) |
-| **Hook activity feed — recent events** | `/tmp/gsd-hooks.log` is the only real-time signal about what hooks are firing and whether agents are matched; operators need to see this from the browser | LOW | `/api/gsd/hooks/log` (new, file read) |
-| **Spawn agent — agent name and workdir inputs** | Core workflow: operator picks agent identifier and project directory, clicks spawn | MEDIUM | `POST /api/gsd/spawn` (new, exec spawn.sh) |
-| **Manual command reference — inline bash equivalent** | Every UI action should show the equivalent bash command (per PRD); operators need to understand what the UI is doing and fall back to CLI if needed | LOW | Static display, no backend |
-| **Collapsible sections** | Bottom panel has limited vertical space; all sections must collapse to a header bar | LOW | None (CSS only) |
+| Feature | Why Expected | Complexity | Dependencies on Existing |
+|---------|--------------|------------|--------------------------|
+| Permission prompt badge on tab | Operator monitors 5+ agents; needs visual interruption signal without watching every terminal | MEDIUM | `useAgentLiveStatus` already detects `permission_prompt` state; needs tab badge layer in `InstanceTabBar` |
+| Agent state chip in terminal header | At a glance: is this agent working, waiting, stuck? Current terminal header only shows session name + connection dot | LOW | `useAgentLiveStatus` provides state; wire into `TerminalView` header bar |
+| Terminal text search (Ctrl+F) | Every terminal tool supports in-buffer search; absence is jarring | MEDIUM | `@xterm/addon-search` (not yet installed); needs UI overlay in `TerminalView` |
+| Keyboard navigation between tabs | Using mouse to switch between 5+ agent sessions is slow for an operator workstation | LOW-MEDIUM | `useSessionSelection` manages selection; need global keydown listener |
+| Context pressure badge in terminal header | Operator needs to know when to intervene before a session hits context limit | LOW | `useAgentLiveStatus` provides `contextPressure` + `contextPressureLevel`; wire into `TerminalView` header |
 
-### Differentiators (Competitive Advantage)
+### Differentiators (What Makes This a Power Tool)
 
-Features that make this control panel genuinely useful rather than just a novelty.
+Features that go beyond a passive viewer and make Warden a genuine operator workstation.
 
-| Feature | Value Proposition | Complexity | Warden Dependency |
-|---------|-------------------|------------|-------------------|
-| **Agent grid — state hint display** | The stop-hook sends `state` (idle / menu / working / error / permission_prompt); showing this in the grid tells operator exactly what Claude is doing without opening the terminal | MEDIUM | `/api/gsd/sessions/:session/state` reads STATE.md + hook log inference |
-| **Agent grid — context pressure indicator** | Stop-hook extracts context pressure percentage (e.g. "72% [WARNING]"); exposing this warns operator before agent hits context limit | MEDIUM | Same as above, STATE.md or hook log parsing |
-| **Spawn agent — auto-detect first command** | Mirror spawn.sh's `choose_first_cmd()` logic: if `.planning/` exists → suggest `/gsd:resume-work`; if `PRD.md` exists → suggest `/gsd:new-project @PRD.md`; show the suggestion so operator can override | MEDIUM | `POST /api/gsd/spawn` with auto-detect flag, or client-side inference |
-| **Quick command — session selector tied to tab bar** | Pre-select the command target to match the terminal tab currently open; reduces cognitive load ("which session am I sending to?") | LOW | `selectedSessionName` prop from App.tsx, passed via plugin context |
-| **Hook activity feed — per-agent filtering** | Multiple agents generate hook events; operator needs to filter to one agent's events without wading through all others | LOW | Client-side filter on log lines (all lines contain `tmux_session=`) |
-| **Hook activity feed — auto-poll with freshness indicator** | Hook log is a file; poll every 5s, show "Updated Xs ago" so operator knows if the feed is live | LOW | Polling `/api/gsd/hooks/log` — no WebSocket needed at this scale |
-| **Registry viewer — launch command display** | `claude_launch_command` and `claude_post_launch_mode` are config fields operators sometimes need to verify | LOW | `/api/gsd/registry` response includes these fields |
-| **Inline bash reference — copy-to-clipboard** | State-changing "Copy" → "Copied!" button next to every bash snippet; operator can paste into terminal for manual override without retyping | LOW | Browser `navigator.clipboard.writeText()` |
-| **Session state — read STATE.md** | Show current phase, progress %, and last activity date from `.planning/STATE.md` when available | MEDIUM | `/api/gsd/sessions/:session/state` (new, reads file at registry's `working_directory`) |
+| Feature | Value Proposition | Complexity | Dependencies on Existing |
+|---------|-------------------|------------|--------------------------|
+| Browser notifications for permission prompts | Operator may be in another tab or window; permission prompts block agent progress until answered — notification allows immediate response | MEDIUM | Requires `Notification.requestPermission()` opt-in UI; notification logic triggered when `useAgentLiveStatus` state transitions to `permission_prompt` |
+| Search match count display | "3 of 47 matches" — operator searching for an error pattern needs to know scope of problem | LOW | Part of `@xterm/addon-search` — `onDidChangeResults` event fires `ISearchResultChangeEvent { resultIndex, resultCount }` |
+| Scrollbar gutter markers for search results | Visual density map of where matches appear in buffer; critical for long terminal sessions | LOW | Part of `@xterm/addon-search` — `ISearchDecorationOptions.matchOverviewRuler` sets gutter color automatically; requires xterm `overviewRulerWidth` option to be set |
+| Search highlight persistence on nav | Operator switches tabs; highlights should survive and be ready when returning | MEDIUM | Requires per-session search state management; SearchAddon instance must persist with terminal lifecycle |
+| Sidebar toggle shortcut | Single key to expand/collapse agent sidebar without losing terminal focus | LOW | `setShowSidebar` callback exists in `App.tsx`; just needs a keyboard binding |
 
-### Anti-Features (Commonly Requested, Often Problematic)
+### Anti-Features (Requested, But Wrong for This Context)
 
-| Feature | Why Requested | Why Problematic | Alternative |
-|---------|---------------|-----------------|-------------|
-| **Edit recovery-registry.json inline** | Operators want to change `system_prompt`, `claude_launch_command` from UI | JSON editing UX in a browser is fragile; schema enforcement difficult; concurrent writes from hooks can clobber edits; partial edits corrupt registry | Support toggle (enabled/disabled) and discrete field updates (PATCH endpoints) only; keep full edits in the file system |
-| **Edit STATE.md or PROJECT.md from UI** | State looks editable; operators want to advance phase markers manually | PRD explicitly flags this as a non-goal; STATE.md is auto-maintained by GSD workflow; manual edits break GSD's tracking assumptions | Read-only display; operators who need to advance state use GSD commands via the command panel |
-| **WebSocket streaming for hook log** | "Real-time" hook events feel more alive | Hook log is a local file appended by bash scripts; `tail -f` via PTY or `fs.watch()` would add complexity with minimal gain at single-operator scale; polling every 5s is imperceptible | Polling at 5s with freshness indicator; operator sees events within 5s which is fast enough for diagnostic purposes |
-| **Spawn agent — system prompt text editor** | spawn.sh supports `--system-prompt`; operators want to set custom prompts | Multi-line text editors in a bottom panel are cramped; system prompts are long and need careful editing; prompts should live in registry or files for traceability | System prompt path field only (pass a file path); the file itself is edited outside Warden; show current prompt as read-only preview |
-| **Kill session button in this plugin** | Seems logical alongside spawn | Already available in `InstanceTabBar` (existing stop button per session); duplicating it here creates confusion about authoritative kill point | Link to the session tab; keep kill in existing UI |
-| **Agent auto-wake toggle UI** | Registry has `auto_wake` field | Requires understanding of OpenClaw agent wake behavior; risk of operator accidentally disabling recovery for a critical agent | Show `auto_wake` as read-only label next to enabled toggle; add to v2.x if demand exists |
-| **Real-time terminal-in-panel** | "See the terminal without switching tabs" | Full xterm.js terminal in a bottom panel is a new PTY connection — doubles resource usage; already solved by the Terminals view | Deep-link "open in terminal" button that switches to the Terminals view and selects that session |
+| Anti-Feature | Surface Appeal | Why Problematic | Better Approach |
+|--------------|----------------|-----------------|-----------------|
+| Always-on browser notifications (no opt-in) | "Keep me informed" | Browsers block auto-permission requests not triggered by user gesture — would silently fail or get denied; also violates best practice and user trust | Settings toggle in UI that calls `Notification.requestPermission()` on click |
+| Search across all sessions simultaneously | "Find which agent has the error" | xterm.js search operates on in-memory terminal buffer; cross-session search would require keeping all PTY buffers live — contradicts the existing PTY keepalive/cleanup design | Operator switches to relevant tab first, then searches |
+| Real-time permission prompt auto-answer | "Automate the approval" | Permission prompts require operator judgment — auto-approval removes the safety check that permission prompts provide | Notification + focus-jump to relevant tab so operator can manually respond |
+| Replacing polling with WebSocket push for live-status | "Eliminate latency" | `tmux capture-pane` is already called every 5s; push would require server-side event loop managing all sessions, adding complexity for marginal gain | Keep 5s poll; add visual flash/animation when state changes to `permission_prompt` |
+| External hotkeys library (react-hotkeys-hook) | "More robust shortcut management" | xterm.js captures keyboard events in its canvas element — a global hotkey library cannot intercept those without complex focus tracking; custom `useEffect` on `document` with focus-awareness is simpler and more predictable | Custom `useKeyboardNav` hook with `document.addEventListener('keydown', ...)` + enabled check |
 
 ---
 
 ## Feature Dependencies
 
 ```
-Agent Grid — State Hint Display
-    └──requires──> /api/gsd/sessions/:session/state (new)
-                       └──requires──> working_directory from /api/gsd/registry
-                       └──reads──> .planning/STATE.md at that path
+Permission prompt tab badge
+    └──requires──> useAgentLiveStatus (exists, polls /api/gsd/agents/live-status)
+    └──requires──> InstanceTabBar badge slot (new: red dot overlay on tab button)
 
-Agent Grid — Context Pressure
-    └──requires──> Hook log parsing OR STATE.md parsing
-    └──enhances──> Agent Grid — State Hint Display
+Agent state chip in terminal header
+    └──requires──> useAgentLiveStatus (exists)
+    └──requires──> TerminalView header accepts agentId prop (new prop)
+    └──requires──> StateBadge component (exists in gsdShared.tsx)
 
-Spawn Agent — auto-detect first command
-    └──requires──> /api/gsd/spawn POST endpoint
-    └──enhances──> Quick Command (suggests first command as a preset)
+Context pressure badge in terminal header
+    └──requires──> useAgentLiveStatus (exists)
+    └──requires──> TerminalView header accepts agentId prop (same new prop as state chip)
+    └──requires──> PressureIndicator component (exists in gsdShared.tsx)
 
-Quick Command — session selector tied to tab bar
-    └──requires──> Plugin receives selectedSessionName from plugin context
-                       └──requires──> PluginSlotRenderer to pass App state as context prop
+Browser notification for permission prompts
+    └──requires──> useAgentLiveStatus (exists)
+    └──requires──> Notification.requestPermission() opt-in (new settings UI)
+    └──requires──> State transition detection: previous state !== 'permission_prompt', new === 'permission_prompt'
 
-Registry Viewer — enabled toggle
-    └──requires──> /api/gsd/registry GET (to render current state)
-    └──requires──> PATCH /api/gsd/registry/agents/:id (to write)
-    └──requires──> File lock awareness (spawn.sh uses flock; server PATCH must also lock)
+Terminal text search (Ctrl+F)
+    └──requires──> @xterm/addon-search package (NOT YET INSTALLED — npm install needed)
+    └──requires──> SearchAddon loaded in TerminalView useEffect alongside FitAddon
+    └──requires──> Search overlay UI (input, prev/next buttons, match count display, close)
+    └──requires──> Ctrl+F keydown intercepted BEFORE xterm (via terminal.attachCustomKeyEventHandler)
 
-Hook Activity Feed — per-agent filter
-    └──requires──> /api/gsd/hooks/log GET (raw log lines)
-    └──enhances──> Agent Grid (can show last hook event per agent)
+Search match count display
+    └──requires──> Terminal text search (above)
+    └──enhances──> Search overlay UI
 
-Manual Command Reference — copy to clipboard
-    └──requires──> Any action that generates a bash equivalent string
-    └──enhances──> All other features (cross-cutting UX concern)
+Scrollbar gutter markers for search results
+    └──requires──> Terminal text search (above)
+    └──requires──> xterm Terminal options: overviewRulerWidth: 15 (new config)
+    └──enhances──> Terminal text search (automatic via ISearchDecorationOptions.matchOverviewRuler)
 
-Session State — STATE.md display
-    └──requires──> /api/gsd/sessions/:session/state
-    └──enhances──> Agent Grid (adds phase/progress to each agent card)
+Keyboard tab navigation shortcuts
+    └──requires──> useSessionSelection.selectSession() callback (exists)
+    └──requires──> activeInstances list (exists via useActiveInstances)
+    └──no external library needed
+
+Sidebar toggle shortcut
+    └──requires──> setShowSidebar callback (exists in App.tsx)
+    └──enhances──> Keyboard tab navigation shortcuts (same hook/listener)
 ```
 
 ### Dependency Notes
 
-- **Plugin context / session selector:** The existing `PluginSlotRenderer` renders `<PanelComponent />` with no props. To pass `selectedSessionName` into the GSD plugin, either the plugin context needs to be extended, or the plugin fetches it from `/api/instances` itself. The latter is simpler: plugin polls instances and cross-references with registry.
-
-- **File locking for registry PATCH:** `spawn.sh` uses `flock` on a `.lock` file when writing the registry. The `/api/gsd/registry/agents/:id` PATCH must also honor this lock (use `child_process.execFile('flock', ...)` wrapper or write a shell helper) to avoid race conditions when an agent spawns while the operator toggles enabled status.
-
-- **STATE.md path:** The path is `{working_directory}/.planning/STATE.md` where `working_directory` comes from the registry entry. The endpoint must resolve this per-agent, not assume a fixed project path.
-
-- **Hook log parsing for state hint:** Hook log lines contain `state=working`, `state=idle`, `state=menu`, `state=error`. Parsing the last matching line per session gives a cheap state approximation without a new data store.
+- **State chip + pressure badge both require agentId in TerminalView:** `TerminalView` currently only receives `tmuxSessionName`. The parent `App.tsx` has `selectedInstance` which contains `agentId`. Adding `agentId?: string` prop to `TerminalView` unlocks both features without architecture changes.
+- **Search requires `terminal.attachCustomKeyEventHandler`:** xterm.js 5 provides `terminal.attachCustomKeyEventHandler(handler)` which returns `true` to allow the event to propagate to the terminal, or `false` to swallow it. Ctrl+F must return `false` so the browser's find dialog doesn't open alongside the custom overlay.
+- **Browser notifications require prior state knowledge:** The notification must only fire when state *transitions* to `permission_prompt`, not every 5s while already in that state. This requires storing previous state in a ref inside `useAgentLiveStatus` or a wrapper hook.
+- **Scrollbar gutter markers are automatic:** Setting `matchOverviewRuler` (required field in `ISearchDecorationOptions`) + `overviewRulerWidth` on the Terminal instance is all that is needed. No separate implementation beyond the color value.
 
 ---
 
 ## MVP Definition
 
-### Launch With (v2.1 — Plugin v1.0)
+### Launch With (v3.0)
 
-Minimum viable set that validates the control-center concept and replaces the most common CLI workflows.
+Minimum viable operator workstation additions — what makes the milestone meaningful.
 
-- [ ] **Agent grid with session status** — show active/idle/stopped per agent, pulling from `/api/instances` + registry merge — _validates the agent grid concept_
-- [ ] **Preset GSD commands** — 6 preset buttons (`/gsd:resume-work`, `/gsd:quick <task>`, `/gsd:new-milestone`, `/gsd:execute-phase`, `/gsd:plan-phase <n>`, `/gsd:progress`) sent via `menu-driver.sh clear_then` — _core operator workflow_
-- [ ] **Custom command input** — free text box + send button — _covers commands not in presets_
-- [ ] **Command success/error feedback** — inline status message (same pattern as PromptPanel) — _operator confidence_
-- [ ] **Recovery registry viewer — agent list** — read-only display of registry agents with enabled status indicator — _audit visibility_
-- [ ] **Enabled/disabled toggle** — PATCH `/api/gsd/registry/agents/:id` — _replaces hand-editing JSON_
-- [ ] **Hook activity feed — last 20 events** — polled every 5s from `/api/gsd/hooks/log` — _diagnostic value_
-- [ ] **Spawn agent form** — agent name, workdir, optional first command, submit button calling `spawn.sh` — _core operator workflow_
-- [ ] **Inline bash reference** — collapsible "Manual" row below each action with copy button — _PRD requirement; operator trust_
-- [ ] **Collapsible sections** — Agent Grid, Quick Actions, Hook Feed, Registry — accordion behavior — _space management in bottom panel_
+- [ ] **Agent state chip + context pressure badge in terminal header** — Wires `useAgentLiveStatus` data (already polling) into the terminal header bar. Minimal UI change, high daily value. Requires new `agentId` prop on TerminalView.
+- [ ] **Permission prompt tab badge** — Red dot overlay on the tab button when `state === 'permission_prompt'`. Operator sees it immediately without watching every terminal.
+- [ ] **Terminal text search (Ctrl+F)** — Install `@xterm/addon-search`, add SearchAddon to TerminalView, build search overlay with input + prev/next + match count.
+- [ ] **Keyboard tab navigation** — `Alt+]` / `Alt+[` (or `Ctrl+Tab` / `Ctrl+Shift+Tab`) to cycle tabs; `Alt+S` to toggle sidebar. Custom hook, no library.
 
-### Add After Validation (v2.1.x)
+### Add After Core Is Working (v3.0.x)
 
-- [ ] **State hint display** — parse hook log for last `state=` line per agent, show idle/menu/working/error badge — _trigger: operators asking "what is this agent doing?"_
-- [ ] **Context pressure indicator** — parse `XX% [WARNING/CRITICAL]` from hook log per agent — _trigger: agents hitting context limit unnoticed_
-- [ ] **Session selector tied to tab bar** — pre-select command target from currently viewed terminal session — _trigger: friction sending commands to wrong agent_
-- [ ] **STATE.md phase + progress display** — show phase X/N and progress % per agent — _trigger: operators asking "how far along is this project?"_
-- [ ] **Spawn agent auto-detect first command** — mirror spawn.sh logic, show suggested command in form — _trigger: operators spawning wrong command type_
-- [ ] **Per-agent hook feed filter** — client-side filter on log lines by agent/session name — _trigger: multi-agent operators confused by mixed feed_
+- [ ] **Browser notifications for permission prompts** — Depends on opt-in UI being placed somewhere logical (settings toggle); add after tab badge is confirmed working (same data source, lower urgency).
+- [ ] **Scrollbar gutter markers** — Trivial addition once search is working; just set `overviewRulerWidth: 15` in Terminal options and add `matchOverviewRuler` color to search decorations.
 
-### Future Consideration (v2.2+)
+### Future Consideration (v3.1+)
 
-- [ ] **Hook log SSE streaming** — Server-Sent Events push log lines as they appear — _defer: polling at 5s is sufficient for diagnostic use; SSE adds server-side complexity_
-- [ ] **Registry field editor** — PATCH discrete fields (topic_id, claude_post_launch_mode) — _defer: currently low demand; hand-editing file is acceptable_
-- [ ] **System prompt path field in spawn form** — pass `--system-prompt /path/to/file` to spawn.sh — _defer: advanced use case, most agents use defaults_
-- [ ] **Recovery diagnostics — run diagnose-hooks.sh** — button to run the diagnostic script and show output — _defer: niche; `diagnose-hooks.sh` is already CLI-friendly_
+- [ ] **Search highlight persistence across tab switches** — Requires storing search term per session in React state or localStorage; SearchAddon must be re-initialized with stored term on tab return. Adds complexity to terminal lifecycle.
+- [ ] **Keyboard shortcut help overlay** — `?` key shows all shortcuts. Nice UX polish, not critical for single operator who configured the system.
 
 ---
 
@@ -162,111 +145,197 @@ Minimum viable set that validates the control-center concept and replaces the mo
 
 | Feature | Operator Value | Implementation Cost | Priority |
 |---------|---------------|---------------------|----------|
-| Spawn agent form | HIGH | MEDIUM | P1 |
-| Preset GSD commands | HIGH | LOW | P1 |
-| Custom command input | HIGH | LOW | P1 |
-| Command success/error feedback | HIGH | LOW | P1 |
-| Agent grid — session status | HIGH | LOW | P1 |
-| Collapsible sections | HIGH | LOW | P1 |
-| Recovery registry viewer (read) | MEDIUM | LOW | P1 |
-| Enabled/disabled toggle | MEDIUM | MEDIUM | P1 |
-| Hook activity feed (polled) | MEDIUM | LOW | P1 |
-| Inline bash reference + copy | MEDIUM | LOW | P1 |
-| State hint display | MEDIUM | MEDIUM | P2 |
-| Context pressure indicator | MEDIUM | MEDIUM | P2 |
-| Session selector tied to tab bar | MEDIUM | MEDIUM | P2 |
-| STATE.md display | MEDIUM | MEDIUM | P2 |
-| Spawn auto-detect first command | LOW | MEDIUM | P2 |
-| Per-agent hook feed filter | LOW | LOW | P2 |
-| Hook log SSE streaming | LOW | HIGH | P3 |
-| Registry field editor | LOW | MEDIUM | P3 |
-| System prompt path in spawn | LOW | LOW | P3 |
+| Agent state chip in terminal header | HIGH — immediate situational awareness | LOW — existing data + existing component | P1 |
+| Context pressure badge in terminal header | HIGH — prevents context overflow surprises | LOW — same data, same component | P1 |
+| Permission prompt tab badge | HIGH — unblocks stuck agents immediately | MEDIUM — badge slot in InstanceTabBar | P1 |
+| Terminal text search (Ctrl+F) | HIGH — investigating agent output is core workflow | MEDIUM — new package + overlay UI | P1 |
+| Keyboard tab navigation | MEDIUM — convenience, not critical path | LOW — simple keydown handler | P1 |
+| Browser notifications | MEDIUM — useful when away from tab | MEDIUM — opt-in flow + transition detection | P2 |
+| Scrollbar gutter markers | MEDIUM — visual density for long sessions | LOW — config flag once search exists | P2 |
+| Search match count | MEDIUM — scope awareness during investigation | LOW — onDidChangeResults event | P2 |
+| Search highlight persistence | LOW — current flow is tab → search | MEDIUM — per-session state management | P3 |
+| Keyboard shortcut help overlay | LOW — single operator knows shortcuts | LOW — static overlay | P3 |
 
 **Priority key:**
-- P1: Must have for v2.1 launch
-- P2: Should have; add in v2.1.x patch cycles
-- P3: Defer to v2.2+ or only if explicitly requested
+- P1: Must have for v3.0 milestone to feel complete
+- P2: Should have — add in same milestone if time allows
+- P3: Nice to have — defer to v3.1
 
 ---
 
-## UX Patterns from Reference Analysis
+## Implementation Notes by Feature
 
-### Agent Spawning UI (confirmed patterns)
+### @xterm/addon-search Integration
 
-- **Suggest-and-confirm pattern** (agentic AI UX standard): Show the auto-detected first command as a pre-filled suggestion; operator can override before confirming. Do not auto-spawn without review.
-- **Progressive disclosure**: Spawn form starts collapsed; expands on "Spawn Agent" button click. Advanced options (system prompt path, launch command override) under an "Advanced" expander.
-- **Clear feedback on long-running operations**: `spawn.sh` waits for TUI readiness (up to 20 seconds). Show a "Spawning..." state with an indeterminate progress indicator; show success/error when the endpoint resolves.
+**Package:** `@xterm/addon-search` (monorepo package — matches the `@xterm/addon-fit` pattern already in use)
+**Install:** `npm install --save-dev @xterm/addon-search`
+**Version:** 0.15.0 (latest stable as of research date)
+**Peer dep:** xterm.js v4+ (project uses v5.3.0 / @xterm/xterm@5.5.0 — compatible)
 
-### Command Dispatch (confirmed patterns)
+**Key API (HIGH confidence — verified from type definitions):**
+```typescript
+import { SearchAddon } from '@xterm/addon-search';
 
-- **Preset buttons as primary affordance**: 6 preset command buttons are the primary action surface. Custom input is secondary (collapsed or smaller).
-- **Confirmation dialogs**: Only for destructive or irreversible actions. Sending a GSD command is non-destructive (Claude will handle or ignore it) — no confirmation needed. Spawn is also recoverable (can kill session). Do NOT add confirmation modals to every action (adds friction).
-- **In-place feedback**: Use the same inline status pattern as `PromptPanel` — success message auto-dismisses after 5s, error persists until dismissed. No modal dialogs.
+const searchAddon = new SearchAddon({ highlightLimit: 1000 });
+terminal.loadAddon(searchAddon);
 
-### Real-Time Log/Event Feed (confirmed patterns)
+// Search
+searchAddon.findNext(term, {
+  regex: false,
+  caseSensitive: false,
+  wholeWord: false,
+  decorations: {
+    matchBackground: '#ffff0033',
+    matchBorder: '#ffff00',
+    matchOverviewRuler: '#ffff00',         // Required — enables gutter markers
+    activeMatchBackground: '#ff6a0099',
+    activeMatchBorder: '#ff6a00',
+    activeMatchColorOverviewRuler: '#ff6a00', // Required
+  },
+});
+searchAddon.findPrevious(term, { ... });
+searchAddon.clearDecorations();
 
-- **Polling over streaming for this scale**: Single operator, file-based log, updates every few seconds. Poll at 5s intervals. WebSocket streaming is overkill here and adds server complexity.
-- **Freshness indicator**: Show "Updated Xs ago" or timestamp of last poll. Makes the feed feel live even with polling.
-- **User-driven refresh**: Add a manual "Refresh" button for operators who want immediate update without waiting 5s.
-- **Newest-first ordering**: Hook events are diagnostic — operators want the latest event, not historical scroll. Newest first, fixed max of 20-50 lines.
-- **No auto-scroll lock**: If operator is reading older events, do not scroll to bottom on new event. Use a "New events" badge at the top that scrolls when clicked.
+// Match count (fires after each search)
+searchAddon.onDidChangeResults((event) => {
+  // event.resultIndex: 0-based index of active match (-1 if > threshold)
+  // event.resultCount: total matches
+});
+```
 
-### Process Registry Management (confirmed patterns)
+**Gutter markers:** Requires `Terminal` options to include `overviewRulerWidth: 15`. This renders the colored ruler on the right edge of the terminal canvas. The `matchOverviewRuler` color in `ISearchDecorationOptions` is a required field — it must be set.
 
-- **Toggle switch for enabled/disabled**: Standard UX for enable/disable. Green = enabled, grey = disabled. Show label ("Enabled" / "Disabled") next to toggle to avoid ambiguity.
-- **Optimistic UI with revert**: Apply toggle state immediately in UI, then confirm with server. If PATCH fails, revert and show error — don't leave UI in inconsistent state.
-- **Status indicators with semantic color**: `active` → green dot, `idle` → amber dot, `stopped` → grey dot, `error` → red dot. Consistent with existing `AgentInstanceStatus` type.
+**Ctrl+F interception:** Use `terminal.attachCustomKeyEventHandler` BEFORE `terminal.open()`:
+```typescript
+terminal.attachCustomKeyEventHandler((ev) => {
+  if (ev.ctrlKey && ev.key === 'f' && ev.type === 'keydown') {
+    setSearchVisible(true);
+    return false; // Swallow — prevents browser find dialog
+  }
+  return true; // Pass through all other keys
+});
+```
 
-### Inline Command Reference (confirmed patterns)
+**Escape to close:** Also intercept `Escape` when search overlay is open:
+```typescript
+if (ev.key === 'Escape' && searchVisible) {
+  setSearchVisible(false);
+  searchAddon.clearDecorations();
+  return false;
+}
+```
 
-- **Collapsible "Manual" disclosure**: Show the bash equivalent as a collapsed row below each action form. Operator can expand when needed. Not shown by default (reduce visual noise).
-- **Inline compact clipboard copy** (PatternFly / shadcn pattern): Copy button adjacent to the command text. State changes "Copy" → "Copied!" for 2s, then resets.
-- **Monospace code block**: Wrap bash commands in `<code>` with monospace font and subtle background (`bg-warden-bg/50`), matching Warden's terminal aesthetic.
+### Permission Prompt Tab Badge
+
+**Signal source:** `useAgentLiveStatus` already exposes `state: AgentStateHint | null` per agent. The `InstanceTabBar` needs to receive this data.
+
+**Data flow options:**
+1. Call `useAgentLiveStatus()` inside `App.tsx` (already available via `useAgentLiveStatus` hook) and pass relevant state down to `InstanceTabBar` as a prop: `permissionAlertSessions: Set<string>`
+2. Call `useAgentLiveStatus()` directly in `InstanceTabBar` — simpler, self-contained
+
+Option 2 is recommended to keep `InstanceTabBar` self-contained. The hook already deduplicates via JSON comparison so double-calling has no polling cost.
+
+**Badge UI:** Small red dot overlay positioned top-right of tab button. Pulse animation (`animate-ping`) to draw attention. Accessible: `title="Permission prompt waiting"` on the badge element.
+
+**Tab indicator pattern (standard UX):**
+- Dot badge: colored circle overlay in tab corner — low footprint, high visibility
+- Color: `warden-warning` (amber/yellow) — permission prompts are attention-needed, not errors
+- Animation: `animate-ping` pulse while state is active; stops when resolved
+
+### Browser Notifications
+
+**Permission flow (MEDIUM confidence — verified against MDN):**
+1. Notification.permission states: `'default'`, `'granted'`, `'denied'`
+2. Must call `Notification.requestPermission()` inside a user gesture handler
+3. Pattern: settings toggle → user clicks → `requestPermission()` → OS prompt appears
+4. Never auto-prompt on page load — browsers will block and users will deny
+
+**State transition detection (needed to avoid repeated notifications):**
+```typescript
+const previousStatesRef = useRef<Map<string, AgentStateHint | null>>(new Map());
+
+// Inside useEffect watching liveStatusMap:
+for (const [agentId, status] of liveStatusMap) {
+  const prev = previousStatesRef.current.get(agentId);
+  if (prev !== 'permission_prompt' && status.state === 'permission_prompt') {
+    // Only fires on transition, not on each 5s poll while state persists
+    new Notification(`Agent ${agentId} needs permission`, { body: '...' });
+  }
+}
+previousStatesRef.current = new Map(liveStatusMap.entries().map(...));
+```
+
+### Keyboard Navigation
+
+**Approach:** Custom `useKeyboardNav` hook with `document.addEventListener('keydown', ...)`.
+
+**Why not react-hotkeys-hook:** The xterm.js canvas captures keyboard events. When terminal is focused, `document` events still fire (xterm uses `document.addEventListener` internally), but a global hotkey library may conflict with xterm's own key handler registration. A custom `useEffect` on `document` is more predictable and requires zero additional dependencies.
+
+**Key bindings (chosen to avoid common conflicts):**
+- `Alt+]` → next tab (no browser conflict, no tmux conflict)
+- `Alt+[` → previous tab (symmetric)
+- `Alt+S` → toggle sidebar
+- `Ctrl+F` → open terminal search (intercepted at xterm level via `attachCustomKeyEventHandler`, not document)
+
+**Focus-aware enabling:** The keydown handler should check if the active element is a text input (`INPUT`, `TEXTAREA`, `[contenteditable]`) and skip navigation in that case — operator may be typing in the prompt panel.
+
+```typescript
+document.addEventListener('keydown', (ev) => {
+  const target = document.activeElement;
+  const isTyping = target instanceof HTMLInputElement ||
+    target instanceof HTMLTextAreaElement ||
+    (target as HTMLElement)?.contentEditable === 'true';
+  if (isTyping) return; // Don't navigate while typing a prompt
+
+  if (ev.altKey && ev.key === ']') {
+    // next tab
+  }
+});
+```
+
+### Agent State Chip + Context Pressure in Terminal Header
+
+**Current header structure in `TerminalView.tsx`:**
+```
+[connection dot] [session name]           [font size button] [hint text]
+```
+
+**New header structure:**
+```
+[connection dot] [session name]   [state chip] [pressure %]   [font size button]
+```
+
+**Prop change needed:** `TerminalView` receives `tmuxSessionName`. Parent `App.tsx` has `selectedInstance` which has `agentId`. Add `agentId?: string` prop.
+
+**Inside `TerminalView`:** Call `useAgentLiveStatus()` directly (same self-contained pattern as InstanceTabBar badge recommendation), look up by `agentId`. Render `StateBadge` + `PressureIndicator` from `gsdShared.tsx`.
+
+**Warning:** Both components already exist — this is a wiring task, not a build task. LOW implementation risk.
 
 ---
 
-## Backend API Surface (New Routes)
+## Ecosystem Comparison: Terminal Search Approaches
 
-All new routes are in `src/server/routes/gsdRoutes.ts` mounted at `/api/gsd/`:
+| Approach | Match Count | Gutter Markers | Search Highlight | Implementation |
+|----------|-------------|----------------|------------------|----------------|
+| `@xterm/addon-search` | YES (`onDidChangeResults`) | YES (`matchOverviewRuler`) | YES (decorations) | Install package, load addon |
+| Manual buffer scan + mark | NO (DIY) | NO | Fragile (ANSI codes) | Major custom work |
+| Browser Find (Ctrl+F) | YES (browser UI) | NO | YES | Zero work, but only finds rendered text |
 
-| Endpoint | Method | Action | Key Behavior |
-|----------|--------|--------|--------------|
-| `/api/gsd/registry` | GET | Read recovery-registry.json | JSON parse, return agents array with global hook_settings |
-| `/api/gsd/registry/agents/:agentId` | PATCH | Toggle enabled, update discrete fields | Use flock-compatible write; validate field allow-list |
-| `/api/gsd/spawn` | POST | Run spawn.sh | `execFile` with timeout (30s); stream stdout/stderr to response |
-| `/api/gsd/sessions/:session/command` | POST | Run menu-driver.sh action | `execFile`; action must be in allow-list |
-| `/api/gsd/sessions/:session/state` | GET | Read STATE.md from project .planning/ | Resolve path from registry; graceful 404 if not found |
-| `/api/gsd/hooks/log` | GET | Tail /tmp/gsd-hooks.log | Last N lines (default 50, max 200); optional `?session=` filter |
+**Recommendation:** `@xterm/addon-search` is the only viable option. Browser Find does not work reliably on xterm.js canvas rendering. Manual scan is prohibitive. The addon is maintained by the xterm.js core team and ships as `@xterm/addon-search` matching the monorepo package pattern already used (`@xterm/addon-fit`, `@xterm/addon-web-links`).
 
 ---
 
 ## Sources
 
-### Process Management UI Patterns
-- [Agentic AI Design Patterns — UX Magazine](https://uxmag.com/articles/secrets-of-agentic-ux-emerging-design-patterns-for-human-interaction-with-ai-agents)
-- [Agentic Patterns and Implementation — Salesforce Architects](https://architect.salesforce.com/fundamentals/agentic-patterns)
-- [Top 10 Agentic AI Design Patterns — AufaitUX](https://www.aufaitux.com/blog/agentic-ai-design-patterns-enterprise-guide/)
-
-### Real-Time Log Feed Patterns
-- [Activity Stream design pattern — UI Patterns](https://ui-patterns.com/patterns/ActivityStream)
-- [Polling vs Streaming — Svix Resources](https://www.svix.com/resources/faq/polling-vs-streaming/)
-- [UX Strategies for Real-Time Dashboards — Smashing Magazine](https://www.smashingmagazine.com/2025/09/ux-strategies-real-time-dashboards/)
-- [Streaming Options for UI: SSE, WebSocket, Long Poll — VerticalServe/Medium](https://verticalserve.medium.com/streaming-options-for-ui-sse-websocket-and-long-poll-975192248506)
-
-### Inline Command Reference / Copy-to-Clipboard
-- [Clipboard Copy Design Guidelines — PatternFly](https://www.patternfly.org/components/clipboard-copy/design-guidelines/)
-- [UI Copy: UX Guidelines for Command Names and Keyboard Shortcuts — NN/g](https://www.nngroup.com/articles/ui-copy/)
-- [Top 8 UX Patterns for Contextual Help — Chameleon](https://www.chameleon.io/blog/contextual-help-ux)
-
-### Existing Codebase Reference
-- `spawn.sh` — `/home/forge/.openclaw/workspace/skills/gsd-code-skill/scripts/spawn.sh`
-- `menu-driver.sh` — `/home/forge/.openclaw/workspace/skills/gsd-code-skill/scripts/menu-driver.sh`
-- `recovery-registry.example.json` — `/home/forge/.openclaw/workspace/skills/gsd-code-skill/config/recovery-registry.example.json`
-- `/tmp/gsd-hooks.log` — live hook event log (format: `[ISO8601] [script.sh] key=value`)
-- `PRD-gsd-manager-plugin.md` — product requirements document
+- [@xterm/addon-search type definitions](https://github.com/xtermjs/xterm.js/blob/master/addons/addon-search/typings/addon-search.d.ts) — HIGH confidence (official source, complete API)
+- [@xterm/addon-search npm page](https://www.npmjs.com/package/@xterm/addon-search) — HIGH confidence
+- [MDN Notifications API](https://developer.mozilla.org/en-US/docs/Web/API/Notifications_API) — HIGH confidence (official MDN)
+- [MDN Notification.requestPermission()](https://developer.mozilla.org/en-US/docs/Web/API/Notification/requestPermission_static) — HIGH confidence
+- [web.dev Push Notifications Permission UX](https://web.dev/articles/push-notifications-permissions-ux) — MEDIUM confidence (Google official but prescriptive)
+- [react-hotkeys-hook useHotkeys API](https://react-hotkeys-hook.vercel.app/docs/api/use-hotkeys) — MEDIUM confidence (referenced to inform the anti-feature recommendation)
+- Existing codebase: `src/server/routes/gsdRoutes.ts`, `src/client/hooks/useAgentLiveStatus.ts`, `src/client/components/TerminalView.tsx`, `src/client/components/InstanceTabBar.tsx`, `src/client/components/gsdShared.tsx` — HIGH confidence (direct code inspection)
 
 ---
 
-*Feature research for: GSD Manager Plugin for Warden Dashboard (v2.1 milestone)*
-*Researched: 2026-02-18*
-*Confidence: HIGH (primary sources: live codebase inspection, GSD scripts, real hook log, PRD; web: agentic UX patterns, polling vs streaming, copy-to-clipboard patterns)*
+*Feature research for: Warden Dashboard v3.0 Operator Awareness & Terminal Power Tools*
+*Researched: 2026-03-03*
