@@ -13,7 +13,7 @@ See: .planning/PROJECT.md (updated 2026-03-03)
 Phase: — (between milestones)
 Plan: —
 Status: v2.3 milestone complete — all 18 phases shipped
-Last activity: 2026-03-03 - Completed quick task 2030: Review debug fix commit 6dd185d: identify risks, untested edge cases, and follow-up tasks
+Last activity: 2026-03-03 - Completed quick task 2031: Replace documentation-only useTerminalSocket tests with 9 real behavioral tests
 
 Progress: [####################] 100% (v2.3 shipped)
 
@@ -199,6 +199,7 @@ Key decisions for v2.2:
 | 22 | Delete dead script reconcile-deployment-gaps.ts (301 LOC) | 2026-03-03 | `d6e2663` |
 | 2029 | Fix remaining tech debt: annotate GsdHookLogWatcher refs in Phase 17 docs | 2026-03-03 | `c9c2190` |
 | 2030 | Review debug fix commit 6dd185d: identify risks, untested edge cases, and follow-up tasks | 2026-03-03 | `2609278` |
+| 2031 | Replace documentation-only useTerminalSocket tests with 9 real behavioral tests (fake timers, vi.mock socket.io-client) | 2026-03-03 | `63f1fbe` |
 
 ### Roadmap Evolution
 
