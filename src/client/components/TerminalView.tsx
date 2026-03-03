@@ -321,6 +321,30 @@ export function TerminalView({ tmuxSessionName, onSessionExit, agentLiveStatus, 
     terminal.open(terminalContainerRef.current);
     terminal.focus();
 
+    // Suppress shortcut keys from being forwarded to the PTY.
+    // The global useGlobalHotkeys handler (capture phase) handles these keys
+    // at the document level. Without this guard, xterm.js also processes the
+    // keydown event and sends escape sequences (e.g. ^1, ^[, ^]) to the PTY.
+    terminal.attachCustomKeyEventHandler((event: KeyboardEvent) => {
+      // Ctrl+F: suppress browser find AND PTY forwarding
+      if (event.ctrlKey && (event.key === 'f' || event.key === 'F')) {
+        return false;
+      }
+      // Ctrl+B: suppress PTY forwarding (Ctrl+B is tmux prefix by default in some configs)
+      if (event.ctrlKey && (event.key === 'b' || event.key === 'B')) {
+        return false;
+      }
+      // Ctrl+1..9: suppress PTY forwarding
+      if (event.ctrlKey && /^[1-9]$/.test(event.key)) {
+        return false;
+      }
+      // Ctrl+[ and Ctrl+]: suppress PTY forwarding
+      if (event.ctrlKey && (event.key === '[' || event.key === ']')) {
+        return false;
+      }
+      return true;
+    });
+
     // Fit synchronously so the terminal has correct dimensions before the server
     // starts sending PTY output. Deferring to rAF creates a window where tmux dumps
     // the screen at estimated dimensions, causing garbled/wrapped text.
