@@ -7,7 +7,7 @@
 - ✅ **v2.0 Mission Control** — Phases 9-11 (shipped 2026-02-18)
 - ✅ **v2.1 GSD Manager Plugin** — Phases 12-14 (shipped 2026-02-18)
 - ✅ **v2.3 Code Hygiene & Token Usage** — Phases 15-18 (shipped 2026-03-03)
-- 🔄 **v3.0 Operator Awareness & Terminal Power Tools** — Phases 19-20 (in progress)
+- ✅ **v3.0 Operator Awareness & Terminal Power Tools** — Phases 19-20 (shipped 2026-03-04)
 
 ## Phases
 
