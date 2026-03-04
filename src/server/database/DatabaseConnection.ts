@@ -68,7 +68,11 @@ class DatabaseConnection {
       SELECT id, agent_id as agentId, agent_name as agentName, tmux_session_name as tmuxSessionName,
              status, project_path as projectPath, telegram_topic_id as telegramTopicId,
              created_at as createdAt, last_active_at as lastActiveAt
-      FROM instances WHERE status IN ('active', 'idle', 'starting', 'stopping')
+      FROM instances
+      WHERE status IN ('active', 'idle', 'starting', 'stopping')
+         -- Retain recently-stopped and recently-errored sessions for 30 minutes so the
+         -- operator can see the tab and click Restart before it ages out of the tab bar.
+         OR (status IN ('stopped', 'error') AND last_active_at >= datetime('now', '-30 minutes'))
       ORDER BY last_active_at DESC
     `).all() as AgentInstance[];
   }
