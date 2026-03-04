@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import type { AgentInstance } from '../../shared/types.js';
+import type { AgentInstance, RecordingEntry } from '../../shared/types.js';
 
 interface SessionSearchFilters {
   agentId: string;
@@ -8,11 +8,18 @@ interface SessionSearchFilters {
   dateTo: string;
 }
 
-export function SessionHistory() {
+interface SessionHistoryProps {
+  onNavigateToSession?: (sessionName: string) => void;
+  onPlayRecording?: (recording: RecordingEntry) => void;
+}
+
+export function SessionHistory({ onNavigateToSession, onPlayRecording }: SessionHistoryProps) {
   const [sessions, setSessions] = useState<AgentInstance[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const [recordings, setRecordings] = useState<RecordingEntry[]>([]);
+  const [noRecordingMessage, setNoRecordingMessage] = useState<string | null>(null);
   const [filters, setFilters] = useState<SessionSearchFilters>({
     agentId: '',
     status: '',
@@ -49,6 +56,36 @@ export function SessionHistory() {
   useEffect(() => {
     fetchSessions();
   }, [fetchSessions]);
+
+  // One-time recordings fetch on mount — recordings are stable data, not polled
+  useEffect(() => {
+    fetch('/api/recordings')
+      .then((response) => response.ok ? response.json() : [])
+      .then((data: RecordingEntry[]) => setRecordings(data))
+      .catch(() => { /* best-effort — false "no recording" is acceptable failure mode */ });
+  }, []);
+
+  // Statuses that indicate the session is still live (navigable to terminals view)
+  const NAVIGABLE_STATUSES = new Set(['active', 'idle', 'starting', 'stopping']);
+
+  const handleRowClick = useCallback((session: AgentInstance) => {
+    // NAV-01: Active sessions navigate to live terminal
+    if (NAVIGABLE_STATUSES.has(session.status)) {
+      onNavigateToSession?.(session.tmuxSessionName);
+      return;
+    }
+    // NAV-02: Stopped sessions with a completed recording open the player
+    const recording = recordings.find(
+      (r) => r.sessionName === session.tmuxSessionName && r.stoppedAt !== null
+    );
+    if (recording) {
+      onPlayRecording?.(recording);
+      return;
+    }
+    // NAV-03: Stopped sessions without a recording show inline feedback
+    setNoRecordingMessage(`No recording available for "${session.tmuxSessionName}"`);
+    setTimeout(() => setNoRecordingMessage(null), 3000);
+  }, [recordings, onNavigateToSession, onPlayRecording]);
 
   const totalPages = Math.ceil(total / pageSize);
 
@@ -95,6 +132,12 @@ export function SessionHistory() {
         <span className="text-xs text-warden-text-dim self-center">{total} sessions</span>
       </div>
 
+      {noRecordingMessage && (
+        <div className="px-3 py-2 text-sm text-warden-text-dim bg-warden-border/30 rounded">
+          {noRecordingMessage}
+        </div>
+      )}
+
       {isLoading ? (
         <div className="flex items-center gap-2 py-8 justify-center">
           <div className="w-4 h-4 border-2 border-warden-accent border-t-transparent rounded-full animate-spin" />
@@ -107,7 +150,8 @@ export function SessionHistory() {
           {sessions.map((session) => (
             <div
               key={session.id}
-              className="bg-warden-border/20 rounded hover:bg-warden-border/30 transition-colors"
+              onClick={() => handleRowClick(session)}
+              className="bg-warden-border/20 rounded hover:bg-warden-border/30 transition-colors cursor-pointer"
             >
               {/* Desktop: horizontal row */}
               <div className="hidden sm:flex items-center gap-3 px-3 py-2 text-sm">
