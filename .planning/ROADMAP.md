@@ -9,6 +9,7 @@
 - ✅ **v2.3 Code Hygiene & Token Usage** — Phases 15-18 (shipped 2026-03-03)
 - ✅ **v3.0 Operator Awareness & Terminal Power Tools** — Phases 19-20 (shipped 2026-03-04)
 - ✅ **v3.1 Agent Control & Deep Insights** — Phases 21-24, 26-27 (shipped 2026-03-04)
+- 🚧 **v3.2 Mobile Operations & UX Polish** — Phases 28-31 (in progress)
 
 ## Phases
 
@@ -80,6 +81,15 @@
 
 </details>
 
+### 🚧 v3.2 Mobile Operations & UX Polish (In Progress)
+
+**Milestone Goal:** Fix daily mobile friction and complete the recording story — auto-record and storage rotation ship together.
+
+- [ ] **Phase 28: Mobile Toolbar Fixes** — Enter button + keyboard persistence on toolbar taps
+- [ ] **Phase 29: Session Navigation** — History rows navigate to live terminal, recording replay, or explanatory feedback
+- [ ] **Phase 30: Auto-Record Per Agent** — Per-agent toggle to start recording automatically on session creation
+- [ ] **Phase 31: Storage Rotation** — Configurable storage cap with safe oldest-first pruning and rotation UI
+
 ## Phase Details
 
 <details>
@@ -131,6 +141,65 @@ See `.planning/milestones/v3.1-ROADMAP.md`
 
 </details>
 
+### Phase 28: Mobile Toolbar Fixes
+**Goal**: Operators on mobile can tap any toolbar button and keep typing — the soft keyboard never dismisses mid-session
+**Depends on**: Nothing (client-only, no server dependency)
+**Requirements**: MOB-01, MOB-02
+**Success Criteria** (what must be TRUE):
+  1. User taps the Enter button in the mobile toolbar and the command is submitted to the terminal
+  2. User taps any toolbar button (Enter, Tab, Esc, Ctrl+C, arrows, PgUp/PgDn, Copy, Paste) and the soft keyboard remains open immediately after the tap
+  3. User can complete a multi-step command sequence (type, tap Enter, type more, tap arrow) without the keyboard ever dismissing between taps
+**Plans**: TBD
+
+Plans:
+- [ ] 28-01: Add Enter key to MOBILE_KEYS and wire keyboard-persistence focus fix
+
+### Phase 29: Session Navigation
+**Goal**: Operators can tap any session row in history and land somewhere useful — live terminal, recording replay, or an honest explanation of why neither is available
+**Depends on**: Nothing (client-only against existing API, can run parallel with Phase 28)
+**Requirements**: NAV-01, NAV-02, NAV-03
+**Success Criteria** (what must be TRUE):
+  1. User taps a history row for an active session and the Terminals view opens with that session's tab selected
+  2. User taps a history row for a stopped session that has a recording and the recording player opens immediately
+  3. User taps a history row for a stopped session with no recording and sees a clear toast or inline message explaining why navigation is not possible
+  4. Tapping a session row never silently navigates to the wrong session or does nothing without feedback
+**Plans**: TBD
+
+Plans:
+- [ ] 29-01: Wire onNavigateToSession callback through App.tsx, HistoryView, and SessionHistory with recording lookup
+
+### Phase 30: Auto-Record Per Agent
+**Goal**: Operators can opt individual agents into automatic recording so every session is captured from the first frame without manual intervention
+**Depends on**: Phase 28 (can run after; independent of Phase 29)
+**Requirements**: REC-05, REC-06
+**Success Criteria** (what must be TRUE):
+  1. User sees a per-agent auto-record toggle in the recording library UI and can enable or disable it
+  2. When auto-record is enabled for an agent, a new session for that agent begins recording automatically with no operator action
+  3. The recording captures the first line of terminal output (no missing frames due to race conditions)
+  4. The recording-active indicator in the terminal header lights up automatically for auto-started recordings
+  5. Auto-record defaults to off for all agents — existing recording behavior is unchanged until the operator explicitly opts in
+**Plans**: TBD
+
+Plans:
+- [ ] 30-01: AutoRecordConfigService, DB migration, REST endpoints
+- [ ] 30-02: Hook into TerminalStreamService after PTY onData registration + RecordingLibrary toggle UI
+
+### Phase 31: Storage Rotation
+**Goal**: Operators can cap total recording storage so auto-record never causes unbounded disk growth — oldest recordings are pruned safely without interrupting active playback
+**Depends on**: Phase 30 (rotation needs real auto-generated recordings to test pruning behavior against; auto-record without a storage cap is unsafe to ship alone)
+**Requirements**: ROT-01, ROT-02, ROT-03
+**Success Criteria** (what must be TRUE):
+  1. User can set a maximum storage cap (in MB or GB) for recordings via the recording library settings UI
+  2. When total recording storage exceeds the cap, the system automatically deletes the oldest recordings until usage falls below the cap
+  3. Rotation never deletes a recording that is currently being played back (two-phase deletion with deletion_pending flag)
+  4. Rotation never deletes a session whose recording is actively being captured
+  5. User can see current storage usage stats and trigger a manual prune run from the recording library UI
+**Plans**: TBD
+
+Plans:
+- [ ] 31-01: RecordingRotationService, deletion_pending DB migration, rotation policy config + REST endpoint
+- [ ] 31-02: Storage stats UI and manual prune button in RecordingLibrary
+
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
@@ -161,3 +230,7 @@ See `.planning/milestones/v3.1-ROADMAP.md`
 | 26. Token Analytics Polish & Tech Debt | v3.1 | 1/1 | Complete | 2026-03-04 |
 | 24. Session Recording & Replay | v3.1 | 2/2 | Complete | 2026-03-04 |
 | 27. Recording State Cleanup & Tech Debt | v3.1 | 1/1 | Complete | 2026-03-04 |
+| 28. Mobile Toolbar Fixes | v3.2 | 0/1 | Not started | - |
+| 29. Session Navigation | v3.2 | 0/1 | Not started | - |
+| 30. Auto-Record Per Agent | v3.2 | 0/2 | Not started | - |
+| 31. Storage Rotation | v3.2 | 0/2 | Not started | - |

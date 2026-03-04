@@ -60,22 +60,22 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| MOB-01 | — | Pending |
-| MOB-02 | — | Pending |
-| NAV-01 | — | Pending |
-| NAV-02 | — | Pending |
-| NAV-03 | — | Pending |
-| REC-05 | — | Pending |
-| REC-06 | — | Pending |
-| ROT-01 | — | Pending |
-| ROT-02 | — | Pending |
-| ROT-03 | — | Pending |
+| MOB-01 | Phase 28 | Pending |
+| MOB-02 | Phase 28 | Pending |
+| NAV-01 | Phase 29 | Pending |
+| NAV-02 | Phase 29 | Pending |
+| NAV-03 | Phase 29 | Pending |
+| REC-05 | Phase 30 | Pending |
+| REC-06 | Phase 30 | Pending |
+| ROT-01 | Phase 31 | Pending |
+| ROT-02 | Phase 31 | Pending |
+| ROT-03 | Phase 31 | Pending |
 
 **Coverage:**
 - v3.2 requirements: 10 total
-- Mapped to phases: 0
-- Unmapped: 10 ⚠️
+- Mapped to phases: 10
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-03-04*
-*Last updated: 2026-03-04 after initial definition*
+*Last updated: 2026-03-04 after roadmap creation (Phases 28-31)*
