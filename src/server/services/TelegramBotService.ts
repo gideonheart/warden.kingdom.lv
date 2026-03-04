@@ -1,8 +1,20 @@
-import { Bot, GrammyError, HttpError } from 'grammy';
+import { Bot, GrammyError, HttpError, InlineKeyboard } from 'grammy';
 import { autoRetry } from '@grammyjs/auto-retry';
 
 export class TelegramBotService {
   private bot: Bot | null = null;
+  private callbackHandlers: Array<(bot: Bot) => void> = [];
+
+  /**
+   * Register a callback handler to be applied to the bot during start().
+   *
+   * Must be called BEFORE start() — handlers are applied after the Bot instance
+   * is created (so they can call bot.callbackQuery, etc.) but BEFORE bot.start()
+   * begins long polling. This ensures all handlers are active from the first update.
+   */
+  registerCallbackHandler(handler: (bot: Bot) => void): void {
+    this.callbackHandlers.push(handler);
+  }
 
   /**
    * Start the Telegram bot using long polling.
@@ -39,6 +51,12 @@ export class TelegramBotService {
         console.error('[TelegramBot] Unexpected error:', err);
       }
     });
+
+    // Apply all registered callback handlers BEFORE bot.start() — ensures
+    // handlers (e.g., approve button callbacks) are active from the first update
+    for (const handler of this.callbackHandlers) {
+      handler(this.bot);
+    }
 
     // Fire-and-forget — bot.start() returns a Promise that only resolves when
     // the bot stops. Awaiting it would block the process forever.
@@ -99,6 +117,40 @@ export class TelegramBotService {
       });
     } catch (error) {
       console.error(`[TelegramBot] Failed to send to topic ${topicId}:`, error);
+    }
+  }
+
+  /**
+   * Send a text message to a Telegram group topic with an Approve inline button.
+   *
+   * The button callback data is "approve:{sessionName}" — matches the pattern
+   * registered in ApprovalCallbackHandler.
+   *
+   * Returns the sent message_id on success (needed by ApprovalStateTracker to
+   * allow editing the message after approval). Returns null when bot is not
+   * running or if the send fails.
+   */
+  async sendToTopicWithApproveButton(
+    chatId: string,
+    topicId: string,
+    text: string,
+    sessionName: string,
+  ): Promise<number | null> {
+    if (!this.bot) {
+      console.warn('[TelegramBot] sendToTopicWithApproveButton called but bot is not running — skipping');
+      return null;
+    }
+    try {
+      const keyboard = new InlineKeyboard().text('Approve', `approve:${sessionName}`);
+      const sentMessage = await this.bot.api.sendMessage(chatId, text, {
+        message_thread_id: parseInt(topicId, 10),
+        parse_mode: 'Markdown',
+        reply_markup: keyboard,
+      });
+      return sentMessage.message_id;
+    } catch (error) {
+      console.error(`[TelegramBot] Failed to send approve-button message to topic ${topicId}:`, error);
+      return null;
     }
   }
 }

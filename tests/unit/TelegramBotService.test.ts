@@ -2,22 +2,33 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // Mock grammy before importing the service
+const mockSendMessage = vi.fn();
+
 const mockBotInstance = {
   api: {
     config: {
       use: vi.fn(),
     },
+    sendMessage: mockSendMessage,
   },
   catch: vi.fn(),
   start: vi.fn(() => new Promise<void>(() => {})), // never-resolving promise
   stop: vi.fn(() => Promise.resolve()),
   isRunning: vi.fn(() => false),
+  callbackQuery: vi.fn(),
 };
 
 const MockBot = vi.fn(function () { return mockBotInstance; });
 
+// InlineKeyboard mock — captures the text() call so tests can verify button data
+const mockInlineKeyboardInstance = {
+  text: vi.fn().mockReturnThis(),
+};
+const MockInlineKeyboard = vi.fn(function () { return mockInlineKeyboardInstance; });
+
 vi.mock('grammy', () => ({
   Bot: MockBot,
+  InlineKeyboard: MockInlineKeyboard,
   GrammyError: class GrammyError extends Error {
     description: string;
     constructor(description: string) {
@@ -48,6 +59,7 @@ describe('TelegramBotService', () => {
     mockBotInstance.start.mockReturnValue(new Promise<void>(() => {}));
     mockBotInstance.stop.mockResolvedValue(undefined);
     mockBotInstance.isRunning.mockReturnValue(false);
+    mockInlineKeyboardInstance.text.mockReturnThis();
 
     // Reset singleton state by re-importing via unstable_importModule
     vi.resetModules();
@@ -181,6 +193,116 @@ describe('TelegramBotService', () => {
       telegramBotService.start();
       await telegramBotService.stop();
       expect(mockBotInstance.stop).toHaveBeenCalled();
+    });
+  });
+
+  // ─── APRV-01 tests ───────────────────────────────────────────────────────
+
+  describe('APRV-01: sendToTopicWithApproveButton', () => {
+    it('sends message with InlineKeyboard reply_markup and returns message_id', async () => {
+      process.env.WARDEN_TELEGRAM_BOT_TOKEN = 'test-token-123';
+      telegramBotService.start();
+
+      mockSendMessage.mockResolvedValue({ message_id: 42 });
+
+      const result = await telegramBotService.sendToTopicWithApproveButton(
+        '-100123',
+        '5',
+        'Test message',
+        'gideon-project-abc'
+      );
+
+      expect(result).toBe(42);
+      expect(MockInlineKeyboard).toHaveBeenCalled();
+      expect(mockInlineKeyboardInstance.text).toHaveBeenCalledWith(
+        'Approve',
+        'approve:gideon-project-abc'
+      );
+      expect(mockSendMessage).toHaveBeenCalledWith(
+        '-100123',
+        'Test message',
+        expect.objectContaining({
+          message_thread_id: 5,
+          parse_mode: 'Markdown',
+          reply_markup: mockInlineKeyboardInstance,
+        })
+      );
+    });
+
+    it('returns null when bot is not running (no token)', async () => {
+      delete process.env.WARDEN_TELEGRAM_BOT_TOKEN;
+      // bot is null — not started
+
+      const result = await telegramBotService.sendToTopicWithApproveButton(
+        '-100123',
+        '5',
+        'Test message',
+        'gideon-project-abc'
+      );
+
+      expect(result).toBeNull();
+      expect(mockSendMessage).not.toHaveBeenCalled();
+    });
+
+    it('returns null when sendMessage throws (error caught)', async () => {
+      process.env.WARDEN_TELEGRAM_BOT_TOKEN = 'test-token-123';
+      telegramBotService.start();
+
+      mockSendMessage.mockRejectedValue(new Error('Network error'));
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      const result = await telegramBotService.sendToTopicWithApproveButton(
+        '-100123',
+        '5',
+        'Test message',
+        'gideon-project-abc'
+      );
+
+      expect(result).toBeNull();
+      expect(errorSpy).toHaveBeenCalled();
+      errorSpy.mockRestore();
+    });
+  });
+
+  // ─── registerCallbackHandler tests ───────────────────────────────────────
+
+  describe('registerCallbackHandler applies handlers during start()', () => {
+    it('registered handler receives the bot instance during start()', () => {
+      process.env.WARDEN_TELEGRAM_BOT_TOKEN = 'test-token-123';
+
+      const handlerSpy = vi.fn();
+      telegramBotService.registerCallbackHandler(handlerSpy);
+
+      telegramBotService.start();
+
+      expect(handlerSpy).toHaveBeenCalledOnce();
+      expect(handlerSpy).toHaveBeenCalledWith(mockBotInstance);
+    });
+
+    it('handler is applied BEFORE bot.start() — called in correct order', () => {
+      process.env.WARDEN_TELEGRAM_BOT_TOKEN = 'test-token-123';
+
+      const callOrder: string[] = [];
+      const handlerSpy = vi.fn(() => { callOrder.push('handler'); });
+      mockBotInstance.start.mockImplementation(() => {
+        callOrder.push('start');
+        return new Promise<void>(() => {});
+      });
+
+      telegramBotService.registerCallbackHandler(handlerSpy);
+      telegramBotService.start();
+
+      expect(callOrder).toEqual(['handler', 'start']);
+    });
+
+    it('handler is not called when token is missing (bot never created)', () => {
+      delete process.env.WARDEN_TELEGRAM_BOT_TOKEN;
+
+      const handlerSpy = vi.fn();
+      telegramBotService.registerCallbackHandler(handlerSpy);
+      telegramBotService.start();
+
+      expect(handlerSpy).not.toHaveBeenCalled();
     });
   });
 });
