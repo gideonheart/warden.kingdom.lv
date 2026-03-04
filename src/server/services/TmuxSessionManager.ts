@@ -47,6 +47,17 @@ export class TmuxSessionManager {
     return sessionName;
   }
 
+  async createSessionWithClaude(agentId: string, projectSlug: string, projectPath: string): Promise<string> {
+    const sessionName = this.buildSessionName(agentId, projectSlug);
+    await this.executeTmuxCommand('new-session', ['-d', '-s', sessionName, '-c', projectPath]);
+    await this.executeTmuxCommand('send-keys', ['-t', `${sessionName}:0.0`, 'claude --dangerously-skip-permissions', 'Enter']);
+    return sessionName;
+  }
+
+  async sendCtrlC(sessionName: string): Promise<void> {
+    await this.executeTmuxCommand('send-keys', ['-t', `${sessionName}:0.0`, 'C-c']);
+  }
+
   async destroySession(sessionName: string): Promise<void> {
     await this.executeTmuxCommand('kill-session', ['-t', sessionName]);
   }
@@ -83,7 +94,7 @@ export class TmuxSessionManager {
     return sessionName.split('-')[0];
   }
 
-  private buildSessionName(agentId: string, projectSlug: string): string {
+  buildSessionName(agentId: string, projectSlug: string): string {
     const shortId = crypto.randomUUID().slice(0, 4);
     return `${agentId}-${projectSlug}-${shortId}`;
   }

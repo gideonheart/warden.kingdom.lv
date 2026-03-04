@@ -10,7 +10,7 @@ export interface AgentInstance {
   lastActiveAt: string;
 }
 
-export type AgentInstanceStatus = 'active' | 'idle' | 'stopped' | 'error';
+export type AgentInstanceStatus = 'active' | 'idle' | 'stopped' | 'error' | 'starting' | 'stopping';
 
 export interface AgentInstanceCreateParams {
   agentId: string;
