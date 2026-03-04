@@ -178,11 +178,11 @@ Plans:
   3. The recording captures the first line of terminal output (no missing frames due to race conditions)
   4. The recording-active indicator in the terminal header lights up automatically for auto-started recordings
   5. Auto-record defaults to off for all agents — existing recording behavior is unchanged until the operator explicitly opts in
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 30-01: AutoRecordConfigService, DB migration, REST endpoints
-- [ ] 30-02: Hook into TerminalStreamService after PTY onData registration + RecordingLibrary toggle UI
+- [ ] 30-01-PLAN.md — AutoRecordConfig type, DB migration, DB methods, REST endpoints
+- [ ] 30-02-PLAN.md — Auto-record hook in PTY lifecycle, useRecordingState sync, RecordingLibrary toggle UI
 
 ### Phase 31: Storage Rotation
 **Goal**: Operators can cap total recording storage so auto-record never causes unbounded disk growth — oldest recordings are pruned safely without interrupting active playback
