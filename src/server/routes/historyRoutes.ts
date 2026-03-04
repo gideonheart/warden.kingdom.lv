@@ -30,6 +30,32 @@ historyRoutes.get('/api/history/token-usage', (request, response) => {
   response.json({ usage, summary });
 });
 
+historyRoutes.get('/api/history/model-comparison', (request, response) => {
+  const { agentId, dateFrom, dateTo } = request.query as Record<string, string | undefined>;
+  const data = database.getModelComparison({ agentId, dateFrom, dateTo });
+  response.json({ modelComparison: data });
+});
+
+historyRoutes.get('/api/history/token-usage/export', (request, response) => {
+  const rows = database.getTokenUsageForExport({});
+
+  const headers = ['date', 'agent_id', 'model', 'input_tokens', 'output_tokens',
+                   'cache_creation_input_tokens', 'cache_read_input_tokens', 'cost_usd'];
+  const csvLines = [
+    headers.join(','),
+    ...rows.map((row) =>
+      [row.date, row.agentId, row.model, row.inputTokens, row.outputTokens,
+       row.cacheCreationInputTokens, row.cacheReadInputTokens, row.costUsd.toFixed(6)].join(',')
+    ),
+  ];
+  const csvContent = csvLines.join('\n');
+
+  const today = new Date().toISOString().slice(0, 10);
+  response.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  response.setHeader('Content-Disposition', `attachment; filename="warden-token-usage-${today}.csv"`);
+  response.send(csvContent);
+});
+
 historyRoutes.post('/api/history/token-usage/scan', async (_request, response) => {
   try {
     await sessionUsageReader.scanAllProjects();
