@@ -3,6 +3,7 @@ import { execFile } from 'child_process';
 import { promisify } from 'util';
 import type { Server as SocketIOServer, Socket } from 'socket.io';
 import { recordingCaptureService } from './RecordingCaptureService.js';
+import { database } from '../database/DatabaseConnection.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -179,6 +180,26 @@ export class TerminalStreamService {
       }
       this.sessions.delete(sessionName);
     });
+
+    // Auto-record: start recording if the agent has auto-record enabled (fresh PTY spawn only)
+    const instanceForAutoRecord = database.findInstanceBySessionName(sessionName);
+    if (instanceForAutoRecord && database.isAutoRecordEnabled(instanceForAutoRecord.agentId)) {
+      if (!recordingCaptureService.isRecording(sessionName)) {
+        try {
+          recordingCaptureService.startRecording({
+            sessionName,
+            agentId: instanceForAutoRecord.agentId,
+            agentName: instanceForAutoRecord.agentName,
+            projectPath: instanceForAutoRecord.projectPath,
+            cols,
+            rows,
+          });
+          console.log(`[TerminalStream] Auto-record started for ${sessionName} (agent: ${instanceForAutoRecord.agentId})`);
+        } catch (error) {
+          console.warn(`[TerminalStream] Auto-record failed to start for ${sessionName}:`, error);
+        }
+      }
+    }
 
     this.setupSocketInputHandlers(socket, session);
   }

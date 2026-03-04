@@ -47,6 +47,27 @@ export function useRecordingState({
     };
   }, []);
 
+  // Sync recording state on mount: detect server-side auto-started recordings
+  useEffect(() => {
+    void fetch('/api/recordings/active')
+      .then(r => r.json())
+      .then((active: Array<{ sessionName: string; recordingId: number; startedAt: string }>) => {
+        const found = active.find(a => a.sessionName === sessionName);
+        if (found && !tickerRef.current) {
+          setRecordingId(found.recordingId);
+          setIsRecording(true);
+          startedAtRef.current = new Date(found.startedAt).getTime();
+          setElapsedMs(Date.now() - startedAtRef.current);
+          tickerRef.current = setInterval(() => {
+            if (startedAtRef.current !== null) {
+              setElapsedMs(Date.now() - startedAtRef.current);
+            }
+          }, 1000);
+        }
+      })
+      .catch(() => { /* non-fatal — indicator just won't light up for auto-started recordings */ });
+  }, [sessionName]);
+
   const startRecording = useCallback(async (cols: number, rows: number) => {
     const response = await fetch(`/api/recordings/session/${encodeURIComponent(sessionName)}/start`, {
       method: 'POST',
