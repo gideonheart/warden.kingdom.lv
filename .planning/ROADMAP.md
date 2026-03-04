@@ -77,7 +77,7 @@
 - [x] **Phase 23: Token Analytics & Export** — Model cost comparison view and CSV export of full token usage dataset (completed 2026-03-04)
 - [x] **Phase 26: Token Analytics Polish & Tech Debt** — Fix agent filter accessibility on Model Costs tab, clean up unused imports and label semantics (gap closure) (completed 2026-03-04)
 - [x] **Phase 24: Session Recording & Replay** — Record terminal output as asciicast v2 files, replay at variable speed, browsable recording library (completed 2026-03-04)
-- [ ] **Phase 27: Recording State Cleanup & Tech Debt** — Fix recording state desync on session_ended, clean up unused variables, doc consistency (gap closure)
+- [x] **Phase 27: Recording State Cleanup & Tech Debt** — Fix recording state desync on session_ended, clean up unused variables, doc consistency (gap closure) (completed 2026-03-04)
 
 ## Phase Details
 
@@ -329,4 +329,4 @@ Plans:
 | 23. Token Analytics & Export | v3.1 | 2/2 | Complete | 2026-03-04 |
 | 26. Token Analytics Polish & Tech Debt | v3.1 | 1/1 | Complete | 2026-03-04 |
 | 24. Session Recording & Replay | v3.1 | 2/2 | Complete | 2026-03-04 |
-| 27. Recording State Cleanup & Tech Debt | v3.1 | 0/1 | Planned | - |
+| 27. Recording State Cleanup & Tech Debt | 1/1 | Complete   | 2026-03-04 | - |

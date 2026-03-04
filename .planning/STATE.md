@@ -6,16 +6,16 @@ See: .planning/PROJECT.md (updated 2026-03-04)
 
 **Core value:** Real-time visibility into all active Claude Code agent sessions from a single browser tab
 
-**Current focus:** v3.1 — Agent Control & Deep Insights (Phase 24 Plan 02 complete)
+**Current focus:** v3.1 — Agent Control & Deep Insights (Phase 27 Plan 01 complete — recording state cleanup & tech debt)
 
 ## Current Position
 
-Phase: 24 of 26 (Session Recording & Replay)
-Plan: 2 of 3 complete (Phase 24 Plans 01-02 done)
-Status: Phase 24 Plan 02 complete — full recording UI layer: REC button with pulse indicator, RecordingLibrary sortable table, RecordingPlayer with asciicast v2 replay
-Last activity: 2026-03-04 - Phase 24 Plan 02 executed (24-02: recording UI — useRecordingState hook, REC button, RecordingLibrary, RecordingPlayer, Recordings nav tab)
+Phase: 27 of 27 (Recording State Cleanup & Tech Debt)
+Plan: 1 of 1 complete (Phase 27 Plan 01 done)
+Status: Phase 27 Plan 01 complete — sessionExited() hook, __dirname removal, 23-VERIFICATION body corrected to 8/8
+Last activity: 2026-03-04 - Phase 27 Plan 01 executed (27-01: REC-02-STATE-DESYNC fix, RecordingCaptureService cleanup, 23-VERIFICATION doc consistency)
 
-Progress: [████████████████░░░░░░░░░░░░░░] 54% (21/26 phases complete — Phase 24 in progress, Plan 01/3 done)
+Progress: [████████████████████████████░░] 100% (27/27 phases complete — v3.1 milestone COMPLETE)
 
 ## Performance Metrics
 
@@ -69,6 +69,9 @@ Key decisions relevant to v3.1:
 - [Phase 24-02]: RecordingPlayer uses RAF loop for playback — writes all frames up to current virtual time per tick, naturally handles any speed multiplier
 - [Phase 24-02]: seekTo() resets terminal and replays all frames from start to target — ensures correctness; acceptable for session recording lengths
 - [Phase 24-02]: RecordingLibrary shows Play only for recordings with stoppedAt — prevents attempting to play still-active recordings
+- [Phase 27-01]: sessionExited() does not HTTP-stop recording — server auto-stops on ptyProcess.onExit; client only resets local state
+- [Phase 27-01]: useRecordingState moved before handleSessionExit in TerminalView — JavaScript scoping requires sessionExited to be in scope when handleSessionExit captures it
+- [Phase 27-01]: useCallback([]) empty deps for sessionExited — only uses refs and setter functions, stable identity prevents unnecessary handleSessionExit recreations
 
 ### Pending Todos
 
@@ -76,14 +79,7 @@ None
 
 ### Blockers/Concerns
 
-**Phase 24 (Recording Replay):**
-- Plans 01 and 02 complete — backend and UI layer both done. Plan 03 (if it exists) would cover remaining items.
-- asciicast v2 replay player implemented as custom RAF-driven xterm.js writes — no new npm dependency needed.
-
-**Phase 25 (Stretch):**
-- Depends on Phase 19 permission detection stability. If detectAgentState() heuristics produce false positives, auto-record trigger will over-record. Research phase should confirm false-positive rate before committing to on-permission-prompt trigger.
-
-Phase 24 Plan 01 complete — no active blockers.
+None — Phase 27 Plan 01 complete. v3.1 milestone is clean: 22/22 integrations, 4/4 flows, all tech debt items resolved.
 
 ### Quick Tasks Completed
 
@@ -96,5 +92,5 @@ Phase 24 Plan 01 complete — no active blockers.
 ## Session Continuity
 
 Last session: 2026-03-04
-Stopped at: Completed 24-02-PLAN.md (Recording UI: REC button, RecordingLibrary, RecordingPlayer, Recordings nav tab)
-Next step: Execute Phase 24 Plan 03 (if planned) — or proceed to Phase 25/26
+Stopped at: Completed 27-01-PLAN.md (REC-02-STATE-DESYNC fix, RecordingCaptureService __dirname removal, 23-VERIFICATION 8/8 consistency)
+Next step: v3.1 milestone is complete — all 27 phases done
