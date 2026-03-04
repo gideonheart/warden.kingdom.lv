@@ -194,11 +194,11 @@ Plans:
   3. Rotation never deletes a recording that is currently being played back (two-phase deletion with deletion_pending flag)
   4. Rotation never deletes a session whose recording is actively being captured
   5. User can see current storage usage stats and trigger a manual prune run from the recording library UI
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 31-01: RecordingRotationService, deletion_pending DB migration, rotation policy config + REST endpoint
-- [ ] 31-02: Storage stats UI and manual prune button in RecordingLibrary
+- [ ] 31-01-PLAN.md — RecordingRotationService + DB migration + rotation config + REST endpoints
+- [ ] 31-02-PLAN.md — Storage stats UI and manual prune button in RecordingLibrary
 
 ## Progress
 
