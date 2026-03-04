@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-03-04)
 
 **Core value:** Real-time visibility into all active Claude Code agent sessions from a single browser tab
-**Current focus:** v3.2 Mobile Operations & UX Polish — Phase 28: Mobile Toolbar Fixes
+**Current focus:** v3.2 Mobile Operations & UX Polish — Phase 29: Session Navigation
 
 ## Current Position
 
-Phase: 28 of 31 (Mobile Toolbar Fixes)
+Phase: 29 of 31 (Session Navigation)
 Plan: 1 of 1 in current phase
-Status: Phase complete — ready for Phase 29
-Last activity: 2026-03-04 — Phase 28 complete: Enter key + iOS keyboard persistence fix shipped
+Status: Phase complete — ready for Phase 30
+Last activity: 2026-03-04 — Phase 29 complete: Session history rows now actionable with three-way navigation
 
-Progress: [████████████████████] 28/31 phases complete (90%)
+Progress: [█████████████████████] 29/31 phases complete (94%)
 
 ## Performance Metrics
 
@@ -23,6 +23,7 @@ Progress: [████████████████████] 28/31 p
 | Phase | Plan | Duration | Tasks | Files |
 |-------|------|----------|-------|-------|
 | 28-mobile-toolbar-fixes | 01 | 2min | 2 | 1 |
+| 29-session-navigation | 01 | 2min | 2 | 3 |
 
 ## Accumulated Context
 
@@ -39,6 +40,9 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase 28-mobile-toolbar-fixes]: Use terminal.textarea?.focus() (DOM) not terminal.focus() (xterm API) for iOS keyboard retention
 - [Phase 28-mobile-toolbar-fixes]: Call refocusTerminal() synchronously in onTouchStart — deferred calls ignored by iOS Safari
 - [Phase 28-mobile-toolbar-fixes]: Enter key placed at MOBILE_KEYS[0] for always-visible position on narrow phone screens
+- [Phase 29-session-navigation]: NAVIGABLE_STATUSES checks session.status field directly (not active instances list) — status is authoritative signal
+- [Phase 29-session-navigation]: recordings.find() requires r.stoppedAt !== null — only completed recordings are playable
+- [Phase 29-session-navigation]: Recordings fetched once on mount (not polled) — stable reference data doesn't need per-render polling
 
 ### Pending Todos
 
@@ -60,5 +64,5 @@ None — v3.1 shipped cleanly. v3.2 scope is well-researched with HIGH confidenc
 ## Session Continuity
 
 Last session: 2026-03-04
-Stopped at: Completed 28-01-PLAN.md — Phase 28 done (Enter key + iOS keyboard-persistence fix in TerminalView.tsx)
-Next step: `/gsd:plan-phase 29` (or `/gsd:execute-phase 29` if plan already exists)
+Stopped at: Completed 29-01-PLAN.md — Phase 29 done (session history rows now actionable with three-way navigation)
+Next step: `/gsd:plan-phase 30` (or `/gsd:execute-phase 30` if plan already exists)

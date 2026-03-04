@@ -14,9 +14,9 @@ Requirements for v3.2 Mobile Operations & UX Polish. Each maps to roadmap phases
 
 ### Session Navigation
 
-- [ ] **NAV-01**: User can tap a history session row to navigate to its live terminal (if session is active)
-- [ ] **NAV-02**: User can tap a history session row to open recording replay (if session is stopped and recording exists)
-- [ ] **NAV-03**: User sees explanatory feedback when tapping a stopped session with no recording available
+- [x] **NAV-01**: User can tap a history session row to navigate to its live terminal (if session is active)
+- [x] **NAV-02**: User can tap a history session row to open recording replay (if session is stopped and recording exists)
+- [x] **NAV-03**: User sees explanatory feedback when tapping a stopped session with no recording available
 
 ### Auto-Record
 
@@ -62,9 +62,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 |-------------|-------|--------|
 | MOB-01 | Phase 28 | Complete |
 | MOB-02 | Phase 28 | Complete |
-| NAV-01 | Phase 29 | Pending |
-| NAV-02 | Phase 29 | Pending |
-| NAV-03 | Phase 29 | Pending |
+| NAV-01 | Phase 29 | Complete |
+| NAV-02 | Phase 29 | Complete |
+| NAV-03 | Phase 29 | Complete |
 | REC-05 | Phase 30 | Pending |
 | REC-06 | Phase 30 | Pending |
 | ROT-01 | Phase 31 | Pending |
