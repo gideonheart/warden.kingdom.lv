@@ -10,19 +10,19 @@ See: .planning/PROJECT.md (updated 2026-03-04)
 ## Current Position
 
 Phase: 34 — One-Tap Approve
-Plan: 01 complete (1/? plans — Phase 34 in progress)
-Status: Phase 34 plan 01 complete — ApprovalStateTracker and ApprovalCallbackHandler built with 16 unit tests; APRV-02/03/04/05 covered
-Last activity: 2026-03-04 — 34-01-PLAN.md executed, core approval services built via TDD
+Plan: 02 complete (2/2 plans — Phase 34 complete)
+Status: Phase 34 complete — end-to-end one-tap approve wired; 81 tests pass; APRV-01/02/03/04/05 all covered
+Last activity: 2026-03-04 — 34-02-PLAN.md executed, approve button wired into notification pipeline
 
 ```
-Progress: [###░] 3/4 phases (Phase 32 complete, Phase 33 complete, Phase 34 in progress)
-Milestone: v3.3 Telegram Operator Awareness
+Progress: [####] 4/4 phases (Phase 32 complete, Phase 33 complete, Phase 34 complete)
+Milestone: v3.3 Telegram Operator Awareness — COMPLETE
 ```
 
 ## Performance Metrics
 
-**Completed milestones:** v1.0 (6 phases), v1.1 (2), v2.0 (3), v2.1 (3), v2.3 (4), v3.0 (2), v3.1 (6), v3.2 (4) = 31 phases shipped
-**Current milestone:** v3.3 — Phase 32 complete, Phase 33 complete, Phase 34 in progress (3/4 phases)
+**Completed milestones:** v1.0 (6 phases), v1.1 (2), v2.0 (3), v2.1 (3), v2.3 (4), v3.0 (2), v3.1 (6), v3.2 (4), v3.3 (4) = 35 phases shipped
+**Current milestone:** v3.3 Telegram Operator Awareness — COMPLETE (Phase 32, 33, 34 all done)
 
 ## Accumulated Context
 
@@ -54,6 +54,9 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase 34-01]: ApprovalStateTracker uses in-memory Map; markConsumed() synchronous before async tmux call prevents double-tap race (Node.js single-threaded event loop)
 - [Phase 34-01]: ApprovalCallbackHandler.register(bot) pattern — handler class registers on bot reference; called after bot construction but before bot.start()
 - [Phase 34-01]: Expired approval returns 'Approval expired' without editing message; session-gone returns 'Session no longer available' without editing message (leaves button as failure indicator)
+- [Phase 34-02]: sendToTopicWithApproveButton is a separate method — cleaner API, sendToTopic remains for non-approval messages
+- [Phase 34-02]: registerCallbackHandler stores handlers in array — supports multiple handlers without coupling
+- [Phase 34-02]: approvalStateTracker.pruneExpired() piggybacked on 10s poll cycle — no extra timer needed
 
 ### Research Flags
 
@@ -80,6 +83,6 @@ None
 
 ## Session Continuity
 
-Last session: 2026-03-04 (Plan 34-01 execution)
-Stopped at: Completed 34-01-PLAN.md — ApprovalStateTracker and ApprovalCallbackHandler built with TDD; APRV-02/03/04/05 satisfied
-Next step: Execute Phase 34 Plan 02 — Wire ApprovalCallbackHandler into TelegramBotService and extend NotificationPoller to send approve buttons
+Last session: 2026-03-04 (Plan 34-02 execution)
+Stopped at: Completed 34-02-PLAN.md — approve button wired end-to-end; 81 tests pass; production build succeeds; v3.3 milestone complete
+Next step: Plan next milestone (v3.4 or new feature area)
