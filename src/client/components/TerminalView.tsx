@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback, useState } from 'react';
+import { useEffect, useRef, useCallback, useState, memo } from 'react';
 import { Terminal } from 'xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
@@ -203,7 +203,10 @@ function estimateTerminalDimensions(
   return { cols, rows };
 }
 
-export function TerminalView({
+// TerminalView is wrapped in React.memo to bail out of re-renders when all props are
+// reference-equal. Combined with the value-based agentLiveStatus stabilization in App.tsx,
+// this prevents xterm.js from being disturbed every 5s when the live-status poll fires.
+function TerminalViewInner({
   tmuxSessionName,
   onSessionExit,
   agentLiveStatus,
@@ -853,3 +856,5 @@ export function TerminalView({
     </div>
   );
 }
+
+export const TerminalView = memo(TerminalViewInner);

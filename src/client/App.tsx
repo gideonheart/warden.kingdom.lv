@@ -129,6 +129,30 @@ export function App() {
     initialSessionName: parseHash().session,
   });
 
+  // Stabilize the AgentLiveStatus object for the selected session by value — not by
+  // reference. sessionStatusMap.get() returns a NEW object on every poll cycle even when
+  // state/contextPressure/contextPressureLevel values are identical, because useMemo
+  // rebuilds the Map whenever liveStatus reference changes. Without this stabilization,
+  // TerminalView re-renders every 5s (whenever the agent's tmux pane output changes),
+  // causing avoidable reconciliation work and potential layout disruption to xterm.js.
+  const selectedSessionLiveStatusRef = useRef<AgentLiveStatus | null>(null);
+  const selectedSessionLiveStatus = useMemo(() => {
+    const next = sessionStatusMap.get(selectedSessionName ?? '') ?? null;
+    const prev = selectedSessionLiveStatusRef.current;
+    // Return the previous reference when all three fields are value-equal.
+    if (
+      prev !== null &&
+      next !== null &&
+      prev.state === next.state &&
+      prev.contextPressure === next.contextPressure &&
+      prev.contextPressureLevel === next.contextPressureLevel
+    ) {
+      return prev;
+    }
+    selectedSessionLiveStatusRef.current = next;
+    return next;
+  }, [sessionStatusMap, selectedSessionName]);
+
   // Auto-select first agent in sidebar when agents load (useEffect guard — not render body)
   useEffect(() => {
     if (sidebarSelectedAgentId === null && agents.length > 0) {
@@ -488,7 +512,7 @@ export function App() {
                   <TerminalView
                     tmuxSessionName={selectedSessionName}
                     onSessionExit={handleSessionExit}
-                    agentLiveStatus={sessionStatusMap.get(selectedSessionName ?? '') ?? null}
+                    agentLiveStatus={selectedSessionLiveStatus}
                     terminalFocusRef={terminalFocusRef}
                     searchOpenRef={searchOpenRef}
                     notificationsEnabled={notificationsEnabled}
