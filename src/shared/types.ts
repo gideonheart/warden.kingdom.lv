@@ -91,3 +91,17 @@ export interface ModelComparisonRow {
 }
 
 export type TokenUsageExportRow = TokenUsageByModelRow;
+
+export interface RecordingEntry {
+  id: number;
+  sessionName: string;
+  agentId: string;
+  agentName: string;
+  projectPath: string;
+  startedAt: string;      // ISO 8601 datetime
+  stoppedAt: string | null;
+  durationSecs: number | null;
+  filePath: string;       // absolute path to .cast file
+  fileSizeBytes: number | null;
+  stopReason: 'manual' | 'session_ended' | null;
+}

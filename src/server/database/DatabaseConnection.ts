@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import type { AgentInstance, AgentInstanceCreateParams, AgentInstanceStatus, TokenUsageRow, BurnRateEntry, BudgetConfig, BudgetAlertStatus, BurnWindow, TokenUsageByModelRow, ModelComparisonRow, TokenUsageExportRow } from '../../shared/types.js';
+import type { AgentInstance, AgentInstanceCreateParams, AgentInstanceStatus, TokenUsageRow, BurnRateEntry, BudgetConfig, BudgetAlertStatus, BurnWindow, TokenUsageByModelRow, ModelComparisonRow, TokenUsageExportRow, RecordingEntry } from '../../shared/types.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -297,6 +297,59 @@ class DatabaseConnection {
     `).all() as BudgetAlertStatus[];
   }
 
+  insertRecording(params: {
+    sessionName: string;
+    agentId: string;
+    agentName: string;
+    projectPath: string;
+    filePath: string;
+  }): RecordingEntry {
+    const result = this.db.prepare(`
+      INSERT INTO recordings (session_name, agent_id, agent_name, project_path, file_path)
+      VALUES (@sessionName, @agentId, @agentName, @projectPath, @filePath)
+    `).run(params);
+    return this.findRecordingById(result.lastInsertRowid as number)!;
+  }
+
+  findRecordingById(id: number): RecordingEntry | null {
+    return this.db.prepare(`
+      SELECT id, session_name AS sessionName, agent_id AS agentId, agent_name AS agentName,
+             project_path AS projectPath, file_path AS filePath,
+             started_at AS startedAt, stopped_at AS stoppedAt,
+             duration_secs AS durationSecs, file_size_bytes AS fileSizeBytes,
+             stop_reason AS stopReason
+      FROM recordings WHERE id = ?
+    `).get(id) as RecordingEntry | null;
+  }
+
+  finaliseRecording(id: number, params: { durationSecs: number; fileSizeBytes: number; stopReason: 'manual' | 'session_ended' }): void {
+    this.db.prepare(`
+      UPDATE recordings
+      SET stopped_at = CURRENT_TIMESTAMP, duration_secs = @durationSecs,
+          file_size_bytes = @fileSizeBytes, stop_reason = @stopReason
+      WHERE id = @id
+    `).run({ id, ...params });
+  }
+
+  listRecordings(): RecordingEntry[] {
+    return this.db.prepare(`
+      SELECT id, session_name AS sessionName, agent_id AS agentId, agent_name AS agentName,
+             project_path AS projectPath, file_path AS filePath,
+             started_at AS startedAt, stopped_at AS stoppedAt,
+             duration_secs AS durationSecs, file_size_bytes AS fileSizeBytes,
+             stop_reason AS stopReason
+      FROM recordings
+      ORDER BY started_at DESC
+    `).all() as RecordingEntry[];
+  }
+
+  deleteRecording(id: number): RecordingEntry | null {
+    const entry = this.findRecordingById(id);
+    if (!entry) return null;
+    this.db.prepare('DELETE FROM recordings WHERE id = ?').run(id);
+    return entry;
+  }
+
   close(): void {
     console.log('[Database] Checkpointing WAL before close');
     this.db.pragma('wal_checkpoint(TRUNCATE)');
@@ -399,6 +452,26 @@ class DatabaseConnection {
 
       CREATE INDEX IF NOT EXISTS idx_token_usage_by_model_agent_date
         ON token_usage_by_model(agent_id, date);
+    `);
+
+    // Migration: recordings table (REC-01) for asciicast v2 session recordings
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS recordings (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        session_name TEXT NOT NULL,
+        agent_id TEXT NOT NULL,
+        agent_name TEXT NOT NULL DEFAULT '',
+        project_path TEXT NOT NULL DEFAULT '',
+        file_path TEXT NOT NULL,
+        started_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        stopped_at DATETIME,
+        duration_secs REAL,
+        file_size_bytes INTEGER,
+        stop_reason TEXT
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_recordings_agent_id ON recordings(agent_id);
+      CREATE INDEX IF NOT EXISTS idx_recordings_started_at ON recordings(started_at);
     `);
   }
 
