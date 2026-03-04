@@ -6,22 +6,20 @@ See: .planning/PROJECT.md (updated 2026-03-04)
 
 **Core value:** Real-time visibility into all active Claude Code agent sessions from a single browser tab
 
-**Current focus:** v3.1 — Agent Control & Deep Insights (Phase 27 Plan 01 complete — recording state cleanup & tech debt)
+**Current focus:** v3.1 milestone complete — planning next milestone
 
 ## Current Position
 
-Phase: 27 of 27 (Recording State Cleanup & Tech Debt)
-Plan: 1 of 1 complete (Phase 27 Plan 01 done)
-Status: Phase 27 Plan 01 complete — sessionExited() hook, __dirname removal, 23-VERIFICATION body corrected to 8/8
-Last activity: 2026-03-04 - Phase 27 Plan 01 executed (27-01: REC-02-STATE-DESYNC fix, RecordingCaptureService cleanup, 23-VERIFICATION doc consistency)
+Phase: All phases complete
+Plan: N/A
+Status: v3.1 milestone archived and tagged
+Last activity: 2026-03-04 - v3.1 milestone completion (archival, PROJECT.md evolution, git tag)
 
-Progress: [████████████████████████████░░] 100% (27/27 phases complete — v3.1 milestone COMPLETE)
+Progress: [██████████████████████████████] 100% (27/27 phases complete — v3.1 milestone SHIPPED)
 
 ## Performance Metrics
 
-**Completed milestones:** v1.0 (6 phases), v1.1 (2), v2.0 (3), v2.1 (3), v2.3 (4), v3.0 (2) = 20 phases shipped
-
-**v3.1 scope:** 5 phases, ~9 plans estimated, 15 requirements
+**Completed milestones:** v1.0 (6 phases), v1.1 (2), v2.0 (3), v2.1 (3), v2.3 (4), v3.0 (2), v3.1 (6) = 26 phases shipped
 
 ## Accumulated Context
 
@@ -29,57 +27,13 @@ Progress: [███████████████████████
 
 See PROJECT.md Key Decisions table for full list with outcomes.
 
-Key decisions relevant to v3.1:
-
-- [Phase 11]: setImmediate tap pattern for PTY output — zero latency impact; reuse for recording capture in Phase 24
-- [Phase 12]: execFile (not exec) for all shell invocations — prevents injection; apply to spawn logic in Phase 21
-- [Phase 12]: Fire-and-forget spawn returns 202 immediately; session appears via InstanceTracker within 10s — same pattern for Phase 21 start
-- [Phase 18]: Upsert replaces full daily totals (idempotent scanner) — per-model aggregates needed for Phase 23 model comparison
-- [v3.0 Research]: useAgentLiveStatus polling at App.tsx level — Phase 21 'starting'/'stopping' states extend same pattern
-- [Quick-2038 scope]: Phase 25 is a stretch goal — may be deferred if Phase 24 recording infrastructure needs more time
-- [21-01]: promise chain fire-and-forget for start (not spawn detach) — tmux commands fast (<1s), no event loop blocking risk
-- [21-01]: buildSessionName made public — instanceRoutes pre-registers session name before tmux creation
-- [21-01]: markMissingSessionsStopped guards only 'active'/'idle' — 'starting'/'stopping' have own lifecycle handlers
-- [21-02]: activeInstances filter includes all 6 statuses — API controls scope, UI shows everything returned
-- [21-02]: Confirmation dialogs inline (not modal) — local state string|null pattern for compact UX
-- [21-02]: Dismiss button uses client-side Set — no server call, tab reappears on next poll if still in DB
-- [21-03]: 30-minute retention window for stopped/error sessions in listActiveInstances() — balances restart access vs tab bar clutter
-- [21-03]: OR clause (not UNION) for stopped/error retention — simpler, readable, same single-pass performance
-- [22-01]: SQL numeric constants interpolated directly (hours/days) — not user input, no injection risk
-- [22-01]: upsertBudgetConfig(agentId, 0) deletes row — "no budget = no alert" via delete-on-zero
-- [22-01]: /budget-config/status route before /:agentId — prevents Express param shadowing
-- [22-01]: Aggregate alertLevel computed in application layer, not SQL — clarity over cleverness
-- [22-02]: useBudgetAlerts uses previousRef guard — only calls setAlertLevel when value changes, preventing unnecessary re-renders every 30s
-- [22-02]: editingBudget Record<string,string> per agent — isolates draft state, avoids controlled/uncontrolled input issues
-- [22-02]: Amber badge animate-pulse, red badge static — visual distinction between warning and exceeded states
-- [22-02]: Projection card conditionally rendered when burnRates.length > 0 — no misleading $0.00 projections when no data
-- [Phase 23-token-analytics-export]: processJsonlFile() receives both dailyUsage and modelDailyUsage maps — ensures both accumulators see identical records in single pass
-- [Phase 23-token-analytics-export]: model || 'unknown' as fallback key in per-model accumulation — handles JSONL records missing model field gracefully
-- [Phase 23-token-analytics-export]: CSV export always sends full unfiltered dataset with date-stamped filename — consistent with TOKN-14 spec
-- [Phase 23]: ModelComparisonView defines formatAgentId() locally — avoids cross-component import coupling
-- [Phase 23]: Global max scaling for bars — allows cross-agent cost comparison at a glance
-- [Phase 26-01]: Shared filter inputs (affecting multiple tabs) belong in the tab bar header row, not inside individual tab content blocks
-- [Phase 26-01]: TIME_RANGE_LABELS['24h'] = 'Today' — calculateDateFrom uses calendar-day midnight, not a rolling 24h window; label must match implementation semantics
-- [Phase 26-01]: Scan Now button stays in usage tab block — it is a usage-tab-specific action, unlike the agent filter which affects both tabs
-- [Phase 24-01]: RecordingCaptureService holds in-memory frame buffer per session — no intermediate disk writes, writes full asciicast v2 on stop
-- [Phase 24-01]: PTY output tap in TerminalStreamService.ptyProcess.onData after broadcast loop — zero-latency impact
-- [Phase 24-01]: Auto-stop recording on ptyProcess.onExit with reason 'session_ended' — guarantees .cast file written even if operator never clicks stop
-- [Phase 24-01]: recordingCaptureService singleton exported — clean import from both TerminalStreamService and recordingRoutes without circular deps
-- [Phase 24-02]: useRecordingState uses optimistic local state with elapsed ticker — no polling needed; server call only on start/stop
-- [Phase 24-02]: RecordingPlayer uses RAF loop for playback — writes all frames up to current virtual time per tick, naturally handles any speed multiplier
-- [Phase 24-02]: seekTo() resets terminal and replays all frames from start to target — ensures correctness; acceptable for session recording lengths
-- [Phase 24-02]: RecordingLibrary shows Play only for recordings with stoppedAt — prevents attempting to play still-active recordings
-- [Phase 27-01]: sessionExited() does not HTTP-stop recording — server auto-stops on ptyProcess.onExit; client only resets local state
-- [Phase 27-01]: useRecordingState moved before handleSessionExit in TerminalView — JavaScript scoping requires sessionExited to be in scope when handleSessionExit captures it
-- [Phase 27-01]: useCallback([]) empty deps for sessionExited — only uses refs and setter functions, stable identity prevents unnecessary handleSessionExit recreations
-
 ### Pending Todos
 
 None
 
 ### Blockers/Concerns
 
-None — Phase 27 Plan 01 complete. v3.1 milestone is clean: 22/22 integrations, 4/4 flows, all tech debt items resolved.
+None — v3.1 milestone shipped. All requirements satisfied, all integrations wired, all flows verified.
 
 ### Quick Tasks Completed
 
@@ -92,5 +46,5 @@ None — Phase 27 Plan 01 complete. v3.1 milestone is clean: 22/22 integrations,
 ## Session Continuity
 
 Last session: 2026-03-04
-Stopped at: Completed 27-01-PLAN.md (REC-02-STATE-DESYNC fix, RecordingCaptureService __dirname removal, 23-VERIFICATION 8/8 consistency)
-Next step: v3.1 milestone is complete — all 27 phases done
+Stopped at: v3.1 milestone complete — archived, tagged, ready for next milestone
+Next step: `/gsd:new-milestone` to define next milestone scope and requirements

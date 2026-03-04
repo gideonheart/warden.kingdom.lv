@@ -2,7 +2,7 @@
 
 ## What This Is
 
-A browser-based terminal multiplexer hosted at `warden.kingdom.lv` that streams live Claude Code output via xterm.js, shows which OpenClaw agent owns each session, maps sessions to Telegram topics, and lets the operator inject prompts or type directly into terminals — with auto-focusing terminals, mouse scrollback, and session-aware prompt delivery via Gateway. It is the observation and override layer for the multi-agent system orchestrated by Gideon.
+A browser-based terminal multiplexer and operations platform hosted at `warden.kingdom.lv` that streams live Claude Code output via xterm.js, provides agent lifecycle control (start/stop/restart), cost velocity tracking with budget alerts, session recording with variable-speed replay, and operator awareness features (permission badges, context pressure, keyboard navigation, terminal search, browser notifications). It is the observation, control, and audit layer for the multi-agent system orchestrated by Gideon.
 
 ## Core Value
 
@@ -47,41 +47,30 @@ Real-time visibility into all active Claude Code agent sessions from a single br
 - ✓ Terminal text search via xterm-addon-search (Ctrl+F) — v3.0
 - ✓ Search match count, highlight persistence, scrollbar gutter markers — v3.0
 - ✓ Browser notifications for permission prompts (opt-in) — v3.0
+- ✓ Start, stop, and restart agent sessions from dashboard — v3.1
+- ✓ Agent session status lifecycle with transitional states (starting/stopping) — v3.1
+- ✓ Safety guards for agent orchestration (confirmations, 409 duplicate guard) — v3.1
+- ✓ Token burn rate calculation with sliding windows (Today/2-day/7-day) — v3.1
+- ✓ Per-agent budget alerts at 80%/100% thresholds with nav badge — v3.1
+- ✓ Cost projection at current burn rate — v3.1
+- ✓ Model cost comparison view (bar chart by model variant) — v3.1
+- ✓ CSV export of token usage data — v3.1
+- ✓ Terminal session recording in asciicast v2 format — v3.1
+- ✓ Recording toggle per session with red pulse indicator — v3.1
+- ✓ Recording replay at variable speed (1x/2x/4x/8x) — v3.1
+- ✓ Recording library with session metadata — v3.1
 
 ### Active
 
-- [ ] Start, stop, and restart agent sessions from dashboard
-- [ ] Agent session status lifecycle with transitional states
-- [ ] Safety guards for agent orchestration actions
-- [ ] Token burn rate calculation with sliding windows
-- [ ] Per-agent budget alerts at 80%/100% thresholds
-- [ ] Cost projection at current burn rate
-- [ ] Model cost comparison view
-- [ ] CSV export of token usage data
-- [ ] Terminal session recording in asciicast v2 format
-- [ ] Recording toggle per session
-- [ ] Recording replay at variable speed
-- [ ] Recording library with session metadata
-- [ ] Auto-record option with configurable triggers
+- [ ] Auto-record option with configurable triggers (REC-05, deferred from v3.1)
+- [ ] Recording storage rotation policy (auto-delete, cap total storage)
+- [ ] Telegram integration for permission prompt forwarding
 
-## Current Milestone: v3.1 Agent Control & Deep Insights
+## Current State
 
-**Goal:** Advance Warden from a monitoring tool to an active operations platform — agent lifecycle control, cost velocity insights, and session recording.
+**Latest milestone:** v3.1 Agent Control & Deep Insights (shipped 2026-03-04)
 
-**Target features:**
-- Start, stop, and restart agent sessions from the dashboard
-- Agent session status lifecycle with transitional states
-- Safety guards (confirmation dialogs, double-start prevention)
-- Token burn rate calculation with sliding windows (1h/4h/24h)
-- Per-agent budget alerts with visual warnings at 80%/100%
-- Cost projection based on current burn rate
-- Model cost comparison view
-- CSV export of token usage data
-- Terminal session recording in asciicast v2 format
-- Recording toggle per session (start/stop from UI)
-- Recording replay at variable speed (1x/2x/4x/8x)
-- Recording library with session metadata
-- Auto-record option with configurable triggers
+Warden has evolved from a monitoring dashboard to a full operations platform. The operator can now start, stop, and restart agent sessions; monitor cost velocity with budget alerts; compare model costs; export usage data; and record/replay terminal sessions.
 
 ### Out of Scope
 
@@ -96,12 +85,13 @@ Real-time visibility into all active Claude Code agent sessions from a single br
 
 ## Context
 
-Shipped v2.3 with 6,650 LOC TypeScript (src/). Net -486 LOC from v2.2 code hygiene pass.
+Shipped v3.1 with 10,685 LOC TypeScript (src/). Net +4,092 LOC from v3.0.
 Tech stack: Express 5, Socket.IO 4, React 19, xterm.js 5, node-pty, SQLite (better-sqlite3), Tailwind CSS 4, Vite 6, Vitest.
-Features: live terminal streaming, GSD Manager (4-tab control center), plugin registry, activity timeline, token usage JSONL scanner with cache tracking.
+Features: live terminal streaming, agent lifecycle control (start/stop/restart), token burn rate with budget alerts, model cost comparison, CSV export, session recording (asciicast v2) with variable-speed replay, terminal search, browser notifications, keyboard navigation, GSD Manager plugin, activity timeline.
 Runs on Ubuntu 24 server (Laravel Forge managed), same host as gideons.kingdom.lv.
 20 Playwright E2E tests + Vitest unit tests. Production Nginx config with SSL + IP whitelist + WebSocket.
 tmux configured with mouse mode and 50,000-line scrollback buffer for monitoring workflows.
+Known tech debt: detectAgentState() regex heuristics fragile but functional; REC-05 auto-record deferred.
 
 ## Constraints
 
@@ -138,6 +128,15 @@ tmux configured with mouse mode and 50,000-line scrollback buffer for monitoring
 | Per-model pricing with fallback | Map known models, default to sonnet-4-6 for unknowns | ✓ Good — safe default, warn-once for new variants |
 | Streaming readline for JSONL | Replace readFile with readline stream for large files | ✓ Good — memory-efficient, fd-safe cleanup |
 | useSessionSelection hook | Centralize tab selection with polling dedup and hysteresis | ✓ Good — eliminated socket disruption on polls |
+| Fire-and-forget start with 202 response | tmux commands fast (<1s), no event loop blocking | ✓ Good — session appears via InstanceTracker within 10s |
+| 30-minute retention for stopped/errored sessions | Balances restart access vs tab bar clutter | ✓ Good — OR clause, same single-pass performance |
+| Inline confirmation dialogs (not modal) | Local state string pattern for compact UX | ✓ Good — simple, no shared state needed |
+| useBudgetAlerts previousRef guard | Only calls setAlertLevel when value changes | ✓ Good — prevents unnecessary re-renders every 30s |
+| In-memory frame buffer for recordings | No intermediate disk writes, full asciicast v2 on stop | ✓ Good — clean files, no partial writes |
+| PTY output tap via onData callback | Zero-latency impact, after broadcast loop | ✓ Good — recording transparent to terminal streaming |
+| Auto-stop recording on PTY exit | Guarantees .cast file written even if operator never clicks stop | ✓ Good — no orphaned recordings |
+| RAF loop for recording playback | Writes all frames up to virtual time per tick, handles any speed | ✓ Good — smooth at all speeds |
+| sessionExited() resets client recording state | Server auto-stops; client only resets local state, no HTTP call | ✓ Good — clean separation of concerns |
 
 ---
-*Last updated: 2026-03-04 after v3.1 milestone start*
+*Last updated: 2026-03-04 after v3.1 milestone*

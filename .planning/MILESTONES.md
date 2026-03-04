@@ -93,3 +93,37 @@ See `.planning/milestones/v2.3-ROADMAP.md` for full phase details.
 
 ---
 
+
+## v3.1 Agent Control & Deep Insights (Shipped: 2026-03-04)
+
+**Phases:** 6 (Phases 21-24, 26-27) | **Plans:** 11 | **Commits:** 43 | **LOC:** 10,685 TypeScript (net +4,092)
+**Timeline:** 2 days (2026-03-03 → 2026-03-04)
+**Git range:** `81d21a3..c670de2`
+
+**Delivered:** Active operations platform — start, stop, and restart agent sessions from the dashboard with safety guards; cost velocity tracking with per-agent budget alerts; model cost comparison and CSV export; terminal session recording in asciicast v2 format with variable-speed replay.
+
+**Key accomplishments:**
+1. Agent lifecycle controls — full start/stop/restart with confirmation dialogs, real-time transitional state badges (starting/stopping), 30-minute stopped session retention for restart access
+2. Token burn rate & budget alerts — cost velocity with sliding windows (Today/2-day/7-day), per-agent budget thresholds with amber/red nav badges, cost projection cards
+3. Token analytics & export — model cost comparison view (grouped bar chart by sonnet/opus/haiku) and CSV export of full token usage dataset
+4. Session recording & replay — complete asciicast v2 recording pipeline with PTY output tap, variable-speed replay (1x/2x/4x/8x), browsable recording library with sortable table
+5. Two dedicated gap-closure phases (26, 27) resolved all integration gaps and tech debt discovered during milestone audit
+
+**Phases:**
+- Phase 21: Agent Lifecycle Controls (3/3 plans) — `93b4f4a`
+- Phase 22: Token Burn Rate & Budget Alerts (2/2 plans) — `1a71a43`
+- Phase 23: Token Analytics & Export (2/2 plans) — `5407146`
+- Phase 26: Token Analytics Polish & Tech Debt (1/1 plan) — `16da84f`
+- Phase 24: Session Recording & Replay (2/2 plans) — `35c79ce`
+- Phase 27: Recording State Cleanup & Tech Debt (1/1 plan) — `832a102`
+
+**Quick tasks shipped during milestone:** 2039-2041 (Phase 21 review, Phase 22 API key fix, Phase 22 re-verification)
+
+**Tech debt accepted:**
+- REC-05 auto-record settings panel — explicitly deferred to future milestone
+- Confirmation dialogs use inline local state — could extract to shared ConfirmDialog component (info-level)
+
+See `.planning/milestones/v3.1-ROADMAP.md` for full phase details.
+
+---
+
