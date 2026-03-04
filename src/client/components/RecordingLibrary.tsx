@@ -246,6 +246,102 @@ export function RecordingLibrary({ onPlayRecording, refreshKey }: RecordingLibra
         )}
       </div>
 
+      {/* Storage settings — collapsible */}
+      <div className="border-b border-warden-border">
+        <button
+          onClick={() => setShowStorageSettings(prev => !prev)}
+          className="w-full flex items-center justify-between px-4 py-2 text-xs text-warden-text-dim hover:text-warden-text transition-colors"
+        >
+          <span>Storage settings</span>
+          <span className="text-[10px]">{showStorageSettings ? '▲' : '▼'}</span>
+        </button>
+        {showStorageSettings && (
+          <div className="px-4 pb-3 space-y-3">
+            {/* Current usage display */}
+            {storageStats !== null && (
+              <div className="space-y-1">
+                <p className="text-xs text-warden-text-dim">
+                  Usage:{' '}
+                  <span className="text-warden-text">{formatFileSize(storageStats.totalBytes)}</span>
+                  {' '}across{' '}
+                  <span className="text-warden-text">{storageStats.recordingCount}</span>
+                  {' '}recording{storageStats.recordingCount !== 1 ? 's' : ''}
+                </p>
+                {storageStats.capBytes > 0 ? (
+                  <div className="w-full h-2 bg-warden-border rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all ${
+                        storageStats.totalBytes / storageStats.capBytes > 0.9
+                          ? 'bg-red-500/70'
+                          : 'bg-warden-accent'
+                      }`}
+                      style={{ width: `${Math.min(100, (storageStats.totalBytes / storageStats.capBytes) * 100).toFixed(1)}%` }}
+                    />
+                  </div>
+                ) : (
+                  <p className="text-[11px] text-yellow-400">
+                    No cap set — auto-record may use unlimited disk
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Cap input row */}
+            <div className="flex items-center gap-2">
+              <label className="text-xs text-warden-text-dim whitespace-nowrap">Storage cap (MB)</label>
+              <input
+                type="number"
+                min="0"
+                value={capInputMb}
+                onChange={(e) => setCapInputMb(e.target.value)}
+                placeholder="e.g. 500"
+                className="w-24 px-2 py-0.5 text-xs bg-warden-panel border border-warden-border text-warden-text-primary rounded focus:outline-none focus:border-warden-accent"
+              />
+              <button
+                onClick={handleSetCap}
+                className="px-2 py-0.5 text-xs bg-warden-accent text-black rounded hover:bg-warden-accent/80 transition-colors"
+              >
+                Set
+              </button>
+              {storageStats !== null && storageStats.capBytes > 0 && (
+                <button
+                  onClick={() => {
+                    setCapInputMb('');
+                    void fetch('/api/recordings/rotation-config', {
+                      method: 'PUT',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ capBytes: 0 }),
+                    }).then(() => fetchStorageStats());
+                  }}
+                  className="px-2 py-0.5 text-xs text-warden-text-dim border border-warden-border rounded hover:text-warden-text transition-colors"
+                >
+                  Disable
+                </button>
+              )}
+            </div>
+
+            {/* Prune Now button */}
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handlePrune}
+                disabled={isPruning || storageStats === null || storageStats.capBytes === 0}
+                className="px-2 py-0.5 text-xs bg-warden-border hover:bg-warden-border/80 text-warden-text-dim rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {isPruning ? 'Pruning...' : 'Prune now'}
+              </button>
+              {pruneResult !== null && (
+                <span className="text-[11px] text-warden-text-dim">
+                  Deleted {pruneResult.deletedCount} recording{pruneResult.deletedCount !== 1 ? 's' : ''}, freed {formatFileSize(pruneResult.freedBytes)}
+                </span>
+              )}
+              {storageStats !== null && storageStats.capBytes === 0 && (
+                <span className="text-[11px] text-warden-text-dim/50">Set a cap to enable pruning</span>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
       <div className="flex-1 min-h-0 overflow-y-auto">
         {isLoading ? (
           <div className="flex items-center justify-center h-32">
