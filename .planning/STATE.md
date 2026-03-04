@@ -6,14 +6,14 @@ See: .planning/PROJECT.md (updated 2026-03-04)
 
 **Core value:** Real-time visibility into all active Claude Code agent sessions from a single browser tab
 
-**Current focus:** v3.1 — Agent Control & Deep Insights (Phase 24 Plan 01 complete)
+**Current focus:** v3.1 — Agent Control & Deep Insights (Phase 24 Plan 02 complete)
 
 ## Current Position
 
 Phase: 24 of 26 (Session Recording & Replay)
-Plan: 1 of 3 complete (Phase 24 Plan 01 done)
-Status: Phase 24 Plan 01 complete — recording capture backend with RecordingCaptureService, recordings DB table, and REST API
-Last activity: 2026-03-04 - Phase 24 Plan 01 executed (24-01: recording capture backend — asciicast v2 writer, REST API, PTY output tap)
+Plan: 2 of 3 complete (Phase 24 Plans 01-02 done)
+Status: Phase 24 Plan 02 complete — full recording UI layer: REC button with pulse indicator, RecordingLibrary sortable table, RecordingPlayer with asciicast v2 replay
+Last activity: 2026-03-04 - Phase 24 Plan 02 executed (24-02: recording UI — useRecordingState hook, REC button, RecordingLibrary, RecordingPlayer, Recordings nav tab)
 
 Progress: [████████████████░░░░░░░░░░░░░░] 54% (21/26 phases complete — Phase 24 in progress, Plan 01/3 done)
 
@@ -65,6 +65,10 @@ Key decisions relevant to v3.1:
 - [Phase 24-01]: PTY output tap in TerminalStreamService.ptyProcess.onData after broadcast loop — zero-latency impact
 - [Phase 24-01]: Auto-stop recording on ptyProcess.onExit with reason 'session_ended' — guarantees .cast file written even if operator never clicks stop
 - [Phase 24-01]: recordingCaptureService singleton exported — clean import from both TerminalStreamService and recordingRoutes without circular deps
+- [Phase 24-02]: useRecordingState uses optimistic local state with elapsed ticker — no polling needed; server call only on start/stop
+- [Phase 24-02]: RecordingPlayer uses RAF loop for playback — writes all frames up to current virtual time per tick, naturally handles any speed multiplier
+- [Phase 24-02]: seekTo() resets terminal and replays all frames from start to target — ensures correctness; acceptable for session recording lengths
+- [Phase 24-02]: RecordingLibrary shows Play only for recordings with stoppedAt — prevents attempting to play still-active recordings
 
 ### Pending Todos
 
@@ -73,8 +77,8 @@ None
 ### Blockers/Concerns
 
 **Phase 24 (Recording Replay):**
-- asciicast v2 replay player: may need a new npm dependency (asciinema-player) or a custom implementation using setInterval-driven xterm.js write calls. Evaluate dependency cost vs build effort during Plan 02.
-- Plan 01 complete — backend recording infrastructure done. Plans 02 (UI) and 03 (replay player) remain.
+- Plans 01 and 02 complete — backend and UI layer both done. Plan 03 (if it exists) would cover remaining items.
+- asciicast v2 replay player implemented as custom RAF-driven xterm.js writes — no new npm dependency needed.
 
 **Phase 25 (Stretch):**
 - Depends on Phase 19 permission detection stability. If detectAgentState() heuristics produce false positives, auto-record trigger will over-record. Research phase should confirm false-positive rate before committing to on-permission-prompt trigger.
@@ -92,5 +96,5 @@ Phase 24 Plan 01 complete — no active blockers.
 ## Session Continuity
 
 Last session: 2026-03-04
-Stopped at: Completed 24-01-PLAN.md (Recording Capture Backend: RecordingCaptureService, recordings DB table, REST API)
-Next step: Execute Phase 24 Plan 02 — Recording Library UI (record button, recording list view in History tab)
+Stopped at: Completed 24-02-PLAN.md (Recording UI: REC button, RecordingLibrary, RecordingPlayer, Recordings nav tab)
+Next step: Execute Phase 24 Plan 03 (if planned) — or proceed to Phase 25/26
