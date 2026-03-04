@@ -3,7 +3,7 @@ import { readdir } from 'fs/promises';
 import { createInterface } from 'readline';
 import path from 'path';
 import { database } from '../database/DatabaseConnection.js';
-import type { TokenUsageRow } from '../../shared/types.js';
+import type { TokenUsageRow, TokenUsageByModelRow } from '../../shared/types.js';
 
 const CLAUDE_PROJECTS_DIR = path.resolve(process.env.HOME ?? '/home/forge', '.claude/projects');
 const SCAN_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
@@ -167,9 +167,11 @@ class SessionUsageReader {
 
     // Aggregate usage by date: Map<date, UsageAccumulator>
     const dailyUsage = new Map<string, UsageAccumulator>();
+    // Aggregate usage by (date, model): Map<date, Map<model, UsageAccumulator>>
+    const modelDailyUsage = new Map<string, Map<string, UsageAccumulator>>();
 
     for (const filePath of jsonlFilePaths) {
-      await this.processJsonlFile(filePath, dailyUsage);
+      await this.processJsonlFile(filePath, dailyUsage, modelDailyUsage);
     }
 
     // Upsert each day's aggregated usage
@@ -189,6 +191,27 @@ class SessionUsageReader {
         console.error(`[SessionUsageReader] Failed to upsert usage for ${agentId} on ${date}:`, error);
       }
     }
+
+    // Upsert each (day, model) pair's aggregated usage
+    for (const [date, modelMap] of modelDailyUsage.entries()) {
+      for (const [model, accumulator] of modelMap.entries()) {
+        const row: TokenUsageByModelRow = {
+          agentId,
+          date,
+          model,
+          inputTokens: accumulator.inputTokens,
+          outputTokens: accumulator.outputTokens,
+          cacheCreationInputTokens: accumulator.cacheCreationInputTokens,
+          cacheReadInputTokens: accumulator.cacheReadInputTokens,
+          costUsd: accumulator.costUsd,
+        };
+        try {
+          database.upsertTokenUsageByModel(row);
+        } catch (error) {
+          console.error(`[SessionUsageReader] Failed to upsert model usage for ${agentId}/${model} on ${date}:`, error);
+        }
+      }
+    }
   }
 
   /**
@@ -199,6 +222,7 @@ class SessionUsageReader {
   private async processJsonlFile(
     filePath: string,
     dailyUsage: Map<string, UsageAccumulator>,
+    modelDailyUsage: Map<string, Map<string, UsageAccumulator>>,
   ): Promise<void> {
     const readStream = createReadStream(filePath, { encoding: 'utf-8' });
     const rl = createInterface({ input: readStream, crlfDelay: Infinity });
@@ -273,6 +297,30 @@ class SessionUsageReader {
           existing.costUsd += costUsd;
         } else {
           dailyUsage.set(date, {
+            inputTokens,
+            outputTokens,
+            cacheCreationInputTokens,
+            cacheReadInputTokens,
+            costUsd,
+          });
+        }
+
+        // Accumulate into per-model daily totals
+        const modelKey = model || 'unknown';
+        let modelDateMap = modelDailyUsage.get(date);
+        if (!modelDateMap) {
+          modelDateMap = new Map<string, UsageAccumulator>();
+          modelDailyUsage.set(date, modelDateMap);
+        }
+        const existingModel = modelDateMap.get(modelKey);
+        if (existingModel) {
+          existingModel.inputTokens += inputTokens;
+          existingModel.outputTokens += outputTokens;
+          existingModel.cacheCreationInputTokens += cacheCreationInputTokens;
+          existingModel.cacheReadInputTokens += cacheReadInputTokens;
+          existingModel.costUsd += costUsd;
+        } else {
+          modelDateMap.set(modelKey, {
             inputTokens,
             outputTokens,
             cacheCreationInputTokens,

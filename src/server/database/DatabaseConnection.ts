@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import type { AgentInstance, AgentInstanceCreateParams, AgentInstanceStatus, TokenUsageRow, BurnRateEntry, BudgetConfig, BudgetAlertStatus, BurnWindow } from '../../shared/types.js';
+import type { AgentInstance, AgentInstanceCreateParams, AgentInstanceStatus, TokenUsageRow, BurnRateEntry, BudgetConfig, BudgetAlertStatus, BurnWindow, TokenUsageByModelRow, ModelComparisonRow, TokenUsageExportRow } from '../../shared/types.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -381,6 +381,113 @@ class DatabaseConnection {
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )
     `);
+
+    // Migration: token_usage_by_model table for per-model daily aggregates (TOKN-12, TOKN-14)
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS token_usage_by_model (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        agent_id TEXT NOT NULL,
+        date TEXT NOT NULL,
+        model TEXT NOT NULL,
+        input_tokens INTEGER DEFAULT 0,
+        output_tokens INTEGER DEFAULT 0,
+        cache_creation_input_tokens INTEGER DEFAULT 0,
+        cache_read_input_tokens INTEGER DEFAULT 0,
+        cost_usd REAL DEFAULT 0.0,
+        UNIQUE(agent_id, date, model)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_token_usage_by_model_agent_date
+        ON token_usage_by_model(agent_id, date);
+    `);
+  }
+
+  upsertTokenUsageByModel(row: TokenUsageByModelRow): void {
+    this.db.prepare(`
+      INSERT INTO token_usage_by_model (agent_id, date, model, input_tokens, output_tokens, cache_creation_input_tokens, cache_read_input_tokens, cost_usd)
+      VALUES (@agentId, @date, @model, @inputTokens, @outputTokens, @cacheCreationInputTokens, @cacheReadInputTokens, @costUsd)
+      ON CONFLICT(agent_id, date, model) DO UPDATE SET
+        input_tokens = excluded.input_tokens,
+        output_tokens = excluded.output_tokens,
+        cache_creation_input_tokens = excluded.cache_creation_input_tokens,
+        cache_read_input_tokens = excluded.cache_read_input_tokens,
+        cost_usd = excluded.cost_usd
+    `).run({
+      agentId: row.agentId,
+      date: row.date,
+      model: row.model,
+      inputTokens: row.inputTokens,
+      outputTokens: row.outputTokens,
+      cacheCreationInputTokens: row.cacheCreationInputTokens,
+      cacheReadInputTokens: row.cacheReadInputTokens,
+      costUsd: row.costUsd,
+    });
+  }
+
+  getModelComparison(filters: { agentId?: string; dateFrom?: string; dateTo?: string }): ModelComparisonRow[] {
+    const conditions: string[] = [];
+    const params: string[] = [];
+
+    if (filters.agentId) {
+      conditions.push('agent_id = ?');
+      params.push(filters.agentId);
+    }
+    if (filters.dateFrom) {
+      conditions.push('date >= ?');
+      params.push(filters.dateFrom);
+    }
+    if (filters.dateTo) {
+      conditions.push('date <= ?');
+      params.push(filters.dateTo);
+    }
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    return this.db.prepare(`
+      SELECT
+        agent_id AS agentId,
+        model,
+        SUM(cost_usd) AS totalCostUsd,
+        SUM(input_tokens) AS totalInputTokens,
+        SUM(output_tokens) AS totalOutputTokens
+      FROM token_usage_by_model ${whereClause}
+      GROUP BY agent_id, model
+      ORDER BY agentId, totalCostUsd DESC
+    `).all(...params) as ModelComparisonRow[];
+  }
+
+  getTokenUsageForExport(filters: { agentId?: string; dateFrom?: string; dateTo?: string }): TokenUsageExportRow[] {
+    const conditions: string[] = [];
+    const params: string[] = [];
+
+    if (filters.agentId) {
+      conditions.push('agent_id = ?');
+      params.push(filters.agentId);
+    }
+    if (filters.dateFrom) {
+      conditions.push('date >= ?');
+      params.push(filters.dateFrom);
+    }
+    if (filters.dateTo) {
+      conditions.push('date <= ?');
+      params.push(filters.dateTo);
+    }
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    return this.db.prepare(`
+      SELECT
+        agent_id AS agentId,
+        date,
+        model,
+        input_tokens AS inputTokens,
+        output_tokens AS outputTokens,
+        cache_creation_input_tokens AS cacheCreationInputTokens,
+        cache_read_input_tokens AS cacheReadInputTokens,
+        cost_usd AS costUsd
+      FROM token_usage_by_model ${whereClause}
+      ORDER BY date DESC, agent_id, model
+    `).all(...params) as TokenUsageExportRow[];
   }
 }
 

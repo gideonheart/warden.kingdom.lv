@@ -70,3 +70,24 @@ export interface BudgetAlertStatus {
   budgetPct: number;
   alertLevel: 'ok' | 'warning' | 'exceeded';
 }
+
+export interface TokenUsageByModelRow {
+  agentId: string;
+  date: string;
+  model: string;
+  inputTokens: number;
+  outputTokens: number;
+  cacheCreationInputTokens: number;
+  cacheReadInputTokens: number;
+  costUsd: number;
+}
+
+export interface ModelComparisonRow {
+  agentId: string;
+  model: string;
+  totalCostUsd: number;
+  totalInputTokens: number;
+  totalOutputTokens: number;
+}
+
+export type TokenUsageExportRow = TokenUsageByModelRow;
