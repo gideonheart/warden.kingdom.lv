@@ -8,7 +8,7 @@ interface ModelComparisonViewProps {
 type TimeRange = '24h' | '7d' | '30d' | 'all';
 
 const TIME_RANGE_LABELS: Record<TimeRange, string> = {
-  '24h': '24h',
+  '24h': 'Today',
   '7d': '7d',
   '30d': '30d',
   all: 'All',
