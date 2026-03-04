@@ -5,20 +5,20 @@
 See: .planning/PROJECT.md (updated 2026-03-04)
 
 **Core value:** Real-time visibility into all active Claude Code agent sessions from a single browser tab
-**Current focus:** v3.2 Mobile Operations & UX Polish — Phase 31: Storage Rotation COMPLETE
+**Current focus:** Planning next milestone
 
 ## Current Position
 
-Phase: 31 of 31 (Recording Storage Rotation)
-Plan: 2 of 2 complete in current phase
-Status: Phase 31 COMPLETE — storage rotation backend + UI fully shipped
-Last activity: 2026-03-04 — Phase 31 Plan 02 complete: Storage settings collapsible panel in RecordingLibrary with usage bar, cap input, and Prune Now button
+Phase: 31 of 31 (all phases complete)
+Plan: All plans complete
+Status: v3.2 milestone SHIPPED — all 8 milestones delivered
+Last activity: 2026-03-04 — v3.2 milestone archived
 
 Progress: [█████████████████████] 31/31 phases complete (100%)
 
 ## Performance Metrics
 
-**Completed milestones:** v1.0 (6 phases), v1.1 (2), v2.0 (3), v2.1 (3), v2.3 (4), v3.0 (2), v3.1 (6), v3.2 in progress (1 phase) = 27 phases shipped
+**Completed milestones:** v1.0 (6 phases), v1.1 (2), v2.0 (3), v2.1 (3), v2.3 (4), v3.0 (2), v3.1 (6), v3.2 (4) = 31 phases shipped
 
 | Phase | Plan | Duration | Tasks | Files |
 |-------|------|----------|-------|-------|
@@ -26,8 +26,8 @@ Progress: [█████████████████████] 31/3
 | 29-session-navigation | 01 | 2min | 2 | 3 |
 | 30-auto-record-per-agent | 01 | 2min | 2 | 3 |
 | 30-auto-record-per-agent | 02 | 2min | 2 | 3 |
-| Phase 31-storage-rotation P01 | 2 | 2 tasks | 5 files |
-| Phase 31-storage-rotation P02 | 2 | 2 tasks | 1 files |
+| 31-storage-rotation | 01 | 2min | 2 | 5 |
+| 31-storage-rotation | 02 | 2min | 2 | 1 |
 
 ## Accumulated Context
 
@@ -35,37 +35,13 @@ Progress: [█████████████████████] 31/3
 
 See PROJECT.md Key Decisions table for full list with outcomes.
 
-**v3.2 key constraints carried from research:**
-- Phase 28/29: Client-only changes — zero server dependencies, can run in parallel
-- Phase 30: Auto-record hook must fire AFTER `ptyProcess.onData()` is registered (prevents missing first frames)
-- Phase 31: Must co-ship with Phase 30 — auto-record without storage cap causes unbounded disk growth
-- Phase 31: Two-phase deletion required — `deletion_pending` DB flag prevents deleting files mid-playback
-- iOS fix: Use `terminal.textarea?.focus()` synchronously in `onTouchStart`, never `terminal.focus()` or deferred calls
-- [Phase 28-mobile-toolbar-fixes]: Use terminal.textarea?.focus() (DOM) not terminal.focus() (xterm API) for iOS keyboard retention
-- [Phase 28-mobile-toolbar-fixes]: Call refocusTerminal() synchronously in onTouchStart — deferred calls ignored by iOS Safari
-- [Phase 28-mobile-toolbar-fixes]: Enter key placed at MOBILE_KEYS[0] for always-visible position on narrow phone screens
-- [Phase 29-session-navigation]: NAVIGABLE_STATUSES checks session.status field directly (not active instances list) — status is authoritative signal
-- [Phase 29-session-navigation]: recordings.find() requires r.stoppedAt !== null — only completed recordings are playable
-- [Phase 29-session-navigation]: Recordings fetched once on mount (not polled) — stable reference data doesn't need per-render polling
-- [Phase 30-auto-record-per-agent]: Sparse row strategy for auto_record_config — only store row when enabled (delete on disable), mirrors budget_config pattern
-- [Phase 30-auto-record-per-agent]: GET /api/recordings/auto-record-config placed before /:id routes to prevent Express param capture of literal string
-- [Phase 30-auto-record-per-agent]: Auto-record hook placed after ptyProcess.onData() registration to prevent first-frame race condition — captureOutput tap must be wired before startRecording is called
-- [Phase 30-auto-record-per-agent]: Hook placed in fresh PTY spawn branch only (not reuse-existing-PTY) — auto-record fires exactly once per PTY lifecycle
-- [Phase 31-storage-rotation]: rotation_config uses single-row table with CHECK(id=1) constraint + INSERT OR REPLACE upsert (mirrors budget_config pattern)
-- [Phase 31-storage-rotation]: Two-phase deletion: markDeletionPending -> fs.unlinkSync -> deleteRecording; getDeletionPendingRecordings queries deletion_pending=1 for orphan crash recovery on startup
-- [Phase 31-storage-rotation]: capBytes=0 means disabled; orphan cleanup always runs regardless of cap setting (happens before the cap=0 early-return check)
-- [Phase 31-storage-rotation]: Literal-path routes /storage-stats, /rotation-config, /rotation/prune placed before /:id param routes (same ordering lesson from Phase 30)
-- [Phase 31-storage-rotation]: Disable button only shown when cap > 0, Prune Now disabled when cap = 0 — clear UX guards
-- [Phase 31-storage-rotation]: fetchStorageStats wired to mount effect dependency array (not inside Promise.all) for cleaner separation
-- [Phase 31-storage-rotation]: pruneResult cleared via setTimeout(5000) in .then() so freed bytes still accessible when timer fires
-
 ### Pending Todos
 
 None
 
 ### Blockers/Concerns
 
-None — v3.1 shipped cleanly. v3.2 scope is well-researched with HIGH confidence across all four phases.
+None — v3.2 shipped cleanly. Next step: `/gsd:new-milestone` for next version.
 
 ### Quick Tasks Completed
 
@@ -78,6 +54,6 @@ None — v3.1 shipped cleanly. v3.2 scope is well-researched with HIGH confidenc
 
 ## Session Continuity
 
-Last session: 2026-03-04 (Plan 31-02)
-Stopped at: Completed 31-02-PLAN.md — Phase 31 fully complete (storage rotation UI: Storage settings collapsible panel in RecordingLibrary with usage bar, cap input, and Prune Now button)
-Next step: Phase 31 complete — all 31 phases of v3.2 milestone shipped
+Last session: 2026-03-04 (milestone completion)
+Stopped at: v3.2 milestone archived and tagged
+Next step: `/gsd:new-milestone` to start next version (clear context first)

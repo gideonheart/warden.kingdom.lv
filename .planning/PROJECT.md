@@ -2,7 +2,7 @@
 
 ## What This Is
 
-A browser-based terminal multiplexer and operations platform hosted at `warden.kingdom.lv` that streams live Claude Code output via xterm.js, provides agent lifecycle control (start/stop/restart), cost velocity tracking with budget alerts, session recording with variable-speed replay, and operator awareness features (permission badges, context pressure, keyboard navigation, terminal search, browser notifications). It is the observation, control, and audit layer for the multi-agent system orchestrated by Gideon.
+A browser-based terminal multiplexer and operations platform hosted at `warden.kingdom.lv` that streams live Claude Code output via xterm.js, provides agent lifecycle control (start/stop/restart), cost velocity tracking with budget alerts, session recording with automatic capture and storage rotation, mobile-optimized toolbar with keyboard persistence, and operator awareness features (permission badges, context pressure, keyboard navigation, terminal search, browser notifications). It is the observation, control, and audit layer for the multi-agent system orchestrated by Gideon.
 
 ## Core Value
 
@@ -60,31 +60,26 @@ Real-time visibility into all active Claude Code agent sessions from a single br
 - ✓ Recording replay at variable speed (1x/2x/4x/8x) — v3.1
 - ✓ Recording library with session metadata — v3.1
 
+- ✓ Enter button in mobile terminal toolbar — v3.2
+- ✓ Mobile toolbar buttons keep soft keyboard open (re-focus xterm after press) — v3.2
+- ✓ Clickable history session rows → navigate to terminal or replay — v3.2
+- ✓ Per-agent auto-record toggle with first-frame capture — v3.2
+- ✓ Recording storage rotation with configurable cap and two-phase safe deletion — v3.2
+- ✓ Storage stats UI with usage bar, cap input, and manual prune — v3.2
+
 ### Active
 
-- [ ] Enter button in mobile terminal toolbar
-- [ ] Mobile toolbar buttons keep soft keyboard open (re-focus xterm after press)
-- [ ] Clickable history session rows → navigate to terminal or replay
-- [ ] Auto-record option with configurable triggers (REC-05, deferred from v3.1)
-- [ ] Recording storage rotation policy (auto-delete, cap total storage)
 - [ ] Clean up History/Events views — make actionable or reduce noise
-
-## Current Milestone: v3.2 Mobile Operations & UX Polish
-
-**Goal:** Fix daily mobile friction (toolbar gaps, keyboard dismissal, dead clicks) and finish the recording story (auto-record, storage rotation).
-
-**Target features:**
-- Mobile terminal toolbar: Enter button, keyboard persistence on button tap
-- Clickable history sessions with navigation to terminal or recording replay
-- Auto-record per agent with configurable triggers
-- Storage rotation with configurable cap and auto-prune
-- History/Events view cleanup — make existing views useful
+- [ ] Recording library pagination (if recording count exceeds 200)
+- [ ] Streaming write mode for frame buffer (prevents OOM on long sessions — REC-08)
+- [ ] Auto-record on permission prompt detection (depends on detectAgentState reliability — REC-07)
+- [ ] Events tab row click navigates to relevant session's terminal (NAV-04)
 
 ## Current State
 
-**Latest milestone:** v3.1 Agent Control & Deep Insights (shipped 2026-03-04)
+**Latest milestone:** v3.2 Mobile Operations & UX Polish (shipped 2026-03-04)
 
-Warden has evolved from a monitoring dashboard to a full operations platform. The operator can now start, stop, and restart agent sessions; monitor cost velocity with budget alerts; compare model costs; export usage data; and record/replay terminal sessions.
+Warden is a complete operations platform with mobile support. The operator can manage agent sessions from desktop or phone; record sessions automatically with per-agent toggles; cap and rotate recording storage; navigate history rows directly to live terminals or recording replays; monitor cost velocity with budget alerts; and access all features from a mobile browser with keyboard persistence.
 
 ### Out of Scope
 
@@ -100,13 +95,13 @@ Warden has evolved from a monitoring dashboard to a full operations platform. Th
 
 ## Context
 
-Shipped v3.1 with 10,685 LOC TypeScript (src/). Net +4,092 LOC from v3.0.
+Shipped v3.2 with 11,229 LOC TypeScript (src/). Net +544 LOC from v3.1.
 Tech stack: Express 5, Socket.IO 4, React 19, xterm.js 5, node-pty, SQLite (better-sqlite3), Tailwind CSS 4, Vite 6, Vitest.
-Features: live terminal streaming, agent lifecycle control (start/stop/restart), token burn rate with budget alerts, model cost comparison, CSV export, session recording (asciicast v2) with variable-speed replay, terminal search, browser notifications, keyboard navigation, GSD Manager plugin, activity timeline.
+Features: live terminal streaming, agent lifecycle control (start/stop/restart), token burn rate with budget alerts, model cost comparison, CSV export, session recording (asciicast v2) with auto-record and storage rotation, variable-speed replay, mobile toolbar with keyboard persistence, clickable session navigation, terminal search, browser notifications, keyboard navigation, GSD Manager plugin, activity timeline.
 Runs on Ubuntu 24 server (Laravel Forge managed), same host as gideons.kingdom.lv.
 20 Playwright E2E tests + Vitest unit tests. Production Nginx config with SSL + IP whitelist + WebSocket.
 tmux configured with mouse mode and 50,000-line scrollback buffer for monitoring workflows.
-Known tech debt: detectAgentState() regex heuristics fragile but functional; REC-05 auto-record deferred.
+Known tech debt: detectAgentState() regex heuristics fragile but functional; NAVIGABLE_STATUSES Set recreates per render (info-level); recordings fetched once on mount (no polling).
 
 ## Constraints
 
@@ -152,6 +147,13 @@ Known tech debt: detectAgentState() regex heuristics fragile but functional; REC
 | Auto-stop recording on PTY exit | Guarantees .cast file written even if operator never clicks stop | ✓ Good — no orphaned recordings |
 | RAF loop for recording playback | Writes all frames up to virtual time per tick, handles any speed | ✓ Good — smooth at all speeds |
 | sessionExited() resets client recording state | Server auto-stops; client only resets local state, no HTTP call | ✓ Good — clean separation of concerns |
+| iOS keyboard persistence via terminal.textarea?.focus() | Synchronous DOM focus in onTouchStart; deferred calls ignored by iOS Safari | ✓ Good — keyboard stays open on all toolbar taps |
+| Three-way session navigation logic | Check session status → active=terminal, stopped+recording=replay, else=feedback | ✓ Good — clear routing, no dead clicks |
+| Sparse row strategy for auto-record config | Only store DB row when enabled (delete on disable), mirrors budget_config | ✓ Good — clean queries, minimal storage |
+| Auto-record hook after onData registration | Prevents first-frame race condition; hook in fresh PTY spawn only | ✓ Good — captures from first line of output |
+| Single-row rotation_config with CHECK(id=1) | INSERT OR REPLACE upsert, same pattern as budget_config | ✓ Good — simple, no multi-row confusion |
+| Two-phase deletion for storage rotation | deletion_pending flag prevents deleting files mid-playback or mid-capture | ✓ Good — safe concurrent access |
+| Literal routes before :id param routes | Express matches first-registered route; literal /storage-stats before /:id | ✓ Good — prevents param capture of literal strings |
 
 ---
-*Last updated: 2026-03-04 after v3.2 milestone start*
+*Last updated: 2026-03-04 after v3.2 milestone completion*

@@ -127,3 +127,37 @@ See `.planning/milestones/v3.1-ROADMAP.md` for full phase details.
 
 ---
 
+
+## v3.2 Mobile Operations & UX Polish (Shipped: 2026-03-04)
+
+**Phases:** 4 (Phases 28-31) | **Plans:** 6 | **Commits:** 28 | **LOC:** 11,229 TypeScript (net +544)
+**Timeline:** 2026-03-04 (single day)
+**Git range:** `247ccc9..b554bb0`
+
+**Delivered:** Mobile operations polish and recording story completion — mobile toolbar with keyboard persistence, clickable session navigation with three-way routing, per-agent auto-record with first-frame capture, and storage rotation with configurable cap and safe two-phase deletion.
+
+**Key accomplishments:**
+1. Mobile toolbar Enter key + iOS keyboard persistence — soft keyboard stays open on all toolbar button taps via synchronous `terminal.textarea?.focus()` in `onTouchStart`
+2. Three-way session navigation from history — tapping a row routes to live terminal (active), recording replay (stopped + recorded), or explanatory feedback (stopped, no recording)
+3. Per-agent auto-record with PTY lifecycle hook — captures from first frame with no race condition; sparse-row DB pattern; toggle UI in recording library
+4. Storage rotation with configurable cap — two-phase safe deletion (`deletion_pending` flag), periodic 5-minute scheduler, orphan crash recovery on startup
+5. Storage stats UI with usage bar, cap input, and manual Prune Now button in collapsible recording library panel
+
+**Phases:**
+- Phase 28: Mobile Toolbar Fixes (1/1 plan) — `247ccc9`
+- Phase 29: Session Navigation (1/1 plan) — `75adab9`
+- Phase 30: Auto-Record Per Agent (2/2 plans) — `a87c9af`
+- Phase 31: Storage Rotation (2/2 plans) — `1f5e425`
+
+**Quick tasks shipped during milestone:** 2042 (next milestone proposals)
+
+**Tech debt accepted:**
+- SUMMARY frontmatter missing `requirements_satisfied` field on Phases 28, 29, 31 (doc-only gaps)
+- `NAVIGABLE_STATUSES` Set declared inside component body (recreates on every render, info-level)
+- Recordings fetched once on mount, not polled (new recordings require SessionHistory remount)
+- Auto-record hook no-ops during 0-10s InstanceTracker sync window for organically-discovered sessions
+
+See `.planning/milestones/v3.2-ROADMAP.md` for full phase details.
+
+---
+
