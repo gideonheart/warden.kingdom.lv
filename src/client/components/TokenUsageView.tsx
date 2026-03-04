@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { BurnWindow, BurnRateEntry, BudgetConfig, BudgetAlertStatus } from '@shared/types.js';
+import { ModelComparisonView } from './ModelComparisonView.js';
 
 interface TokenUsageEntry {
   agentId: string;
@@ -53,12 +54,20 @@ function getBudgetProgressColor(budgetPct: number): string {
   return 'bg-green-500';
 }
 
+type ActiveTab = 'usage' | 'models';
+
 export function TokenUsageView() {
   const [usage, setUsage] = useState<TokenUsageEntry[]>([]);
   const [summary, setSummary] = useState<TokenUsageSummary[]>([]);
   const [agentFilter, setAgentFilter] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isScanning, setIsScanning] = useState(false);
+
+  // Tab navigation
+  const [activeTab, setActiveTab] = useState<ActiveTab>('usage');
+
+  // Export toast notification
+  const [exportToast, setExportToast] = useState(false);
 
   // Burn rate state
   const [burnWindow, setBurnWindow] = useState<BurnWindow>('today');
@@ -194,6 +203,25 @@ export function TokenUsageView() {
     saveBudget(agentId);
   }, [saveBudget]);
 
+  const handleExport = useCallback(async () => {
+    try {
+      const response = await fetch('/api/history/token-usage/export');
+      if (!response.ok) throw new Error('Export failed');
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      const today = new Date().toISOString().slice(0, 10);
+      anchor.download = `warden-token-usage-${today}.csv`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+      setExportToast(true);
+      setTimeout(() => setExportToast(false), 3000);
+    } catch (error) {
+      console.error('[TokenUsageView] Export failed:', error);
+    }
+  }, []);
+
   const getBudgetForAgent = (agentId: string): number | null => {
     const config = budgetConfigs.find((c) => c.agentId === agentId);
     return config ? config.dailyBudgetUsd : null;
@@ -221,7 +249,52 @@ export function TokenUsageView() {
   const totalProjectedWeeklyUsd = burnRates.reduce((sum, entry) => sum + entry.projectedWeeklyUsd, 0);
 
   return (
-    <div className="p-4 space-y-6">
+    <div className="p-4 space-y-6 relative">
+      {/* Tab bar + Export button row */}
+      <div className="flex items-center justify-between border-b border-warden-border pb-2">
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setActiveTab('usage')}
+            className={`px-4 py-1.5 text-sm font-medium transition-colors border-b-2 -mb-2.5 ${
+              activeTab === 'usage'
+                ? 'text-warden-accent border-warden-accent'
+                : 'text-warden-text-dim border-transparent hover:text-warden-text'
+            }`}
+          >
+            Token Usage
+          </button>
+          <button
+            onClick={() => setActiveTab('models')}
+            className={`px-4 py-1.5 text-sm font-medium transition-colors border-b-2 -mb-2.5 ${
+              activeTab === 'models'
+                ? 'text-warden-accent border-warden-accent'
+                : 'text-warden-text-dim border-transparent hover:text-warden-text'
+            }`}
+          >
+            Model Costs
+          </button>
+        </div>
+
+        {/* Export CSV button */}
+        <button
+          onClick={handleExport}
+          className="flex items-center gap-1.5 bg-warden-panel border border-warden-border text-warden-text text-sm px-3 py-1 rounded hover:bg-warden-border/50 transition-colors"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
+          </svg>
+          Export CSV
+        </button>
+      </div>
+
+      {/* Model Costs tab content */}
+      {activeTab === 'models' && (
+        <ModelComparisonView agentFilter={agentFilter || undefined} />
+      )}
+
+      {/* Token Usage tab content — all existing content below */}
+      {activeTab === 'usage' && (
+        <>
       {/* Filter controls and scan button */}
       <div className="flex items-center gap-3">
         <input
@@ -510,6 +583,15 @@ export function TokenUsageView() {
             <p className="text-warden-text-dim text-sm py-8 text-center">No token usage data recorded</p>
           )}
         </>
+      )}
+        </>
+      )}
+
+      {/* Export toast notification */}
+      {exportToast && (
+        <div className="fixed bottom-4 right-4 z-50 bg-warden-accent/20 text-warden-accent text-sm px-3 py-2 rounded border border-warden-accent/30 transition-opacity">
+          Export downloaded
+        </div>
       )}
     </div>
   );
