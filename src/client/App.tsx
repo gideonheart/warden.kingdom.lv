@@ -51,10 +51,35 @@ export function App() {
   // unchanged. Without this, Array.filter() creates a new reference on every App render
   // (e.g., when liveStatus data changes), which invalidates the sessionStatusMap useMemo
   // and causes unnecessary TerminalView re-renders every ~5s.
+  // Include all lifecycle states so transitional (starting/stopping) and stopped sessions
+  // remain visible in the tab bar with appropriate visual treatment.
   const activeInstances = useMemo(
-    () => instances.filter((instance) => instance.status === 'active' || instance.status === 'idle'),
+    () => instances.filter((instance) =>
+      instance.status === 'active' ||
+      instance.status === 'idle' ||
+      instance.status === 'starting' ||
+      instance.status === 'stopping' ||
+      instance.status === 'stopped' ||
+      instance.status === 'error',
+    ),
     [instances],
   );
+
+  // Derive set of agent IDs that already have an active/starting session.
+  // Used by AgentSidebar to disable Start button for already-running agents.
+  const activeAgentIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const instance of instances) {
+      if (
+        instance.status === 'active' ||
+        instance.status === 'idle' ||
+        instance.status === 'starting'
+      ) {
+        ids.add(instance.agentId);
+      }
+    }
+    return ids;
+  }, [instances]);
 
   // Live status polling — runs once in App (not in AgentsTab) so TerminalView and
   // InstanceTabBar can consume the data without adding a second poll interval.
@@ -145,7 +170,8 @@ export function App() {
     };
   }, []);
 
-  // Derive agent ID from selected session for prompt panel sync
+  // Derive agent ID and lifecycle status from selected session for prompt panel sync
+  // and terminal overlay rendering.
   const selectedInstance = activeInstances.find(
     (instance) => instance.tmuxSessionName === selectedSessionName
   );
@@ -196,6 +222,55 @@ export function App() {
       refetch();
     },
     [refetch]
+  );
+
+  const handleStartAgent = useCallback(
+    async (agentId: string) => {
+      const response = await fetch('/api/instances/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ agentId }),
+      });
+      if (response.status === 409) {
+        // Already running — the button should have been disabled; silently ignore
+        return;
+      }
+      if (!response.ok) {
+        throw new Error(`Start failed: ${response.statusText}`);
+      }
+      refetch();
+    },
+    [refetch],
+  );
+
+  const handleRestartInstance = useCallback(
+    async (instanceId: number) => {
+      try {
+        const response = await fetch(`/api/instances/${instanceId}/restart`, { method: 'POST' });
+        if (!response.ok) {
+          console.error(`Restart failed: ${response.statusText}`);
+        }
+        refetch();
+      } catch (error) {
+        console.error('Error restarting instance:', error);
+      }
+    },
+    [refetch],
+  );
+
+  const handleForceKillInstance = useCallback(
+    async (instanceId: number) => {
+      try {
+        const response = await fetch(`/api/instances/${instanceId}/force-kill`, { method: 'POST' });
+        if (!response.ok) {
+          console.error(`Force kill failed: ${response.statusText}`);
+        }
+        refetch();
+      } catch (error) {
+        console.error('Error force killing instance:', error);
+      }
+    },
+    [refetch],
   );
 
   // Listen for external hash changes (back/forward navigation)
@@ -339,6 +414,8 @@ export function App() {
           onSelectSession={handleSelectSession}
           onSessionStopped={handleSessionStopped}
           sessionStatusMap={sessionStatusMap}
+          onRestart={handleRestartInstance}
+          onForceKill={handleForceKillInstance}
         />
       )}
 
@@ -364,6 +441,9 @@ export function App() {
                     notificationsEnabled={notificationsEnabled}
                     onToggleNotifications={toggleNotifications}
                     notificationPermission={notificationPermission}
+                    instanceStatus={selectedInstance?.status}
+                    agentName={selectedInstance?.agentName}
+                    onRestart={selectedInstance ? () => handleRestartInstance(selectedInstance.id) : undefined}
                   />
                 </ErrorBoundary>
               ) : (
@@ -405,6 +485,8 @@ export function App() {
               selectedAgentId={sidebarSelectedAgentId}
               onSelectAgent={handleSidebarSelectAgent}
               onClose={() => setShowSidebar(false)}
+              onStartAgent={handleStartAgent}
+              activeAgentIds={activeAgentIds}
             />
             {currentView === 'terminals' && (
               <PromptPanel agents={agents} selectedAgentId={derivedAgentId} />
@@ -432,6 +514,8 @@ export function App() {
                 selectedAgentId={sidebarSelectedAgentId}
                 onSelectAgent={handleSidebarSelectAgent}
                 onClose={() => setShowSidebar(false)}
+                onStartAgent={handleStartAgent}
+                activeAgentIds={activeAgentIds}
               />
               {currentView === 'terminals' && (
                 <PromptPanel agents={agents} selectedAgentId={derivedAgentId} />

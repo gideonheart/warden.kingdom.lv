@@ -8,8 +8,10 @@ import type { AgentStateHint, PressureLevel } from '@shared/gsdTypes.js';
 export const STATUS_COLORS: Record<string, string> = {
   active: 'bg-warden-success',
   idle: 'bg-warden-idle',
-  stopped: 'bg-warden-error',
+  stopped: 'bg-warden-idle',
   error: 'bg-warden-error',
+  starting: 'bg-warden-warning animate-pulse',
+  stopping: 'bg-warden-error/60 animate-pulse',
 };
 
 export const STATE_BADGE_COLORS: Record<AgentStateHint, string> = {

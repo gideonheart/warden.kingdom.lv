@@ -1,3 +1,4 @@
+import { useState, useCallback } from 'react';
 import type { AgentDetails, TopicMapping } from '../../shared/openclawTypes.js';
 
 interface AgentSidebarProps {
@@ -6,6 +7,8 @@ interface AgentSidebarProps {
   selectedAgentId: string | null;
   onSelectAgent: (agentId: string) => void;
   onClose?: () => void;
+  onStartAgent?: (agentId: string) => void;
+  activeAgentIds?: Set<string>;
 }
 
 function formatBytes(bytes: number | null | undefined): string {
@@ -19,7 +22,77 @@ function formatBytes(bytes: number | null | undefined): string {
   return `${size.toFixed(1)} ${units[unitIndex]}`;
 }
 
-export function AgentSidebar({ agents, topicMappings, selectedAgentId, onSelectAgent, onClose }: AgentSidebarProps) {
+function StartButton({
+  agentId,
+  isActive,
+  onStartAgent,
+}: {
+  agentId: string;
+  isActive: boolean;
+  onStartAgent: (agentId: string) => void;
+}) {
+  const [isStarting, setIsStarting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const handleClick = useCallback(
+    async (event: React.MouseEvent) => {
+      event.stopPropagation();
+      if (isActive || isStarting) return;
+
+      setIsStarting(true);
+      setErrorMessage(null);
+      try {
+        await onStartAgent(agentId);
+      } catch {
+        setErrorMessage('Failed');
+        setTimeout(() => setErrorMessage(null), 2000);
+      } finally {
+        setIsStarting(false);
+      }
+    },
+    [agentId, isActive, isStarting, onStartAgent],
+  );
+
+  if (isActive) {
+    return (
+      <span className="text-xs text-warden-text-dim/50 ml-auto flex-shrink-0">Running</span>
+    );
+  }
+
+  if (errorMessage) {
+    return (
+      <span className="text-xs text-warden-error ml-auto flex-shrink-0">{errorMessage}</span>
+    );
+  }
+
+  return (
+    <button
+      onClick={handleClick}
+      disabled={isStarting}
+      className="ml-auto flex-shrink-0 px-2 py-0.5 text-xs rounded bg-warden-success/15 text-warden-success hover:bg-warden-success/25 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+      title={`Start ${agentId} session`}
+    >
+      {isStarting ? (
+        <span className="flex items-center gap-1">
+          <span className="w-2.5 h-2.5 border border-warden-success border-t-transparent rounded-full animate-spin inline-block" />
+          Starting...
+        </span>
+      ) : (
+        'Start'
+      )}
+    </button>
+  );
+}
+
+export function AgentSidebar({
+  agents,
+  topicMappings,
+  selectedAgentId,
+  onSelectAgent,
+  onClose,
+  onStartAgent,
+  activeAgentIds,
+}: AgentSidebarProps) {
   const selectedAgent = agents.find((a) => a.id === selectedAgentId);
   const agentTopics = topicMappings.filter((t) => t.agentId === selectedAgentId);
 
@@ -40,21 +113,32 @@ export function AgentSidebar({ agents, topicMappings, selectedAgentId, onSelectA
 
       <div className="flex flex-col gap-1 p-2">
         {agents.map((agent) => (
-          <button
+          <div
             key={agent.id}
-            onClick={() => onSelectAgent(agent.id)}
-            className={`flex items-center gap-2 px-2 py-1.5 min-h-[44px] rounded text-sm text-left transition-colors ${
+            className={`flex items-center gap-2 px-2 py-1.5 min-h-[44px] rounded text-sm transition-colors ${
               agent.id === selectedAgentId
                 ? 'bg-warden-accent/20 text-warden-accent'
                 : 'text-warden-text-dim hover:bg-warden-border/50 hover:text-warden-text'
             }`}
           >
-            <div className="w-2 h-2 rounded-full bg-warden-success flex-shrink-0" />
-            <span className="font-medium truncate">{agent.name}</span>
-            {agent.isDefault && (
-              <span className="text-xs opacity-50 ml-auto">default</span>
+            <button
+              onClick={() => onSelectAgent(agent.id)}
+              className="flex items-center gap-2 flex-1 text-left min-w-0"
+            >
+              <div className="w-2 h-2 rounded-full bg-warden-success flex-shrink-0" />
+              <span className="font-medium truncate">{agent.name}</span>
+              {agent.isDefault && (
+                <span className="text-xs opacity-50 flex-shrink-0">default</span>
+              )}
+            </button>
+            {onStartAgent && (
+              <StartButton
+                agentId={agent.id}
+                isActive={activeAgentIds?.has(agent.id) ?? false}
+                onStartAgent={onStartAgent}
+              />
             )}
-          </button>
+          </div>
         ))}
       </div>
 

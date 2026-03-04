@@ -6,6 +6,7 @@ import { SearchAddon } from 'xterm-addon-search';
 import { useTerminalSocket } from '../hooks/useTerminalSocket.js';
 import type { AgentLiveStatus } from '../hooks/useAgentLiveStatus.js';
 import type { PressureLevel } from '@shared/gsdTypes.js';
+import type { AgentInstanceStatus } from '@shared/types.js';
 import { StateBadge, PRESSURE_COLORS } from './gsdShared.js';
 import { TerminalSearchOverlay } from './TerminalSearchOverlay.js';
 import 'xterm/css/xterm.css';
@@ -24,6 +25,12 @@ interface TerminalViewProps {
   onToggleNotifications?: () => void;
   /** Current browser notification permission state, or 'unsupported' if Notification API is unavailable. */
   notificationPermission?: NotificationPermission | 'unsupported';
+  /** Lifecycle status of the instance — used to show contextual overlays. */
+  instanceStatus?: AgentInstanceStatus;
+  /** Agent name — shown in lifecycle overlays for context. */
+  agentName?: string;
+  /** Callback to trigger a restart for the current stopped/error session. */
+  onRestart?: () => void;
 }
 
 // Strip mouse-tracking enable sequences so xterm.js uses native selection
@@ -198,6 +205,9 @@ export function TerminalView({
   notificationsEnabled = false,
   onToggleNotifications,
   notificationPermission = 'unsupported',
+  instanceStatus,
+  agentName,
+  onRestart,
 }: TerminalViewProps) {
   const terminalContainerRef = useRef<HTMLDivElement>(null);
   const terminalInstanceRef = useRef<Terminal | null>(null);
@@ -672,6 +682,66 @@ export function TerminalView({
               <span className="text-warden-text-dim text-sm">
                 {isReconnecting ? 'Reconnecting' : 'Connecting'} to {tmuxSessionName}...
               </span>
+            </div>
+          </div>
+        )}
+
+        {/* Lifecycle overlays — shown for transitional/terminal states */}
+        {instanceStatus === 'starting' && (
+          <div className="absolute inset-0 flex items-center justify-center bg-warden-bg/80 backdrop-blur-sm z-10">
+            <div className="flex flex-col items-center gap-3">
+              <div className="w-6 h-6 border-2 border-warden-warning border-t-transparent rounded-full animate-spin" />
+              <span className="text-warden-warning text-sm font-medium">
+                Starting {agentName ?? tmuxSessionName}...
+              </span>
+              <span className="text-warden-text-dim/60 text-xs">Waiting for tmux session to appear</span>
+            </div>
+          </div>
+        )}
+
+        {instanceStatus === 'stopping' && (
+          <div className="absolute inset-0 flex items-center justify-center bg-warden-bg/60 z-10">
+            <div className="flex flex-col items-center gap-2">
+              <div className="w-5 h-5 border-2 border-warden-error/60 border-t-transparent rounded-full animate-spin" />
+              <span className="text-warden-text-dim text-sm">Stopping session...</span>
+            </div>
+          </div>
+        )}
+
+        {instanceStatus === 'stopped' && (
+          <div className="absolute inset-0 flex items-center justify-center bg-warden-bg/90 z-10">
+            <div className="flex flex-col items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-warden-idle/20 flex items-center justify-center">
+                <span className="text-warden-text-dim text-lg">&#9632;</span>
+              </div>
+              <span className="text-warden-text-dim text-sm font-medium">Session stopped</span>
+              {onRestart && (
+                <button
+                  onClick={onRestart}
+                  className="mt-1 px-4 py-1.5 text-sm bg-warden-warning/20 text-warden-warning rounded hover:bg-warden-warning/30 transition-colors"
+                >
+                  Restart Session
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {instanceStatus === 'error' && (
+          <div className="absolute inset-0 flex items-center justify-center bg-warden-bg/90 z-10">
+            <div className="flex flex-col items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-warden-error/20 flex items-center justify-center">
+                <span className="text-warden-error text-lg">&#33;</span>
+              </div>
+              <span className="text-warden-error text-sm font-medium">Session error</span>
+              {onRestart && (
+                <button
+                  onClick={onRestart}
+                  className="mt-1 px-4 py-1.5 text-sm bg-warden-warning/20 text-warden-warning rounded hover:bg-warden-warning/30 transition-colors"
+                >
+                  Restart Session
+                </button>
+              )}
             </div>
           </div>
         )}
