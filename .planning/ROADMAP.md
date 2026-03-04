@@ -246,10 +246,10 @@ Plans:
   3. Unused `{ openSync, closeSync }` import removed from instanceRoutes.ts
   4. `24h` time range label in ModelComparisonView clarified (either rename to "Today" or calculate rolling 24h)
 
-**Plans**: TBD
+**Plans:** 1 plan
 
 Plans:
-- [ ] 26-01: Agent filter + tech debt — move agentFilter input to shared header visible on all tabs; remove unused fs import; fix 24h label semantics
+- [ ] 26-01-PLAN.md — Move agent filter to shared header (visible on all tabs); rename '24h' label to 'Today' in ModelComparisonView; verify instanceRoutes.ts unused import already cleaned
 
 ---
 
