@@ -10,6 +10,7 @@
 - ✅ **v3.0 Operator Awareness & Terminal Power Tools** — Phases 19-20 (shipped 2026-03-04)
 - ✅ **v3.1 Agent Control & Deep Insights** — Phases 21-24, 26-27 (shipped 2026-03-04)
 - ✅ **v3.2 Mobile Operations & UX Polish** — Phases 28-31 (shipped 2026-03-04)
+- 🔄 **v3.3 Telegram Operator Awareness** — Phases 32-35 (in progress)
 
 ## Phases
 
@@ -91,6 +92,13 @@
 
 </details>
 
+### v3.3 Telegram Operator Awareness
+
+- [ ] **Phase 32: Bot Foundation** - Telegram bot client with secure token handling and graceful lifecycle
+- [ ] **Phase 33: Permission Prompt Detection and Forwarding** - Server-side polling detects stalled agents and sends Telegram notifications
+- [ ] **Phase 34: One-Tap Approve** - Inline keyboard button unblocks stalled agents from Telegram with operator-only authorization
+- [ ] **Phase 35: Budget Alerts and Notification Settings** - Budget threshold forwarding and dashboard settings panel for all notification preferences
+
 ## Phase Details
 
 <details>
@@ -149,6 +157,53 @@ See `.planning/milestones/v3.2-ROADMAP.md`
 
 </details>
 
+### Phase 32: Bot Foundation
+**Goal**: Warden runs a secure, production-stable Telegram bot that starts on boot, shuts down cleanly, and degrades gracefully when unconfigured
+**Depends on**: Phase 31 (nothing new — extends existing Express process and SIGTERM handlers)
+**Requirements**: BOT-01, BOT-02, BOT-03, BOT-04
+**Success Criteria** (what must be TRUE):
+  1. Server starts with `WARDEN_TELEGRAM_BOT_TOKEN` set and the bot begins long polling without blocking the Express process
+  2. Server starts without `WARDEN_TELEGRAM_BOT_TOKEN` and logs a single warning — no crash, all other features unaffected
+  3. `SIGTERM` or `SIGINT` stops the bot cleanly before process exit — no 409 Conflict error on rapid restart
+  4. Telegram sends a high-volume message burst and the server does not crash or log unhandled errors — auto-retry absorbs 429 responses
+**Plans**: TBD
+
+### Phase 33: Permission Prompt Detection and Forwarding
+**Goal**: The operator receives a Telegram message in the correct agent topic when any agent stalls on a permission prompt, whether or not the browser is open
+**Depends on**: Phase 32
+**Requirements**: PERM-01, PERM-02, PERM-03, PERM-04, PERM-05
+**Success Criteria** (what must be TRUE):
+  1. An agent stalls on a Claude Code permission prompt with no browser open — the operator receives a Telegram message within 20 seconds
+  2. The Telegram message arrives in the agent's configured topic (not a generic channel) and includes a readable ANSI-stripped excerpt of the prompt text
+  3. The agent sustains the permission prompt for 5 minutes — the operator receives exactly one notification, not one per poll cycle
+  4. Two different agents stall simultaneously — each receives a separate notification in their respective topics
+  5. The agent exits the permission state and re-enters it — a new notification fires (transition detection resets the cooldown)
+**Plans**: TBD
+
+### Phase 34: One-Tap Approve
+**Goal**: The operator can unblock a stalled agent by tapping a single button in Telegram — without opening the browser
+**Depends on**: Phase 33
+**Requirements**: APRV-01, APRV-02, APRV-03, APRV-04, APRV-05
+**Success Criteria** (what must be TRUE):
+  1. The permission prompt notification message contains an "Approve" inline keyboard button
+  2. Tapping Approve from the configured operator Telegram account unblocks the agent within 3 seconds and the button disappears from the message (replaced by "Approved at HH:MM")
+  3. A non-operator Telegram user taps Approve — they receive an explicit rejection message and no input is sent to the agent
+  4. An Approve button older than 15 minutes is tapped — the operator receives a friendly "expired" message and no input is sent to the agent
+  5. Approve is tapped twice rapidly — only one `1\n` input is sent to the agent (button removed after first tap)
+**Plans**: TBD
+
+### Phase 35: Budget Alerts and Notification Settings
+**Goal**: Budget threshold breaches forward to Telegram and the operator can configure all notification preferences from the dashboard without code changes
+**Depends on**: Phase 33
+**Requirements**: BUDG-01, BUDG-02, NSET-01, NSET-02, NSET-03
+**Success Criteria** (what must be TRUE):
+  1. An agent crosses the amber (80%) budget threshold — the operator receives a distinctly formatted Telegram warning message
+  2. An agent crosses the red (100%) budget threshold — the operator receives a separate, urgently formatted Telegram alert
+  3. Budget threshold stays exceeded for 20 minutes — the operator receives at most 2 messages (one per 10-minute cooldown interval), not one per poll cycle
+  4. Operator opens Notification Settings panel in the dashboard and can toggle permission prompt notifications and budget alert notifications independently, set cooldown durations, and see the bot connection status (green/red indicator)
+  5. Settings saved in the panel take effect on the next notification event without restarting the server
+**Plans**: TBD
+
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
@@ -183,3 +238,7 @@ See `.planning/milestones/v3.2-ROADMAP.md`
 | 29. Session Navigation | v3.2 | 1/1 | Complete | 2026-03-04 |
 | 30. Auto-Record Per Agent | v3.2 | 2/2 | Complete | 2026-03-04 |
 | 31. Storage Rotation | v3.2 | 2/2 | Complete | 2026-03-04 |
+| 32. Bot Foundation | v3.3 | 0/? | Not started | - |
+| 33. Permission Prompt Detection and Forwarding | v3.3 | 0/? | Not started | - |
+| 34. One-Tap Approve | v3.3 | 0/? | Not started | - |
+| 35. Budget Alerts and Notification Settings | v3.3 | 0/? | Not started | - |

@@ -68,31 +68,31 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| BOT-01 | — | Pending |
-| BOT-02 | — | Pending |
-| BOT-03 | — | Pending |
-| BOT-04 | — | Pending |
-| PERM-01 | — | Pending |
-| PERM-02 | — | Pending |
-| PERM-03 | — | Pending |
-| PERM-04 | — | Pending |
-| PERM-05 | — | Pending |
-| APRV-01 | — | Pending |
-| APRV-02 | — | Pending |
-| APRV-03 | — | Pending |
-| APRV-04 | — | Pending |
-| APRV-05 | — | Pending |
-| BUDG-01 | — | Pending |
-| BUDG-02 | — | Pending |
-| NSET-01 | — | Pending |
-| NSET-02 | — | Pending |
-| NSET-03 | — | Pending |
+| BOT-01 | Phase 32 | Pending |
+| BOT-02 | Phase 32 | Pending |
+| BOT-03 | Phase 32 | Pending |
+| BOT-04 | Phase 32 | Pending |
+| PERM-01 | Phase 33 | Pending |
+| PERM-02 | Phase 33 | Pending |
+| PERM-03 | Phase 33 | Pending |
+| PERM-04 | Phase 33 | Pending |
+| PERM-05 | Phase 33 | Pending |
+| APRV-01 | Phase 34 | Pending |
+| APRV-02 | Phase 34 | Pending |
+| APRV-03 | Phase 34 | Pending |
+| APRV-04 | Phase 34 | Pending |
+| APRV-05 | Phase 34 | Pending |
+| BUDG-01 | Phase 35 | Pending |
+| BUDG-02 | Phase 35 | Pending |
+| NSET-01 | Phase 35 | Pending |
+| NSET-02 | Phase 35 | Pending |
+| NSET-03 | Phase 35 | Pending |
 
 **Coverage:**
 - v3.3 requirements: 19 total
-- Mapped to phases: 0
-- Unmapped: 19
+- Mapped to phases: 19
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-04*
-*Last updated: 2026-03-04 after initial definition*
+*Last updated: 2026-03-04 after roadmap creation (Phases 32-35)*

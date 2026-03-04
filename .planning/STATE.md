@@ -9,20 +9,45 @@ See: .planning/PROJECT.md (updated 2026-03-04)
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-03-04 — Milestone v3.3 started
+Phase: 32 — Bot Foundation
+Plan: TBD
+Status: Roadmap created, ready for Phase 32 planning
+Last activity: 2026-03-04 — v3.3 roadmap created (Phases 32-35)
+
+```
+Progress: [░░░░] 0/4 phases complete
+Milestone: v3.3 Telegram Operator Awareness
+```
 
 ## Performance Metrics
 
 **Completed milestones:** v1.0 (6 phases), v1.1 (2), v2.0 (3), v2.1 (3), v2.3 (4), v3.0 (2), v3.1 (6), v3.2 (4) = 31 phases shipped
+**Current milestone:** v3.3 — 0/4 phases complete
 
 ## Accumulated Context
 
 ### Decisions
 
 See PROJECT.md Key Decisions table for full list with outcomes.
+
+**v3.3-specific decisions (to be made during implementation):**
+
+- grammy ^1.41.1 selected for Telegram bot client (TypeScript-first, long polling, inline keyboards, graceful shutdown)
+- `@grammyjs/auto-retry` for 429 rate-limit handling at bot init
+- `strip-ansi` for ANSI stripping of tmux pane excerpts before Telegram message composition
+- Bot token from `WARDEN_TELEGRAM_BOT_TOKEN` env var — never logged or committed
+- Operator Telegram user ID from `WARDEN_TELEGRAM_OPERATOR_ID` env var
+- `NotificationPoller` with 10-second interval using `tmux capture-pane` (NOT PTY `onData`) — works without browser open
+- `detectAgentState()` extracted from `gsdRoutes.ts` to `src/server/utils/agentStateDetection.ts` (shared utility)
+- `NotificationDeduplicator` with in-memory cooldown Map — configurable window, defaults: 2 min permission, 10 min budget
+- `notification_config` SQLite table following singleton-row pattern (same as `budget_config`, `rotation_config`)
+- Phase 33 depends on Phase 32; Phase 34 depends on Phase 33; Phase 35 depends on Phase 33
+
+### Research Flags
+
+- **Phase 33:** Verify narrowed `detectAgentState()` regex (`❯ 1. Yes`) against actual Claude Code terminal output before finalizing. Capture a real permission prompt pane and confirm match.
+- **Phase 32 deployment:** `WARDEN_TELEGRAM_BOT_TOKEN` must be set in production (Laravel Forge env) before Phase 32 deploy.
+- **Phase 34 prereq:** Operator must look up their Telegram user ID via `@userinfobot` before Phase 34 testing.
 
 ### Pending Todos
 
@@ -43,6 +68,6 @@ None
 
 ## Session Continuity
 
-Last session: 2026-03-04 (milestone initialization)
-Stopped at: v3.3 requirements definition
-Next step: Complete requirements → create roadmap
+Last session: 2026-03-04 (v3.3 roadmap creation)
+Stopped at: Roadmap written — Phases 32-35 defined, all 19 requirements mapped
+Next step: `/gsd:plan-phase 32` — Bot Foundation
