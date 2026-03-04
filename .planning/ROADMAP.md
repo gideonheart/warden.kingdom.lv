@@ -266,11 +266,11 @@ Plans:
   3. Operator can open any completed recording in a replay player showing a read-only xterm.js terminal; the player supports 1x, 2x, 4x, and 8x playback speed and pause/resume controls
   4. A Recording Library page or panel lists all past recordings with agent name, project, date, duration, and file size; clicking a recording opens it in the replay player
 
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 24-01: Recording capture backend — asciicast v2 writer tapped into TerminalStreamService PTY output pipeline; recordings SQLite table; start/stop recording API endpoints; data/recordings/ directory setup
-- [ ] 24-02: Recording UI — Record button with red pulse indicator in TerminalView header; Socket.IO recording state events; RecordingLibrary component; RecordingPlayer with read-only xterm.js and speed controls
+- [ ] 24-01-PLAN.md — Backend: RecordingCaptureService (PTY tap, asciicast v2 writer), recordings SQLite table + CRUD, REST API (list/start/stop/delete/download/content), data/recordings/ directory
+- [ ] 24-02-PLAN.md — UI: Record button + red pulse timer in TerminalView header, RecordingLibrary (new Recordings top-level tab, sortable table, download/delete), RecordingPlayer (xterm.js replay, seek timeline, 1x/2x/4x/8x speed, keyboard shortcuts)
 
 ---
 
