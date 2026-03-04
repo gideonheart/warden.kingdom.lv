@@ -196,7 +196,10 @@ Plans:
   3. A non-operator Telegram user taps Approve — they receive an explicit rejection message and no input is sent to the agent
   4. An Approve button older than 15 minutes is tapped — the operator receives a friendly "expired" message and no input is sent to the agent
   5. Approve is tapped twice rapidly — only one `1\n` input is sent to the agent (button removed after first tap)
-**Plans**: TBD
+**Plans:** 2 plans
+Plans:
+- [ ] 34-01-PLAN.md — TDD: ApprovalStateTracker + ApprovalCallbackHandler with unit tests (APRV-02, APRV-03, APRV-04, APRV-05)
+- [ ] 34-02-PLAN.md — Wire approve button into notification pipeline and register callback handler (APRV-01, APRV-02, APRV-04)
 
 ### Phase 35: Budget Alerts and Notification Settings
 **Goal**: Budget threshold breaches forward to Telegram and the operator can configure all notification preferences from the dashboard without code changes
@@ -246,5 +249,5 @@ Plans:
 | 31. Storage Rotation | v3.2 | 2/2 | Complete | 2026-03-04 |
 | 32. Bot Foundation | 2/2 | Complete    | 2026-03-04 | - |
 | 33. Permission Prompt Detection and Forwarding | 2/2 | Complete    | 2026-03-04 | - |
-| 34. One-Tap Approve | v3.3 | 0/? | Not started | - |
+| 34. One-Tap Approve | v3.3 | 0/2 | Planned | - |
 | 35. Budget Alerts and Notification Settings | v3.3 | 0/? | Not started | - |
