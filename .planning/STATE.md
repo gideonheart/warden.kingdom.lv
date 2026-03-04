@@ -13,7 +13,7 @@ See: .planning/PROJECT.md (updated 2026-03-03)
 Phase: 20 — Terminal Search & Browser Notifications
 Plan: 02 complete (ALL PLANS COMPLETE)
 Status: Phase 20 complete — v3.0 Operator Awareness & Terminal Power Tools milestone achieved
-Last activity: 2026-03-04 — Completed quick task 2037: Review commit 68cbdf1 for regressions; v3.0 shipped
+Last activity: 2026-03-04 — Completed quick task 2038: Draft v3.1 milestone scope with 3 feature areas and 5 phases
 
 Progress: [############################] 100% (Phase 20 of 20 — Plan 02/02 complete)
 
@@ -250,6 +250,7 @@ Key decisions for v3.0 (from research — apply from Phase 19 onwards):
 | 2035 | Draft v3.0 milestone scope: combined Operator Awareness & Terminal Power Tools (permission alerts, context pressure, terminal search, keyboard nav) | 2026-03-03 | `6d0c2e5` |
 | 2036 | Fix v3.0 review findings: aria-label, ROADMAP checkboxes, deps cleanup | 2026-03-04 | `b48660f` |
 | 2037 | Review commit 68cbdf1 (useAgentConfig poll dedup fix) for regressions; all 6 edge cases confirmed safe; v3.0 marked shipped in ROADMAP | 2026-03-04 | `1ca0dbe` |
+| 2038 | Draft v3.1 milestone scope: 3 feature areas (agent orchestration, token insights, session recording), 15 requirements, 5 phases (21-25) | 2026-03-04 | `6c31ce5` |
 
 ### Roadmap Evolution
 
@@ -278,6 +279,6 @@ No active blockers.
 
 ## Session Continuity
 
-Last session: 2026-03-03
-Stopped at: Completed 20-02-PLAN.md (browser notifications — useBrowserNotifications hook, bell icon toggle, state-transition detection)
-Next step: v3.0 milestone SHIPPED 2026-03-04. All phases complete. No further phases planned.
+Last session: 2026-03-04
+Stopped at: Completed quick task 2038: Draft v3.1 milestone scope
+Next step: Run `/gsd:new-milestone` with `.planning/milestones/v3.1-SCOPE.md` as input to begin v3.1 planning
