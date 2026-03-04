@@ -9,6 +9,8 @@ import { PluginRegistryView } from './components/PluginRegistryView.js';
 import { PluginSlotRenderer } from './components/PluginSlotRenderer.js';
 import { MobilePromptSheet } from './components/MobilePromptSheet.js';
 import { GsdView } from './components/GsdView.js';
+import { RecordingLibrary } from './components/RecordingLibrary.js';
+import { RecordingPlayer } from './components/RecordingPlayer.js';
 import { useActiveInstances } from './hooks/useActiveInstances.js';
 import { useAgentConfig } from './hooks/useAgentConfig.js';
 import { usePluginRegistry } from './hooks/usePluginRegistry.js';
@@ -18,14 +20,19 @@ import type { AgentLiveStatus } from './hooks/useAgentLiveStatus.js';
 import { useGlobalHotkeys } from './hooks/useGlobalHotkeys.js';
 import { useBrowserNotifications } from './hooks/useBrowserNotifications.js';
 import { useBudgetAlerts } from './hooks/useBudgetAlerts.js';
+import type { RecordingEntry } from '@shared/types.js';
 
-type AppView = 'terminals' | 'history' | 'plugins' | 'agents';
+type AppView = 'terminals' | 'history' | 'plugins' | 'agents' | 'recordings';
 
 function parseHash(): { view: AppView; session: string | null } {
   const hash = window.location.hash.replace(/^#/, '');
   const params = new URLSearchParams(hash);
   const viewParam = params.get('view');
-  const view: AppView = viewParam === 'history' ? 'history' : viewParam === 'plugins' ? 'plugins' : viewParam === 'agents' ? 'agents' : 'terminals';
+  const view: AppView = viewParam === 'history' ? 'history'
+    : viewParam === 'plugins' ? 'plugins'
+    : viewParam === 'agents' ? 'agents'
+    : viewParam === 'recordings' ? 'recordings'
+    : 'terminals';
   const session = params.get('session') || null;
   return { view, session };
 }
@@ -207,6 +214,21 @@ export function App() {
   // Lifted to App so the History nav badge reflects worst-case alert level across all agents.
   const budgetAlertLevel = useBudgetAlerts();
 
+  const [activeRecording, setActiveRecording] = useState<RecordingEntry | null>(null);
+  const [recordingLibraryRefreshKey, setRecordingLibraryRefreshKey] = useState(0);
+
+  const handlePlayRecording = useCallback((recording: RecordingEntry) => {
+    setActiveRecording(recording);
+  }, []);
+
+  const handleClosePlayer = useCallback(() => {
+    setActiveRecording(null);
+  }, []);
+
+  const handleRecordingComplete = useCallback(() => {
+    setRecordingLibraryRefreshKey((k) => k + 1);
+  }, []);
+
   const handleViewChange = useCallback((view: AppView) => {
     setCurrentView(view);
   }, []);
@@ -332,6 +354,12 @@ export function App() {
             </span>
           </button>
           <button
+            onClick={() => handleViewChange('recordings')}
+            className={`px-2 py-1 min-h-[44px] text-xs transition-colors flex items-center ${currentView === 'recordings' ? 'text-warden-accent' : 'text-warden-text-dim hover:text-warden-text'}`}
+          >
+            Recordings
+          </button>
+          <button
             onClick={() => handleViewChange('agents')}
             className={`px-2 py-1 min-h-[44px] text-xs transition-colors flex items-center ${currentView === 'agents' ? 'text-warden-accent' : 'text-warden-text-dim hover:text-warden-text'}`}
           >
@@ -395,6 +423,12 @@ export function App() {
                     }`} />
                   )}
                 </span>
+              </button>
+              <button
+                onClick={() => { handleViewChange('recordings'); setShowMobileMenu(false); }}
+                className={`w-full text-left px-4 py-3 min-h-[44px] text-sm transition-colors ${currentView === 'recordings' ? 'text-warden-accent bg-warden-accent/10' : 'text-warden-text-dim hover:text-warden-text hover:bg-warden-border/30'}`}
+              >
+                Recordings
               </button>
               <button
                 onClick={() => { handleViewChange('agents'); setShowMobileMenu(false); }}
@@ -463,6 +497,9 @@ export function App() {
                     instanceStatus={selectedInstance?.status}
                     agentName={selectedInstance?.agentName}
                     onRestart={selectedInstance ? () => handleRestartInstance(selectedInstance.id) : undefined}
+                    agentId={selectedInstance?.agentId}
+                    projectPath={selectedInstance?.projectPath}
+                    onRecordingComplete={handleRecordingComplete}
                   />
                 </ErrorBoundary>
               ) : (
@@ -480,6 +517,12 @@ export function App() {
                 <PluginSlotRenderer slot="terminal-overlay" enabledPlugins={enabledPlugins} />
               </div>
             </div>
+          ) : currentView === 'recordings' ? (
+            activeRecording ? (
+              <RecordingPlayer recording={activeRecording} onClose={handleClosePlayer} />
+            ) : (
+              <RecordingLibrary onPlayRecording={handlePlayRecording} refreshKey={recordingLibraryRefreshKey} />
+            )
           ) : currentView === 'agents' ? (
             <GsdView />
           ) : currentView === 'plugins' ? (
