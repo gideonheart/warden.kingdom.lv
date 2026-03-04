@@ -285,9 +285,24 @@ export function TerminalView({
     }
   }, []);
 
+  const {
+    isRecording,
+    formattedElapsed,
+    startRecording,
+    stopRecording,
+    sessionExited,
+  } = useRecordingState({
+    sessionName: tmuxSessionName,
+    agentId: agentId ?? '',
+    agentName: agentName ?? '',
+    projectPath: projectPath ?? '',
+    onRecordingStopped: () => onRecordingComplete?.(),
+  });
+
   const handleSessionExit = useCallback((exitCode: number) => {
+    sessionExited();
     onSessionExit(tmuxSessionName, exitCode);
-  }, [tmuxSessionName, onSessionExit]);
+  }, [tmuxSessionName, onSessionExit, sessionExited]);
 
   // getDimensions is called inside useTerminalSocket's effect at socket-creation time,
   // so it reads the actual rendered container dimensions rather than a stale render-phase value.
@@ -306,19 +321,6 @@ export function TerminalView({
     onTerminalReset: handleTerminalReset,
     onSessionExit: handleSessionExit,
     getDimensions,
-  });
-
-  const {
-    isRecording,
-    formattedElapsed,
-    startRecording,
-    stopRecording,
-  } = useRecordingState({
-    sessionName: tmuxSessionName,
-    agentId: agentId ?? '',
-    agentName: agentName ?? '',
-    projectPath: projectPath ?? '',
-    onRecordingStopped: () => onRecordingComplete?.(),
   });
 
   const handleToggleRecording = useCallback(async () => {

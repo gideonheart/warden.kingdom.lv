@@ -14,6 +14,7 @@ interface UseRecordingStateResult {
   recordingId: number | null;
   startRecording: (cols: number, rows: number) => Promise<void>;
   stopRecording: () => Promise<void>;
+  sessionExited: () => void;
   formattedElapsed: string;   // e.g., "02:34"
 }
 
@@ -89,12 +90,28 @@ export function useRecordingState({
     }
   }, [sessionName]);
 
+  // Called when the PTY exits (terminal:exit event). Resets all recording state without
+  // making any HTTP call — the server already auto-stopped the recording via
+  // RecordingCaptureService.stopRecording(..., 'session_ended') in TerminalStreamService.ptyProcess.onExit.
+  const sessionExited = useCallback(() => {
+    if (tickerRef.current) {
+      clearInterval(tickerRef.current);
+      tickerRef.current = null;
+    }
+    startedAtRef.current = null;
+    setIsRecording(false);
+    setElapsedMs(0);
+    setRecordingId(null);
+    onRecordingStoppedRef.current?.('session_ended');
+  }, []);
+
   return {
     isRecording,
     elapsedMs,
     recordingId,
     startRecording,
     stopRecording,
+    sessionExited,
     formattedElapsed: formatElapsedMs(elapsedMs),
   };
 }
