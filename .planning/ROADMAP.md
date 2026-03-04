@@ -230,7 +230,7 @@ Plans:
 | 26. Token Analytics Polish & Tech Debt | v3.1 | 1/1 | Complete | 2026-03-04 |
 | 24. Session Recording & Replay | v3.1 | 2/2 | Complete | 2026-03-04 |
 | 27. Recording State Cleanup & Tech Debt | v3.1 | 1/1 | Complete | 2026-03-04 |
-| 28. Mobile Toolbar Fixes | 1/1 | Complete   | 2026-03-04 | - |
+| 28. Mobile Toolbar Fixes | 1/1 | Complete    | 2026-03-04 | - |
 | 29. Session Navigation | v3.2 | 0/1 | Not started | - |
 | 30. Auto-Record Per Agent | v3.2 | 0/2 | Not started | - |
 | 31. Storage Rotation | v3.2 | 0/2 | Not started | - |
