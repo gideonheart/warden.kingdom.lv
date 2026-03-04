@@ -2,20 +2,18 @@
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-03-03)
+See: .planning/PROJECT.md (updated 2026-03-04)
 
 **Core value:** Real-time visibility into all active Claude Code agent sessions from a single browser tab
 
-**Current focus:** v3.0 — Operator Awareness & Terminal Power Tools
+**Current focus:** v3.1 — Agent Control & Deep Insights
 
 ## Current Position
 
-Phase: 20 — Terminal Search & Browser Notifications
-Plan: 02 complete (ALL PLANS COMPLETE)
-Status: Phase 20 complete — v3.0 Operator Awareness & Terminal Power Tools milestone achieved
-Last activity: 2026-03-04 — Completed quick task 2038: Draft v3.1 milestone scope with 3 feature areas and 5 phases
-
-Progress: [############################] 100% (Phase 20 of 20 — Plan 02/02 complete)
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-03-04 — Milestone v3.1 started
 
 ## Performance Metrics
 

@@ -40,22 +40,48 @@ Real-time visibility into all active Claude Code agent sessions from a single br
 - ✓ SessionUsageReader JSONL scanner with cache token tracking — v2.3
 - ✓ Auto-scan token usage on boot + every 5 minutes — v2.3
 - ✓ Enhanced TokenUsageView with cache columns and Scan Now button — v2.3
+- ✓ Permission prompt detection with tab badge alert — v3.0
+- ✓ Context window pressure badge in terminal view header — v3.0
+- ✓ Agent state chip in terminal header — v3.0
+- ✓ Keyboard navigation shortcuts (Ctrl+1-9, Ctrl+B, Ctrl+[/]) — v3.0
+- ✓ Terminal text search via xterm-addon-search (Ctrl+F) — v3.0
+- ✓ Search match count, highlight persistence, scrollbar gutter markers — v3.0
+- ✓ Browser notifications for permission prompts (opt-in) — v3.0
 
 ### Active
 
-## Current Milestone: v3.0 Operator Awareness & Terminal Power Tools
+- [ ] Start, stop, and restart agent sessions from dashboard
+- [ ] Agent session status lifecycle with transitional states
+- [ ] Safety guards for agent orchestration actions
+- [ ] Token burn rate calculation with sliding windows
+- [ ] Per-agent budget alerts at 80%/100% thresholds
+- [ ] Cost projection at current burn rate
+- [ ] Model cost comparison view
+- [ ] CSV export of token usage data
+- [ ] Terminal session recording in asciicast v2 format
+- [ ] Recording toggle per session
+- [ ] Recording replay at variable speed
+- [ ] Recording library with session metadata
+- [ ] Auto-record option with configurable triggers
 
-**Goal:** Make Warden a complete operator workstation — passive monitoring alerts (permission prompts, context pressure) and active investigation tools (terminal search, keyboard navigation).
+## Current Milestone: v3.1 Agent Control & Deep Insights
+
+**Goal:** Advance Warden from a monitoring tool to an active operations platform — agent lifecycle control, cost velocity insights, and session recording.
 
 **Target features:**
-- Permission prompt detection with tab badge alert
-- Context window pressure badge in terminal view header
-- Terminal text search via xterm-addon-search (Ctrl+F)
-- Keyboard navigation shortcuts (tab switching, sidebar toggle)
-- Agent state chip in terminal header
-- Browser notifications for permission prompts (opt-in)
-- Search match count and highlight persistence
-- Scrollbar gutter markers for search results
+- Start, stop, and restart agent sessions from the dashboard
+- Agent session status lifecycle with transitional states
+- Safety guards (confirmation dialogs, double-start prevention)
+- Token burn rate calculation with sliding windows (1h/4h/24h)
+- Per-agent budget alerts with visual warnings at 80%/100%
+- Cost projection based on current burn rate
+- Model cost comparison view
+- CSV export of token usage data
+- Terminal session recording in asciicast v2 format
+- Recording toggle per session (start/stop from UI)
+- Recording replay at variable speed (1x/2x/4x/8x)
+- Recording library with session metadata
+- Auto-record option with configurable triggers
 
 ### Out of Scope
 
@@ -114,4 +140,4 @@ tmux configured with mouse mode and 50,000-line scrollback buffer for monitoring
 | useSessionSelection hook | Centralize tab selection with polling dedup and hysteresis | ✓ Good — eliminated socket disruption on polls |
 
 ---
-*Last updated: 2026-03-03 after v3.0 milestone start*
+*Last updated: 2026-03-04 after v3.1 milestone start*
