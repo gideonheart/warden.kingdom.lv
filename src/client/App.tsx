@@ -95,7 +95,16 @@ export function App() {
   const isTerminalsView = currentView === 'terminals';
   const liveStatus = useAgentLiveStatus(!isTerminalsView);
 
+  // Separate live status poll kept always-on exclusively for browser notifications.
+  // The main liveStatus above is disabled on the terminals view to protect xterm.js
+  // from re-renders. useBrowserNotifications needs live state even on the terminals
+  // view (that is where the toggle button lives), so it gets its own independent poll.
+  // This reference is passed only to useBrowserNotifications — NOT into sessionStatusMap
+  // used for rendering — so it cannot cascade into TerminalView re-renders.
+  const notificationLiveStatus = useAgentLiveStatus(true);
+
   // Bridge agentId → tmuxSessionName so live status can be looked up by session name.
+  // Used for UI rendering (InstanceTabBar etc.) — disabled on terminals view.
   const sessionStatusMap = useMemo(() => {
     const map = new Map<string, AgentLiveStatus>();
     for (const instance of activeInstances) {
@@ -106,6 +115,20 @@ export function App() {
     }
     return map;
   }, [liveStatus, activeInstances]);
+
+  // Always-on session status map exclusively for browser notifications.
+  // Built from notificationLiveStatus which polls regardless of active view,
+  // so useBrowserNotifications receives data even while on the terminals view.
+  const notificationSessionStatusMap = useMemo(() => {
+    const map = new Map<string, AgentLiveStatus>();
+    for (const instance of activeInstances) {
+      const status = notificationLiveStatus.get(instance.agentId);
+      if (status) {
+        map.set(instance.tmuxSessionName, status);
+      }
+    }
+    return map;
+  }, [notificationLiveStatus, activeInstances]);
 
   // Focus callback ref — Plan 02 keyboard shortcuts will call this to return focus to terminal.
   const terminalFocusRef = useRef<(() => void) | null>(null);
@@ -232,19 +255,22 @@ export function App() {
     onOpenSearch: handleOpenSearch,
   });
 
+  // Budget alert level — two separate instances:
+  // 1. Always-on: feeds browser notifications so alerts fire from any view.
+  // 2. View-gated: feeds the History nav badge (disabled on terminals view to
+  //    avoid background re-renders that could disturb xterm.js).
+  const budgetAlertLevelForNotifications = useBudgetAlerts(true);
+  const budgetAlertLevel = useBudgetAlerts(!isTerminalsView);
+
   // Browser notification opt-in — fires when agent enters permission_prompt state
-  // and the browser tab is unfocused. Requires sessionStatusMap and handleSelectSession
-  // which are defined above.
+  // or when budget thresholds are crossed, even while the browser tab is unfocused.
+  // Uses notificationSessionStatusMap (always-on poll) rather than sessionStatusMap
+  // (disabled on terminals view) so notifications can fire from the terminals view.
   const { notificationsEnabled, toggleNotifications, notificationPermission } = useBrowserNotifications({
-    sessionStatusMap,
+    sessionStatusMap: notificationSessionStatusMap,
+    budgetAlertLevel: budgetAlertLevelForNotifications,
     onSelectSession: handleSelectSession,
   });
-
-  // Budget alert level — polls /api/history/budget-config/status every 30s.
-  // Disabled while on the terminals view to eliminate background network requests
-  // that could trigger React re-renders. The History nav badge won't pulse on
-  // the terminals tab, but will update as soon as the user switches views.
-  const budgetAlertLevel = useBudgetAlerts(!isTerminalsView);
 
   const [activeRecording, setActiveRecording] = useState<RecordingEntry | null>(null);
   const [recordingLibraryRefreshKey, setRecordingLibraryRefreshKey] = useState(0);

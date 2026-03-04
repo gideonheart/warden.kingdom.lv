@@ -3,8 +3,11 @@ import type { AgentLiveStatus } from './useAgentLiveStatus.js';
 
 const NOTIFICATION_STORAGE_KEY = 'warden:notifications-enabled';
 
+type BudgetAlertLevel = 'ok' | 'warning' | 'exceeded';
+
 interface UseBrowserNotificationsParams {
   sessionStatusMap: Map<string, AgentLiveStatus>;
+  budgetAlertLevel: BudgetAlertLevel;
   onSelectSession: (sessionName: string) => void;
 }
 
@@ -14,12 +17,16 @@ interface UseBrowserNotificationsResult {
   notificationPermission: NotificationPermission | 'unsupported';
 }
 
-/** Browser notification opt-in for permission-prompt state transitions.
+/** Browser notification opt-in for permission-prompt state transitions and budget alerts.
  *
  *  State-transition detection: fires a notification only when a session ENTERS
  *  permission_prompt state, not while it remains in that state. Uses a ref-based
  *  Set to track which sessions are currently in the permission state, comparing
  *  against the previous set to detect transitions.
+ *
+ *  Budget alerts: fires a notification when budgetAlertLevel transitions into
+ *  'warning' or 'exceeded'. Uses a ref to detect transitions so notifications
+ *  are not repeated on every poll cycle.
  *
  *  localStorage persistence: toggle state survives page reloads.
  *
@@ -27,6 +34,7 @@ interface UseBrowserNotificationsResult {
  *  with the same tag, providing a second layer of dedup beyond the ref-based check. */
 export function useBrowserNotifications({
   sessionStatusMap,
+  budgetAlertLevel,
   onSelectSession,
 }: UseBrowserNotificationsParams): UseBrowserNotificationsResult {
   // Feature detection — guard SSR and older browsers
@@ -52,6 +60,9 @@ export function useBrowserNotifications({
   // Only fire a notification when a session ENTERS the set (state transition).
   const permissionStateSessionsRef = useRef<Set<string>>(new Set());
 
+  // Track previous budget alert level to detect transitions (ok→warning, ok→exceeded, etc.)
+  const previousBudgetLevelRef = useRef<BudgetAlertLevel>('ok');
+
   // Main effect — runs when sessionStatusMap or notificationsEnabled changes.
   // Detects permission_prompt state transitions and fires desktop notifications.
   useEffect(() => {
@@ -67,25 +78,49 @@ export function useBrowserNotifications({
 
       // Only fire notification on state TRANSITION (new entry, not sustained)
       if (!permissionStateSessionsRef.current.has(sessionName)) {
-        // Only fire when tab is NOT focused — no need to interrupt if operator is watching
-        if (document.visibilityState === 'hidden') {
-          const notification = new Notification('Warden — Permission Required', {
-            body: `${sessionName} needs operator approval`,
-            // Tag-based deduplication: browser suppresses duplicate tag while previous is showing
-            tag: `warden-permission-${sessionName}`,
-          });
-          notification.onclick = () => {
-            // window.focus() is unreliable on macOS Chrome/Firefox but worth attempting
-            window.focus();
-            onSelectSession(sessionName);
-            notification.close();
-          };
-        }
+        const notification = new Notification('Warden — Permission Required', {
+          body: `${sessionName} needs operator approval`,
+          // Tag-based deduplication: browser suppresses duplicate tag while previous is showing
+          tag: `warden-permission-${sessionName}`,
+        });
+        notification.onclick = () => {
+          // window.focus() is unreliable on macOS Chrome/Firefox but worth attempting
+          window.focus();
+          onSelectSession(sessionName);
+          notification.close();
+        };
       }
     }
 
     permissionStateSessionsRef.current = currentPermissionSessions;
   }, [sessionStatusMap, notificationsEnabled, isSupported, onSelectSession]);
+
+  // Budget alert effect — fires a notification when the budget level transitions
+  // into 'warning' or 'exceeded'. Does not fire when returning to 'ok'.
+  useEffect(() => {
+    if (!notificationsEnabled || !isSupported || Notification.permission !== 'granted') {
+      previousBudgetLevelRef.current = budgetAlertLevel;
+      return;
+    }
+
+    const previous = previousBudgetLevelRef.current;
+    previousBudgetLevelRef.current = budgetAlertLevel;
+
+    // Only fire on transitions that represent a worsening state
+    if (budgetAlertLevel === 'ok' || budgetAlertLevel === previous) return;
+
+    const isExceeded = budgetAlertLevel === 'exceeded';
+    new Notification(
+      isExceeded ? 'Warden — Budget Exceeded' : 'Warden — Budget Warning',
+      {
+        body: isExceeded
+          ? 'Token budget has been exceeded. Review usage in History.'
+          : 'Token budget warning threshold reached. Review usage in History.',
+        // Tag ensures browser deduplicates if the level stays the same across polls
+        tag: `warden-budget-${budgetAlertLevel}`,
+      },
+    );
+  }, [budgetAlertLevel, notificationsEnabled, isSupported]);
 
   // Toggle callback — must be triggered by a user gesture (button click).
   // Browser silently blocks Notification.requestPermission() outside user gesture context.
