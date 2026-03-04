@@ -10,19 +10,19 @@ See: .planning/PROJECT.md (updated 2026-03-04)
 ## Current Position
 
 Phase: 32 — Bot Foundation
-Plan: 01 complete (1/2 plans done)
-Status: Plan 01 complete — TelegramBotService implemented, all 11 tests green
-Last activity: 2026-03-04 — 32-01-PLAN.md executed, TelegramBotService created
+Plan: 02 complete (2/2 plans done — Phase 32 complete)
+Status: Phase 32 complete — TelegramBotService wired into server lifecycle; BOT-01, BOT-02, BOT-03, BOT-04 satisfied
+Last activity: 2026-03-04 — 32-02-PLAN.md executed, TelegramBotService wired into Express server lifecycle
 
 ```
-Progress: [░░░░] 0/4 phases complete
+Progress: [#░░░] 1/4 phases complete
 Milestone: v3.3 Telegram Operator Awareness
 ```
 
 ## Performance Metrics
 
 **Completed milestones:** v1.0 (6 phases), v1.1 (2), v2.0 (3), v2.1 (3), v2.3 (4), v3.0 (2), v3.1 (6), v3.2 (4) = 31 phases shipped
-**Current milestone:** v3.3 — 0/4 phases complete (Phase 32 in progress: 1/2 plans done)
+**Current milestone:** v3.3 — 1/4 phases complete (Phase 32 complete, Phase 33 next)
 
 ## Accumulated Context
 
@@ -45,6 +45,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase 32-bot-foundation]: MockBot vi.fn must use function() not arrow fn for constructability via new Bot(token)
 - [Phase 32-bot-foundation]: TelegramBotService.start() is void — bot.start() fire-and-forget, no await
 - [Phase 32-bot-foundation]: autoRetry() default config (unlimited retries) selected for Phase 32
+- [Phase 32-02]: handleShutdown() converted to async — await telegramBotService.stop() before httpServer.close() prevents 409 Conflict on rapid restart
+- [Phase 32-02]: Signal handlers use void pattern — () => { void handleShutdown('SIGTERM'); } correct async invocation without unhandled rejection
 
 ### Research Flags
 
@@ -71,6 +73,6 @@ None
 
 ## Session Continuity
 
-Last session: 2026-03-04 (Plan 32-01 execution)
-Stopped at: Completed 32-01-PLAN.md — TelegramBotService implemented, 11 tests green, BOT-01/BOT-02/BOT-04 complete
-Next step: Execute 32-02-PLAN.md — wire TelegramBotService into server index.ts (BOT-03)
+Last session: 2026-03-04 (Plan 32-02 execution)
+Stopped at: Completed 32-02-PLAN.md — TelegramBotService wired into Express server lifecycle, Phase 32 complete
+Next step: Execute Phase 33 — notifications (NotificationPoller, detectAgentState, message sending)

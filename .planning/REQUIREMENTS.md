@@ -11,7 +11,7 @@ Requirements for Telegram Operator Awareness milestone. Each maps to roadmap pha
 
 - [x] **BOT-01**: Warden runs its own Telegram bot client using grammy with long polling
 - [x] **BOT-02**: Bot token loaded from environment variable, never logged or committed
-- [ ] **BOT-03**: Bot starts on server boot and stops gracefully on shutdown (SIGTERM/SIGINT)
+- [x] **BOT-03**: Bot starts on server boot and stops gracefully on shutdown (SIGTERM/SIGINT)
 - [x] **BOT-04**: Bot handles Telegram API rate limits with auto-retry
 
 ### Permission Notifications
@@ -70,7 +70,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 |-------------|-------|--------|
 | BOT-01 | Phase 32 | Complete |
 | BOT-02 | Phase 32 | Complete |
-| BOT-03 | Phase 32 | Pending |
+| BOT-03 | Phase 32 | Complete |
 | BOT-04 | Phase 32 | Complete |
 | PERM-01 | Phase 33 | Pending |
 | PERM-02 | Phase 33 | Pending |

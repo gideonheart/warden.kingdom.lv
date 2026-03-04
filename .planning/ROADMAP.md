@@ -94,7 +94,7 @@
 
 ### v3.3 Telegram Operator Awareness
 
-- [ ] **Phase 32: Bot Foundation** - Telegram bot client with secure token handling and graceful lifecycle
+- [x] **Phase 32: Bot Foundation** - Telegram bot client with secure token handling and graceful lifecycle (completed 2026-03-04)
 - [ ] **Phase 33: Permission Prompt Detection and Forwarding** - Server-side polling detects stalled agents and sends Telegram notifications
 - [ ] **Phase 34: One-Tap Approve** - Inline keyboard button unblocks stalled agents from Telegram with operator-only authorization
 - [ ] **Phase 35: Budget Alerts and Notification Settings** - Budget threshold forwarding and dashboard settings panel for all notification preferences
@@ -166,7 +166,7 @@ See `.planning/milestones/v3.2-ROADMAP.md`
   2. Server starts without `WARDEN_TELEGRAM_BOT_TOKEN` and logs a single warning — no crash, all other features unaffected
   3. `SIGTERM` or `SIGINT` stops the bot cleanly before process exit — no 409 Conflict error on rapid restart
   4. Telegram sends a high-volume message burst and the server does not crash or log unhandled errors — auto-retry absorbs 429 responses
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans complete
 Plans:
 - [ ] 32-01-PLAN.md — TDD: TelegramBotService singleton with unit tests (BOT-01, BOT-02, BOT-04)
 - [ ] 32-02-PLAN.md — Wire service into Express lifecycle start/stop (BOT-03)
@@ -241,7 +241,7 @@ Plans:
 | 29. Session Navigation | v3.2 | 1/1 | Complete | 2026-03-04 |
 | 30. Auto-Record Per Agent | v3.2 | 2/2 | Complete | 2026-03-04 |
 | 31. Storage Rotation | v3.2 | 2/2 | Complete | 2026-03-04 |
-| 32. Bot Foundation | 1/2 | In Progress|  | - |
+| 32. Bot Foundation | 2/2 | Complete   | 2026-03-04 | - |
 | 33. Permission Prompt Detection and Forwarding | v3.3 | 0/? | Not started | - |
 | 34. One-Tap Approve | v3.3 | 0/? | Not started | - |
 | 35. Budget Alerts and Notification Settings | v3.3 | 0/? | Not started | - |
