@@ -53,12 +53,22 @@ class DatabaseConnection {
     return row;
   }
 
+  findActiveInstanceByAgentId(agentId: string): AgentInstance | null {
+    const row = this.db.prepare(`
+      SELECT id, agent_id as agentId, agent_name as agentName, tmux_session_name as tmuxSessionName,
+             status, project_path as projectPath, telegram_topic_id as telegramTopicId,
+             created_at as createdAt, last_active_at as lastActiveAt
+      FROM instances WHERE agent_id = ? AND status IN ('active', 'idle', 'starting') LIMIT 1
+    `).get(agentId) as AgentInstance | null;
+    return row;
+  }
+
   listActiveInstances(): AgentInstance[] {
     return this.db.prepare(`
       SELECT id, agent_id as agentId, agent_name as agentName, tmux_session_name as tmuxSessionName,
              status, project_path as projectPath, telegram_topic_id as telegramTopicId,
              created_at as createdAt, last_active_at as lastActiveAt
-      FROM instances WHERE status IN ('active', 'idle')
+      FROM instances WHERE status IN ('active', 'idle', 'starting', 'stopping')
       ORDER BY last_active_at DESC
     `).all() as AgentInstance[];
   }
@@ -90,6 +100,8 @@ class DatabaseConnection {
   }
 
   markMissingSessionsStopped(activeSessionNames: string[]): void {
+    // Only auto-stop 'active' and 'idle' sessions — 'starting' and 'stopping' are
+    // managed by their own lifecycle handlers and must not be clobbered by the poll.
     if (activeSessionNames.length === 0) {
       this.db.prepare(
         "UPDATE instances SET status = 'stopped', last_active_at = CURRENT_TIMESTAMP WHERE status IN ('active', 'idle')"

@@ -1,8 +1,44 @@
 import { Router } from 'express';
+import path from 'path';
+import { openSync, closeSync } from 'fs';
 import { instanceTracker } from '../services/InstanceTracker.js';
 import { tmuxSessionManager } from '../services/TmuxSessionManager.js';
+import { database } from '../database/DatabaseConnection.js';
+import { openClawConfigReader } from '../services/OpenClawConfigReader.js';
+
+const GRACE_PERIOD_MS = 5_000;
+const GRACE_POLL_INTERVAL_MS = 500;
+const START_LOG_DIR = '/tmp';
 
 const router = Router();
+
+// Helper: perform graceful stop of a tmux session.
+// Returns true if session exited during grace period; false if force-killed.
+async function gracefulStopSession(sessionName: string): Promise<boolean> {
+  try {
+    await tmuxSessionManager.sendCtrlC(sessionName);
+  } catch {
+    // Session may already be gone — treat as already stopped
+    return true;
+  }
+
+  const deadline = Date.now() + GRACE_PERIOD_MS;
+  while (Date.now() < deadline) {
+    await new Promise(resolve => setTimeout(resolve, GRACE_POLL_INTERVAL_MS));
+    const stillRunning = await tmuxSessionManager.sessionExists(sessionName);
+    if (!stillRunning) {
+      return true;
+    }
+  }
+
+  // Grace period elapsed — force kill
+  try {
+    await tmuxSessionManager.destroySession(sessionName);
+  } catch {
+    // May already be gone
+  }
+  return false;
+}
 
 router.get('/api/instances', async (_request, response) => {
   try {
@@ -26,7 +62,191 @@ router.get('/api/instances/:id', (request, response) => {
   response.json({ instance });
 });
 
+// POST /api/instances/start — create a new tmux session with Claude Code running inside.
+// Returns 202 immediately; session appears in /api/instances within 10s via InstanceTracker.
+// Returns 409 if the agent already has an active/starting session.
+router.post('/api/instances/start', async (request, response) => {
+  const { agentId } = request.body as { agentId?: unknown };
+
+  if (typeof agentId !== 'string' || !agentId.trim()) {
+    response.status(400).json({ error: 'agentId is required and must be a non-empty string' });
+    return;
+  }
+
+  const trimmedAgentId = agentId.trim();
+
+  // Guard: check for duplicate active/starting session
+  const existingInstance = instanceTracker.findActiveByAgentId(trimmedAgentId);
+  if (existingInstance) {
+    response.status(409).json({
+      error: 'Agent already has an active session',
+      existingInstance,
+    });
+    return;
+  }
+
+  // Look up agent config to obtain workspace path
+  let projectPath: string;
+  let agentName: string;
+  try {
+    const agents = await openClawConfigReader.getAgents();
+    const agentConfig = agents.find(agent => agent.id === trimmedAgentId);
+    if (!agentConfig) {
+      response.status(404).json({ error: 'Agent not found in openclaw.json' });
+      return;
+    }
+    agentName = agentConfig.name;
+    const rawWorkspace = agentConfig.workspace;
+    projectPath = path.isAbsolute(rawWorkspace)
+      ? rawWorkspace
+      : path.join(process.env.HOME ?? '/home/forge', '.openclaw', rawWorkspace);
+  } catch (error) {
+    console.error(`[API] Failed to read agent config for ${trimmedAgentId}:`, error);
+    response.status(500).json({ error: 'Failed to read agent configuration' });
+    return;
+  }
+
+  // Derive projectSlug from last path segment
+  const projectSlug = path.basename(projectPath) || trimmedAgentId;
+
+  // Build session name ahead of time for pre-registration
+  const tmuxSessionName = tmuxSessionManager.buildSessionName(trimmedAgentId, projectSlug);
+
+  // Pre-register instance with 'starting' status for immediate UI visibility
+  const newInstance = database.upsertInstance({
+    agentId: trimmedAgentId,
+    agentName,
+    tmuxSessionName,
+    projectPath,
+    telegramTopicId: undefined,
+  });
+  database.updateInstanceStatus(newInstance.id, 'starting');
+  const startingInstance = instanceTracker.findInstanceById(newInstance.id)!;
+
+  // Fire-and-forget the actual tmux+claude creation.
+  // Using promise chain (not spawn) since tmux commands are fast (< 1s).
+  const spawnLogPath = path.join(START_LOG_DIR, `warden-start-${trimmedAgentId}.log`);
+  tmuxSessionManager.createSessionWithClaude(trimmedAgentId, projectSlug, projectPath)
+    .then(() => {
+      database.updateInstanceStatus(newInstance.id, 'active');
+      console.log(`[API] Session started: ${tmuxSessionName}`);
+    })
+    .catch((error: unknown) => {
+      database.updateInstanceStatus(newInstance.id, 'error');
+      console.error(`[API] Failed to start session for ${trimmedAgentId} (log: ${spawnLogPath}):`, error);
+    });
+
+  console.log(`[API] Starting agent session: agentId=${trimmedAgentId} session=${tmuxSessionName}`);
+  response.status(202).json({
+    message: 'Starting agent session',
+    instance: startingInstance,
+  });
+});
+
+// POST /api/instances/:id/stop — graceful shutdown: sends Ctrl+C, waits up to 5s, then kills.
 router.post('/api/instances/:id/stop', async (request, response) => {
+  const instanceId = parseInt(request.params.id, 10);
+  const instance = instanceTracker.findInstanceById(instanceId);
+
+  if (!instance) {
+    response.status(404).json({ error: 'Instance not found' });
+    return;
+  }
+
+  if (instance.status === 'stopped' || instance.status === 'stopping') {
+    response.status(409).json({ error: 'Session is already stopped or stopping' });
+    return;
+  }
+
+  // Set optimistic stopping status for UI
+  instanceTracker.updateStatus(instanceId, 'stopping');
+
+  try {
+    const sessionExists = await tmuxSessionManager.sessionExists(instance.tmuxSessionName);
+    if (!sessionExists) {
+      instanceTracker.updateStatus(instanceId, 'stopped');
+      response.json({ success: true, instance: instanceTracker.findInstanceById(instanceId), forcedKill: false });
+      return;
+    }
+
+    const exitedGracefully = await gracefulStopSession(instance.tmuxSessionName);
+    instanceTracker.updateStatus(instanceId, 'stopped');
+
+    response.json({
+      success: true,
+      instance: instanceTracker.findInstanceById(instanceId),
+      forcedKill: !exitedGracefully,
+    });
+  } catch (error) {
+    console.error(`[API] Failed to stop instance ${instanceId}:`, error);
+    response.status(500).json({ error: 'Failed to stop instance' });
+  }
+});
+
+// POST /api/instances/:id/restart — stop (if running) then start with same agent identity.
+router.post('/api/instances/:id/restart', async (request, response) => {
+  const instanceId = parseInt(request.params.id, 10);
+  const instance = instanceTracker.findInstanceById(instanceId);
+
+  if (!instance) {
+    response.status(404).json({ error: 'Instance not found' });
+    return;
+  }
+
+  const { agentId, projectPath } = instance;
+
+  // Stop if currently running
+  if (instance.status === 'active' || instance.status === 'idle' || instance.status === 'starting') {
+    instanceTracker.updateStatus(instanceId, 'stopping');
+    try {
+      const sessionExists = await tmuxSessionManager.sessionExists(instance.tmuxSessionName);
+      if (sessionExists) {
+        await gracefulStopSession(instance.tmuxSessionName);
+      }
+    } catch (error) {
+      console.error(`[API] Restart: failed to stop instance ${instanceId}:`, error);
+    }
+    instanceTracker.updateStatus(instanceId, 'stopped');
+  }
+
+  // Derive slug for new session
+  const projectSlug = path.basename(projectPath) || agentId;
+
+  // Build new session name for fresh start
+  const tmuxSessionName = tmuxSessionManager.buildSessionName(agentId, projectSlug);
+
+  // Pre-register the restarted session
+  const newInstance = database.upsertInstance({
+    agentId,
+    agentName: instance.agentName,
+    tmuxSessionName,
+    projectPath,
+    telegramTopicId: instance.telegramTopicId ?? undefined,
+  });
+  database.updateInstanceStatus(newInstance.id, 'starting');
+  const startingInstance = instanceTracker.findInstanceById(newInstance.id)!;
+
+  // Fire-and-forget start
+  tmuxSessionManager.createSessionWithClaude(agentId, projectSlug, projectPath)
+    .then(() => {
+      database.updateInstanceStatus(newInstance.id, 'active');
+      console.log(`[API] Restarted session: ${tmuxSessionName}`);
+    })
+    .catch((error: unknown) => {
+      database.updateInstanceStatus(newInstance.id, 'error');
+      console.error(`[API] Failed to restart session for ${agentId}:`, error);
+    });
+
+  console.log(`[API] Restarting agent session: agentId=${agentId} session=${tmuxSessionName}`);
+  response.status(202).json({
+    message: 'Restarting agent session',
+    instance: startingInstance,
+  });
+});
+
+// POST /api/instances/:id/force-kill — immediately destroys the tmux session, skipping grace period.
+// Intended for use when the operator wants to skip the 5s graceful stop wait.
+router.post('/api/instances/:id/force-kill', async (request, response) => {
   const instanceId = parseInt(request.params.id, 10);
   const instance = instanceTracker.findInstanceById(instanceId);
 
@@ -43,8 +263,8 @@ router.post('/api/instances/:id/stop', async (request, response) => {
     instanceTracker.updateStatus(instanceId, 'stopped');
     response.json({ success: true, instance: instanceTracker.findInstanceById(instanceId) });
   } catch (error) {
-    console.error(`[API] Failed to stop instance ${instanceId}:`, error);
-    response.status(500).json({ error: 'Failed to stop instance' });
+    console.error(`[API] Failed to force-kill instance ${instanceId}:`, error);
+    response.status(500).json({ error: 'Failed to force-kill instance' });
   }
 });
 
