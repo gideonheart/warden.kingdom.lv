@@ -6,14 +6,14 @@ See: .planning/PROJECT.md (updated 2026-03-04)
 
 **Core value:** Real-time visibility into all active Claude Code agent sessions from a single browser tab
 
-**Current focus:** v3.1 — Agent Control & Deep Insights (Phase 21 next)
+**Current focus:** v3.1 — Agent Control & Deep Insights (Phase 21 in progress)
 
 ## Current Position
 
 Phase: 21 of 25 (Agent Lifecycle Controls)
-Plan: —
-Status: Ready to plan
-Last activity: 2026-03-04 — v3.1 roadmap created (Phases 21-25)
+Plan: 1 of 2 complete
+Status: In progress
+Last activity: 2026-03-04 — Phase 21 Plan 01 completed (server-side lifecycle API)
 
 Progress: [████████████████░░░░░░░░░░░░░░] 53% (20/25 phases complete)
 
@@ -37,6 +37,9 @@ Key decisions relevant to v3.1:
 - [Phase 18]: Upsert replaces full daily totals (idempotent scanner) — per-model aggregates needed for Phase 23 model comparison
 - [v3.0 Research]: useAgentLiveStatus polling at App.tsx level — Phase 21 'starting'/'stopping' states extend same pattern
 - [Quick-2038 scope]: Phase 25 is a stretch goal — may be deferred if Phase 24 recording infrastructure needs more time
+- [21-01]: promise chain fire-and-forget for start (not spawn detach) — tmux commands fast (<1s), no event loop blocking risk
+- [21-01]: buildSessionName made public — instanceRoutes pre-registers session name before tmux creation
+- [21-01]: markMissingSessionsStopped guards only 'active'/'idle' — 'starting'/'stopping' have own lifecycle handlers
 
 ### Pending Todos
 
@@ -55,5 +58,5 @@ No active blockers for Phase 21.
 ## Session Continuity
 
 Last session: 2026-03-04
-Stopped at: v3.1 roadmap created — Phases 21-25 defined, ROADMAP.md and STATE.md written
-Next step: Run `/gsd:plan-phase 21` to begin Agent Lifecycle Controls planning
+Stopped at: Completed 21-01-PLAN.md (server-side lifecycle API: start/stop/restart/force-kill endpoints)
+Next step: Execute 21-02-PLAN.md (client-side lifecycle UI controls)

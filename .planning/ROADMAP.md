@@ -179,7 +179,7 @@ Plans:
   4. Session tab badges display all four lifecycle states — starting, active, stopping, stopped — with visually distinct indicators that update in real time without page reload
   5. Start button is disabled when the agent already has an active session; duplicate start attempts via the API return HTTP 409; stop and restart require a confirmation dialog before executing
 
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 
 Plans:
 - [ ] 21-01-PLAN.md — Server-side lifecycle API: extend AgentInstanceStatus with starting/stopping, TmuxSessionManager sendCtrlC + createSessionWithClaude, lifecycle API endpoints (start/stop/restart/force-kill), InstanceTracker transitional state reconciliation
@@ -293,7 +293,7 @@ Plans:
 | 18. Fix token usage | v2.3 | 2/2 | Complete | 2026-02-23 |
 | 19. Operator Awareness Wiring | v3.0 | 2/2 | Complete | 2026-03-03 |
 | 20. Terminal Search & Browser Notifications | v3.0 | 2/2 | Complete | 2026-03-03 |
-| 21. Agent Lifecycle Controls | v3.1 | 0/2 | Not started | - |
+| 21. Agent Lifecycle Controls | 1/2 | In Progress|  | - |
 | 22. Token Burn Rate & Budget Alerts | v3.1 | 0/2 | Not started | - |
 | 23. Token Analytics & Export | v3.1 | 0/2 | Not started | - |
 | 24. Session Recording & Replay | v3.1 | 0/2 | Not started | - |
