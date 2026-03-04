@@ -202,10 +202,14 @@ export function App() {
     };
   }, []);
 
-  // Derive agent ID and lifecycle status from selected session for prompt panel sync
-  // and terminal overlay rendering.
-  const selectedInstance = activeInstances.find(
-    (instance) => instance.tmuxSessionName === selectedSessionName
+  // Derive the selected instance in a memoized way so the object reference is stable
+  // when the underlying data has not changed. Without useMemo, Array.find() returns a
+  // new object reference on every App render (including renders triggered by polling
+  // hooks), which makes the inline `onRestart` prop passed to TerminalView a new
+  // function reference every render — defeating React.memo on TerminalView entirely.
+  const selectedInstance = useMemo(
+    () => activeInstances.find((instance) => instance.tmuxSessionName === selectedSessionName),
+    [activeInstances, selectedSessionName],
   );
   const derivedAgentId = selectedInstance?.agentId ?? null;
 
@@ -323,6 +327,21 @@ export function App() {
     },
     [refetch],
   );
+
+  // Stable callback for restarting the currently selected instance.
+  // Extracted from an inline arrow function so TerminalView receives a stable
+  // prop reference across polling re-renders — allows React.memo to bail out.
+  // Uses a ref to read the latest selectedInstance without making it a dependency,
+  // which would cause handleRestartSelectedInstance to change whenever the session
+  // switches, passing a new function reference to TerminalView.
+  const selectedInstanceRef = useRef<typeof selectedInstance>(selectedInstance);
+  selectedInstanceRef.current = selectedInstance;
+  const handleRestartSelectedInstance = useCallback(() => {
+    const instance = selectedInstanceRef.current;
+    if (instance) {
+      void handleRestartInstance(instance.id);
+    }
+  }, [handleRestartInstance]);
 
   // Listen for external hash changes (back/forward navigation)
   useEffect(() => {
@@ -520,7 +539,7 @@ export function App() {
                     notificationPermission={notificationPermission}
                     instanceStatus={selectedInstance?.status}
                     agentName={selectedInstance?.agentName}
-                    onRestart={selectedInstance ? () => handleRestartInstance(selectedInstance.id) : undefined}
+                    onRestart={selectedInstance ? handleRestartSelectedInstance : undefined}
                     agentId={selectedInstance?.agentId}
                     projectPath={selectedInstance?.projectPath}
                     onRecordingComplete={handleRecordingComplete}
