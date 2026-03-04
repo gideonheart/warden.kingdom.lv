@@ -69,11 +69,31 @@ Real-time visibility into all active Claude Code agent sessions from a single br
 
 ### Active
 
+- [ ] Telegram bot client for operator notifications
+- [ ] Permission prompt forwarding to Telegram topics with one-tap approve
+- [ ] Budget alert forwarding to Telegram (amber/red thresholds)
+- [ ] Duplicate suppression with configurable cooldown
+- [ ] Notification settings UI (toggle per alert type, cooldown config)
+
+### Deferred
+
 - [ ] Clean up History/Events views — make actionable or reduce noise
 - [ ] Recording library pagination (if recording count exceeds 200)
 - [ ] Streaming write mode for frame buffer (prevents OOM on long sessions — REC-08)
 - [ ] Auto-record on permission prompt detection (depends on detectAgentState reliability — REC-07)
 - [ ] Events tab row click navigates to relevant session's terminal (NAV-04)
+
+## Current Milestone: v3.3 Telegram Operator Awareness
+
+**Goal:** Extend operator awareness beyond the dashboard — forward permission prompts and budget alerts to Telegram, with one-tap approve to unblock stalled agents without opening the browser.
+
+**Target features:**
+- Own Telegram bot client (grammy or node-telegram-bot-api) running inside Warden
+- Permission prompt detection → Telegram message to agent's configured topic
+- Inline keyboard button for one-tap approve (sends input to agent tmux session)
+- Budget alert forwarding (amber/red thresholds) to operator's Telegram topic
+- Duplicate suppression with configurable cooldown window
+- Notification settings panel in dashboard UI
 
 ## Current State
 
@@ -85,8 +105,7 @@ Warden is a complete operations platform with mobile support. The operator can m
 
 - Multi-user auth — IP-whitelisted, single operator (Gideon)
 - Agent creation/deletion — managed via openclaw.json, not the dashboard
-- Telegram bot management — handled by OpenClaw gateway
-- Telegram permission prompt forwarding — agents run --dangerously-skip-permissions, no prompts to forward
+- Telegram bot management — OpenClaw gateway manages the main bot; Warden runs a separate notification-only bot
 - Terminal themes/customization — monitoring tool, single dark theme
 - Multi-pane terminal splits — tmux handles layout within sessions
 - In-dashboard code editor — agents edit files, operator intervenes via prompts
@@ -156,4 +175,4 @@ Known tech debt: detectAgentState() regex heuristics fragile but functional; NAV
 | Literal routes before :id param routes | Express matches first-registered route; literal /storage-stats before /:id | ✓ Good — prevents param capture of literal strings |
 
 ---
-*Last updated: 2026-03-04 after v3.2 milestone completion*
+*Last updated: 2026-03-04 after v3.3 milestone started*
