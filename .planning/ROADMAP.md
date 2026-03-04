@@ -8,6 +8,7 @@
 - ✅ **v2.1 GSD Manager Plugin** — Phases 12-14 (shipped 2026-02-18)
 - ✅ **v2.3 Code Hygiene & Token Usage** — Phases 15-18 (shipped 2026-03-03)
 - ✅ **v3.0 Operator Awareness & Terminal Power Tools** — Phases 19-20 (shipped 2026-03-04)
+- 🚧 **v3.1 Agent Control & Deep Insights** — Phases 21-25 (in progress)
 
 ## Phases
 
@@ -59,10 +60,23 @@
 
 </details>
 
-### v3.0 Operator Awareness & Terminal Power Tools (Phases 19-20)
+<details>
+<summary>✅ v3.0 Operator Awareness & Terminal Power Tools (Phases 19-20) — SHIPPED 2026-03-04</summary>
 
 - [x] **Phase 19: Operator Awareness Wiring** — Permission badge, context pressure badge, agent state chip, keyboard navigation (Ctrl+1-9, Ctrl+[/], Ctrl+B, Escape), Ctrl+F stub (completed 2026-03-03)
 - [x] **Phase 20: Terminal Search & Browser Notifications** — Full terminal text search (xterm-addon-search@0.13.0), match count, scrollbar gutter markers, browser notification opt-in for permission prompts (completed 2026-03-03)
+
+</details>
+
+### v3.1 Agent Control & Deep Insights (Phases 21-25)
+
+**Milestone Goal:** Advance Warden from a monitoring tool to an active operations platform — agent lifecycle control, cost velocity insights, and session recording.
+
+- [ ] **Phase 21: Agent Lifecycle Controls** — Start, stop, restart agent sessions with safety guards and real-time transitional state badges
+- [ ] **Phase 22: Token Burn Rate & Budget Alerts** — Real-time cost velocity with sliding windows, budget thresholds, and cost projection
+- [ ] **Phase 23: Token Analytics & Export** — Model cost comparison view and CSV export of full token usage dataset
+- [ ] **Phase 24: Session Recording & Replay** — Record terminal output as asciicast v2 files, replay at variable speed, browsable recording library
+- [ ] **Phase 25: Recording Automation** — Auto-record sessions based on configurable trigger rules (stretch goal)
 
 ## Phase Details
 
@@ -100,6 +114,9 @@ See `.planning/milestones/v2.3-ROADMAP.md` (v2.1 details preserved in v2.3 archi
 See `.planning/milestones/v2.3-ROADMAP.md`
 
 </details>
+
+<details>
+<summary>✅ v3.0 Phase Details (Phases 19-20)</summary>
 
 ### Phase 19: Operator Awareness Wiring
 
@@ -145,6 +162,113 @@ Plans:
 - [x] 20-01-PLAN.md — Terminal search: xterm-addon-search integration, TerminalSearchOverlay, Ctrl+F wiring, match count, gutter markers, debounced input
 - [x] 20-02-PLAN.md — Browser notifications: useBrowserNotifications hook, bell icon toggle, state-transition firing, localStorage opt-in persistence
 
+</details>
+
+### Phase 21: Agent Lifecycle Controls
+
+**Goal**: Operator can start, stop, and restart agent sessions from the dashboard with safety dialogs and real-time lifecycle state tracking — Warden transitions from observer to active controller.
+
+**Depends on**: Phase 20 (existing TmuxSessionManager, InstanceTracker, tab bar infrastructure)
+
+**Requirements**: ORCH-01, ORCH-02, ORCH-03, ORCH-04, ORCH-05
+
+**Success Criteria** (what must be TRUE):
+  1. Operator can select any configured agent and click Start; a new tmux session with Claude Code running appears as a tab in the dashboard within 15 seconds
+  2. Operator can click Stop on any running session; after a confirmation dialog Claude Code receives Ctrl+C, the session enters "stopping" state for up to 5 seconds, then the tmux session is killed and the tab reflects "stopped"
+  3. Operator can restart a stopped or errored session; the restart triggers stop (if needed) then start with the same agent identity and project path
+  4. Session tab badges display all four lifecycle states — starting, active, stopping, stopped — with visually distinct indicators that update in real time without page reload
+  5. Start button is disabled when the agent already has an active session; duplicate start attempts via the API return HTTP 409; stop and restart require a confirmation dialog before executing
+
+**Plans**: TBD
+
+Plans:
+- [ ] 21-01: Server-side lifecycle API — POST /api/instances/start, POST /api/instances/:id/stop, POST /api/instances/:id/restart; extend AgentInstanceStatus with 'starting' and 'stopping'; InstanceTracker polling update
+- [ ] 21-02: Client-side lifecycle UI — Start agent dialog, confirmation dialogs for stop/restart, tab badge updates for transitional states, 409 duplicate-start handling
+
+---
+
+### Phase 22: Token Burn Rate & Budget Alerts
+
+**Goal**: Operator sees real-time cost velocity per agent and receives visual warnings before daily budget is exceeded — cost surprises become impossible.
+
+**Depends on**: Phase 21 (existing token_usage table, SessionUsageReader, TokenUsageView)
+
+**Requirements**: TOKN-10, TOKN-11, TOKN-13
+
+**Success Criteria** (what must be TRUE):
+  1. The token usage view shows a burn rate (cost per hour) per agent with a sliding window selector; operator can switch between 1h, 4h, and 24h windows and the displayed rate updates immediately
+  2. Operator can set a daily budget threshold per agent stored in SQLite; when an agent's daily spend crosses 80% of the threshold an amber warning badge appears on the History nav tab; at 100% the badge turns red
+  3. The cost projection card shows estimated daily and weekly spend at the current burn rate, recalculating automatically when the operator changes the burn rate window
+
+**Plans**: TBD
+
+Plans:
+- [ ] 22-01: Server-side burn rate — time-windowed SQL aggregation for cost/hour; budget_config table in SQLite; budget threshold API endpoints; cost projection calculation
+- [ ] 22-02: Client-side burn rate & alerts — window selector UI, burn rate display per agent, budget threshold editor, amber/red badge on History nav tab, projection card
+
+---
+
+### Phase 23: Token Analytics & Export
+
+**Goal**: Operator can compare model costs across agents for spend optimization and export the full dataset for external analysis.
+
+**Depends on**: Phase 22 (burn rate infrastructure, per-model daily aggregates from SessionUsageReader)
+
+**Requirements**: TOKN-12, TOKN-14
+
+**Success Criteria** (what must be TRUE):
+  1. A model comparison view in the token usage section shows cost breakdown by model variant (sonnet/opus/haiku) per agent as a bar chart or data table; operator can see which model is driving the most cost
+  2. Clicking the Export button downloads a CSV file containing the full token usage dataset with columns: date, agent_id, model, input_tokens, output_tokens, cache_creation_input_tokens, cache_read_input_tokens, cost_usd
+
+**Plans**: TBD
+
+Plans:
+- [ ] 23-01: Model comparison view — extend JSONL scanner for per-model daily aggregates; new API endpoint for model breakdown data; ModelComparisonView component (bar chart or table)
+- [ ] 23-02: CSV export — GET /api/token-usage/export?format=csv endpoint; Export button in TokenUsageView; correct Content-Disposition header for browser download
+
+---
+
+### Phase 24: Session Recording & Replay
+
+**Goal**: Operator can record any terminal session as a standard asciicast v2 file and replay it later at variable speed — every agent action becomes auditable.
+
+**Depends on**: Phase 23 (existing TerminalStreamService PTY pipeline, SQLite database)
+
+**Requirements**: REC-01, REC-02, REC-03, REC-04
+
+**Success Criteria** (what must be TRUE):
+  1. When recording is active for a session, PTY output is captured as timestamped asciicast v2 JSON Lines files written to data/recordings/; each completed recording has a corresponding row in the SQLite recordings table with agent name, project, start time, duration, and file size
+  2. A Record button in the terminal view header starts and stops recording for the active session; a pulsing red indicator is visible in the header whenever recording is in progress
+  3. Operator can open any completed recording in a replay player showing a read-only xterm.js terminal; the player supports 1x, 2x, 4x, and 8x playback speed and pause/resume controls
+  4. A Recording Library page or panel lists all past recordings with agent name, project, date, duration, and file size; clicking a recording opens it in the replay player
+
+**Plans**: TBD
+
+Plans:
+- [ ] 24-01: Recording capture backend — asciicast v2 writer tapped into TerminalStreamService PTY output pipeline; recordings SQLite table; start/stop recording API endpoints; data/recordings/ directory setup
+- [ ] 24-02: Recording UI — Record button with red pulse indicator in TerminalView header; Socket.IO recording state events; RecordingLibrary component; RecordingPlayer with read-only xterm.js and speed controls
+
+---
+
+### Phase 25: Recording Automation (Stretch)
+
+**Goal**: Operator configures rules that trigger recording automatically — capturing critical moments without manual intervention.
+
+**Depends on**: Phase 24 (recording infrastructure), Phase 19 (permission prompt detection)
+
+**Requirements**: REC-05
+
+**Success Criteria** (what must be TRUE):
+  1. A settings panel exposes an auto-record dropdown with three options: always (record every session from start), never (recording is manual only), and on-permission-prompt (recording starts automatically when a permission prompt is detected)
+  2. When auto-record is set to on-permission-prompt, a recording begins within one polling cycle of a permission prompt being detected, without operator action
+
+**Plans**: TBD
+
+Plans:
+- [ ] 25-01: Auto-record settings — settings panel with auto-record dropdown; auto-record rule stored in SQLite or config file; server-side trigger hook in InstanceTracker or TerminalStreamService that fires recording based on configured condition
+
+---
+
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
@@ -167,5 +291,10 @@ Plans:
 | 16. DRY + SRP | v2.3 | 2/2 | Complete | 2026-02-19 |
 | 17. Polish | v2.3 | 2/2 | Complete | 2026-02-19 |
 | 18. Fix token usage | v2.3 | 2/2 | Complete | 2026-02-23 |
-| 19. Operator Awareness Wiring | 2/2 | Complete    | 2026-03-03 | — |
-| 20. Terminal Search & Browser Notifications | 2/2 | Complete    | 2026-03-03 | — |
+| 19. Operator Awareness Wiring | v3.0 | 2/2 | Complete | 2026-03-03 |
+| 20. Terminal Search & Browser Notifications | v3.0 | 2/2 | Complete | 2026-03-03 |
+| 21. Agent Lifecycle Controls | v3.1 | 0/2 | Not started | - |
+| 22. Token Burn Rate & Budget Alerts | v3.1 | 0/2 | Not started | - |
+| 23. Token Analytics & Export | v3.1 | 0/2 | Not started | - |
+| 24. Session Recording & Replay | v3.1 | 0/2 | Not started | - |
+| 25. Recording Automation | v3.1 | 0/1 | Not started | - |
