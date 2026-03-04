@@ -25,8 +25,8 @@ Requirements for v3.2 Mobile Operations & UX Polish. Each maps to roadmap phases
 
 ### Storage Rotation
 
-- [ ] **ROT-01**: Operator can set a maximum total storage cap for recordings (configurable in MB/GB)
-- [ ] **ROT-02**: System auto-deletes oldest recordings when storage cap is exceeded (two-phase deletion, safe for concurrent playback)
+- [x] **ROT-01**: Operator can set a maximum total storage cap for recordings (configurable in MB/GB)
+- [x] **ROT-02**: System auto-deletes oldest recordings when storage cap is exceeded (two-phase deletion, safe for concurrent playback)
 - [ ] **ROT-03**: Storage rotation UI shows current usage stats and manual prune button in recording library
 
 ## Future Requirements
@@ -67,8 +67,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | NAV-03 | Phase 29 | Complete |
 | REC-05 | Phase 30 | Complete |
 | REC-06 | Phase 30 | Complete |
-| ROT-01 | Phase 31 | Pending |
-| ROT-02 | Phase 31 | Pending |
+| ROT-01 | Phase 31 | Complete |
+| ROT-02 | Phase 31 | Complete |
 | ROT-03 | Phase 31 | Pending |
 
 **Coverage:**
