@@ -9,6 +9,7 @@ import { instanceRoutes } from './routes/instanceRoutes.js';
 import { agentRoutes } from './routes/agentRoutes.js';
 import { historyRoutes } from './routes/historyRoutes.js';
 import { gsdRoutes } from './routes/gsdRoutes.js';
+import { recordingRoutes } from './routes/recordingRoutes.js';
 import { terminalStreamService } from './services/TerminalStreamService.js';
 import { instanceTracker } from './services/InstanceTracker.js';
 import { sessionUsageReader } from './services/SessionUsageReader.js';
@@ -65,6 +66,7 @@ app.use(instanceRoutes);
 app.use(agentRoutes);
 app.use(historyRoutes);
 app.use(gsdRoutes);
+app.use(recordingRoutes);
 
 app.get('/api/health', (_request, response) => {
   response.json({

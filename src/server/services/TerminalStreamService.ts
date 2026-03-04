@@ -2,6 +2,7 @@ import * as pty from 'node-pty';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import type { Server as SocketIOServer, Socket } from 'socket.io';
+import { recordingCaptureService } from './RecordingCaptureService.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -148,10 +149,15 @@ export class TerminalStreamService {
           subscriberSocket.emit('terminal:output', terminalOutput);
         }
       }
+      // Tap output into recording if this session is being recorded
+      recordingCaptureService.captureOutput(session.sessionName, terminalOutput);
     });
 
     ptyProcess.onExit(({ exitCode }) => {
       session.isAlive = false;
+
+      // Auto-stop any active recording when the PTY session exits
+      recordingCaptureService.stopRecording(session.sessionName, 'session_ended');
 
       // Cancel any pending keep-alive timer before cleaning up.
       if (session.keepAliveTimer !== null) {
