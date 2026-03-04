@@ -84,7 +84,7 @@ export function ModelComparisonView({ agentFilter }: ModelComparisonViewProps) {
         const response = await fetch(`/api/history/model-comparison?${params}`);
         if (response.ok) {
           const json = await response.json();
-          setData(json.data ?? []);
+          setData(json.modelComparison ?? []);
         }
       } catch (error) {
         console.error('[ModelComparisonView] Failed to fetch model comparison data:', error);
