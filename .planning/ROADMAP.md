@@ -181,7 +181,10 @@ Plans:
   3. The agent sustains the permission prompt for 5 minutes — the operator receives exactly one notification, not one per poll cycle
   4. Two different agents stall simultaneously — each receives a separate notification in their respective topics
   5. The agent exits the permission state and re-enters it — a new notification fires (transition detection resets the cooldown)
-**Plans**: TBD
+**Plans:** 2 plans
+Plans:
+- [ ] 33-01-PLAN.md — TDD: NotificationDeduplicator + agentStateDetection extraction (PERM-04, PERM-05)
+- [ ] 33-02-PLAN.md — NotificationPoller + sendToTopic + server lifecycle wiring (PERM-01, PERM-02, PERM-03)
 
 ### Phase 34: One-Tap Approve
 **Goal**: The operator can unblock a stalled agent by tapping a single button in Telegram — without opening the browser
@@ -242,6 +245,6 @@ Plans:
 | 30. Auto-Record Per Agent | v3.2 | 2/2 | Complete | 2026-03-04 |
 | 31. Storage Rotation | v3.2 | 2/2 | Complete | 2026-03-04 |
 | 32. Bot Foundation | 2/2 | Complete    | 2026-03-04 | - |
-| 33. Permission Prompt Detection and Forwarding | v3.3 | 0/? | Not started | - |
+| 33. Permission Prompt Detection and Forwarding | v3.3 | 0/2 | Planned | - |
 | 34. One-Tap Approve | v3.3 | 0/? | Not started | - |
 | 35. Budget Alerts and Notification Settings | v3.3 | 0/? | Not started | - |
