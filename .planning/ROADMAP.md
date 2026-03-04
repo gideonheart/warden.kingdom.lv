@@ -204,8 +204,8 @@ Plans:
 **Plans:** 2/2 plans complete
 
 Plans:
-- [ ] 22-01-PLAN.md — Server-side burn rate & budget config: shared types, budget_config table migration, getBurnRate/getBudgetAlertStatus DB methods, four API endpoints (burn-rate, budget-config CRUD, budget-config status)
-- [ ] 22-02-PLAN.md — Client-side burn rate & alerts: useBudgetAlerts hook, window selector (Today/2-day/7-day), burn rate cards with aggregate total, inline budget editor, progress bar, cost projection card, History nav badge
+- [x] 22-01-PLAN.md — Server-side burn rate & budget config: shared types, budget_config table migration, getBurnRate/getBudgetAlertStatus DB methods, four API endpoints (burn-rate, budget-config CRUD, budget-config status)
+- [x] 22-02-PLAN.md — Client-side burn rate & alerts: useBudgetAlerts hook, window selector (Today/2-day/7-day), burn rate cards with aggregate total, inline budget editor, progress bar, cost projection card, History nav badge
 
 ---
 
@@ -295,7 +295,7 @@ Plans:
 | 19. Operator Awareness Wiring | v3.0 | 2/2 | Complete | 2026-03-03 |
 | 20. Terminal Search & Browser Notifications | v3.0 | 2/2 | Complete | 2026-03-03 |
 | 21. Agent Lifecycle Controls | v3.1 | 3/3 | Complete | 2026-03-04 |
-| 22. Token Burn Rate & Budget Alerts | 2/2 | Complete   | 2026-03-04 | - |
+| 22. Token Burn Rate & Budget Alerts | v3.1 | 2/2 | Complete | 2026-03-04 |
 | 23. Token Analytics & Export | v3.1 | 0/2 | Not started | - |
 | 24. Session Recording & Replay | v3.1 | 0/2 | Not started | - |
 | 25. Recording Automation | v3.1 | 0/1 | Not started | - |

@@ -12,8 +12,8 @@ See: .planning/PROJECT.md (updated 2026-03-04)
 
 Phase: 22 of 25 (Token Burn Rate & Budget Alerts)
 Plan: 2 of 2 complete (Phase 22 DONE)
-Status: Phase 22 complete — both plans executed (server layer + client UI)
-Last activity: 2026-03-04 - Completed quick task 2040: Fix Phase 22 verification gaps inline
+Status: Phase 22 verified complete — re-verification passed 8/8 truths after quick-2040 fixes
+Last activity: 2026-03-04 - Phase 22 re-verification passed (quick-2041)
 
 Progress: [████████████████░░░░░░░░░░░░░░] 53% (20/25 phases complete)
 
@@ -74,9 +74,10 @@ No active blockers for Phase 22.
 |---|-------------|------|--------|-----------|
 | 2039 | Review Phase 21 commits and confirm milestone completion readiness | 2026-03-04 | 494482e | [2039-review-phase-21-commits-and-confirm-mile](./quick/2039-review-phase-21-commits-and-confirm-mile/) |
 | 2040 | Fix Phase 22 verification gaps — API response key mismatches in TokenUsageView | 2026-03-04 | 24ddd1d | [2040-fix-phase-22-verification-gaps-inline-in](./quick/2040-fix-phase-22-verification-gaps-inline-in/) |
+| 2041 | Re-run Phase 22 verification — confirm all must-haves pass after quick-2040 fixes | 2026-03-04 | b73bf54 | [2041-re-run-phase-22-verification-after-quick](./quick/2041-re-run-phase-22-verification-after-quick/) |
 
 ## Session Continuity
 
 Last session: 2026-03-04
-Stopped at: Completed quick task 2040 (fix Phase 22 API key mismatches: data.entries->data.burnRates, data.agents->data.statuses)
-Next step: Execute Phase 23 — model comparison / cost breakdown by model
+Stopped at: Completed quick task 2041 (Phase 22 re-verification: 8/8 truths pass)
+Next step: Plan and execute Phase 23 — Token Analytics & Export
