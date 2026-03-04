@@ -74,7 +74,7 @@
 
 - [x] **Phase 21: Agent Lifecycle Controls** — Start, stop, restart agent sessions with safety guards and real-time transitional state badges (completed 2026-03-04)
 - [x] **Phase 22: Token Burn Rate & Budget Alerts** — Real-time cost velocity with sliding windows, budget thresholds, and cost projection (completed 2026-03-04)
-- [ ] **Phase 23: Token Analytics & Export** — Model cost comparison view and CSV export of full token usage dataset
+- [x] **Phase 23: Token Analytics & Export** — Model cost comparison view and CSV export of full token usage dataset (completed 2026-03-04)
 - [ ] **Phase 24: Session Recording & Replay** — Record terminal output as asciicast v2 files, replay at variable speed, browsable recording library
 - [ ] **Phase 25: Recording Automation** — Auto-record sessions based on configurable trigger rules (stretch goal)
 
@@ -221,7 +221,7 @@ Plans:
   1. A model comparison view in the token usage section shows cost breakdown by model variant (sonnet/opus/haiku) per agent as a bar chart or data table; operator can see which model is driving the most cost
   2. Clicking the Export button downloads a CSV file containing the full token usage dataset with columns: date, agent_id, model, input_tokens, output_tokens, cache_creation_input_tokens, cache_read_input_tokens, cost_usd
 
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans complete
 
 Plans:
 - [ ] 23-01-PLAN.md — Server-side per-model data: token_usage_by_model table, extended JSONL scanner, model-comparison API endpoint, CSV export API endpoint
@@ -296,6 +296,6 @@ Plans:
 | 20. Terminal Search & Browser Notifications | v3.0 | 2/2 | Complete | 2026-03-03 |
 | 21. Agent Lifecycle Controls | v3.1 | 3/3 | Complete | 2026-03-04 |
 | 22. Token Burn Rate & Budget Alerts | v3.1 | 2/2 | Complete | 2026-03-04 |
-| 23. Token Analytics & Export | 1/2 | In Progress|  | - |
+| 23. Token Analytics & Export | 2/2 | Complete   | 2026-03-04 | - |
 | 24. Session Recording & Replay | v3.1 | 0/2 | Not started | - |
 | 25. Recording Automation | v3.1 | 0/1 | Not started | - |
