@@ -73,9 +73,10 @@ No active blockers for Phase 22.
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
 | 2039 | Review Phase 21 commits and confirm milestone completion readiness | 2026-03-04 | 494482e | [2039-review-phase-21-commits-and-confirm-mile](./quick/2039-review-phase-21-commits-and-confirm-mile/) |
+| 2040 | Fix Phase 22 verification gaps — API response key mismatches in TokenUsageView | 2026-03-04 | 24ddd1d | [2040-fix-phase-22-verification-gaps-inline-in](./quick/2040-fix-phase-22-verification-gaps-inline-in/) |
 
 ## Session Continuity
 
 Last session: 2026-03-04
-Stopped at: Completed 22-02-PLAN.md (client UI: burn rate display, budget editor, History nav badge)
+Stopped at: Completed quick task 2040 (fix Phase 22 API key mismatches: data.entries->data.burnRates, data.agents->data.statuses)
 Next step: Execute Phase 23 — model comparison / cost breakdown by model
