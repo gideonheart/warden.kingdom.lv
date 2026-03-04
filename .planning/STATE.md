@@ -5,14 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-03-04)
 
 **Core value:** Real-time visibility into all active Claude Code agent sessions from a single browser tab
-**Current focus:** v3.2 Mobile Operations & UX Polish — Phase 29: Session Navigation
+**Current focus:** v3.2 Mobile Operations & UX Polish — Phase 30: Auto-Record Per Agent
 
 ## Current Position
 
-Phase: 29 of 31 (Session Navigation)
-Plan: 1 of 1 in current phase
-Status: Phase complete — ready for Phase 30
-Last activity: 2026-03-04 — Phase 29 complete: Session history rows now actionable with three-way navigation
+Phase: 30 of 31 (Auto-Record Per Agent)
+Plan: 1 of 2 complete in current phase
+Status: Plan 30-01 complete — ready for Plan 30-02
+Last activity: 2026-03-04 — Phase 30 Plan 01 complete: Auto-record config persistence layer (type, DB table, methods, REST endpoints)
 
 Progress: [█████████████████████] 29/31 phases complete (94%)
 
@@ -24,6 +24,7 @@ Progress: [█████████████████████] 29/3
 |-------|------|----------|-------|-------|
 | 28-mobile-toolbar-fixes | 01 | 2min | 2 | 1 |
 | 29-session-navigation | 01 | 2min | 2 | 3 |
+| 30-auto-record-per-agent | 01 | 2min | 2 | 3 |
 
 ## Accumulated Context
 
@@ -43,6 +44,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase 29-session-navigation]: NAVIGABLE_STATUSES checks session.status field directly (not active instances list) — status is authoritative signal
 - [Phase 29-session-navigation]: recordings.find() requires r.stoppedAt !== null — only completed recordings are playable
 - [Phase 29-session-navigation]: Recordings fetched once on mount (not polled) — stable reference data doesn't need per-render polling
+- [Phase 30-auto-record-per-agent]: Sparse row strategy for auto_record_config — only store row when enabled (delete on disable), mirrors budget_config pattern
+- [Phase 30-auto-record-per-agent]: GET /api/recordings/auto-record-config placed before /:id routes to prevent Express param capture of literal string
 
 ### Pending Todos
 
@@ -64,5 +67,5 @@ None — v3.1 shipped cleanly. v3.2 scope is well-researched with HIGH confidenc
 ## Session Continuity
 
 Last session: 2026-03-04
-Stopped at: Completed 29-01-PLAN.md — Phase 29 done (session history rows now actionable with three-way navigation)
-Next step: `/gsd:plan-phase 30` (or `/gsd:execute-phase 30` if plan already exists)
+Stopped at: Completed 30-01-PLAN.md — Phase 30 Plan 01 done (auto-record config persistence layer)
+Next step: `/gsd:execute-phase 30` (Plan 30-02: auto-record hook in TerminalStreamService)
