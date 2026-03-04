@@ -17,6 +17,7 @@ import { useAgentLiveStatus } from './hooks/useAgentLiveStatus.js';
 import type { AgentLiveStatus } from './hooks/useAgentLiveStatus.js';
 import { useGlobalHotkeys } from './hooks/useGlobalHotkeys.js';
 import { useBrowserNotifications } from './hooks/useBrowserNotifications.js';
+import { useBudgetAlerts } from './hooks/useBudgetAlerts.js';
 
 type AppView = 'terminals' | 'history' | 'plugins' | 'agents';
 
@@ -202,6 +203,10 @@ export function App() {
     onSelectSession: handleSelectSession,
   });
 
+  // Budget alert level — polls /api/history/budget-config/status every 30s.
+  // Lifted to App so the History nav badge reflects worst-case alert level across all agents.
+  const budgetAlertLevel = useBudgetAlerts();
+
   const handleViewChange = useCallback((view: AppView) => {
     setCurrentView(view);
   }, []);
@@ -317,7 +322,14 @@ export function App() {
             onClick={() => handleViewChange('history')}
             className={`px-2 py-1 min-h-[44px] text-xs transition-colors flex items-center ${currentView === 'history' ? 'text-warden-accent' : 'text-warden-text-dim hover:text-warden-text'}`}
           >
-            History
+            <span className="relative">
+              History
+              {budgetAlertLevel !== 'ok' && (
+                <span className={`absolute -top-1 -right-2 w-2 h-2 rounded-full ${
+                  budgetAlertLevel === 'exceeded' ? 'bg-red-500' : 'bg-amber-500 animate-pulse'
+                }`} />
+              )}
+            </span>
           </button>
           <button
             onClick={() => handleViewChange('agents')}
@@ -375,7 +387,14 @@ export function App() {
                 onClick={() => { handleViewChange('history'); setShowMobileMenu(false); }}
                 className={`w-full text-left px-4 py-3 min-h-[44px] text-sm transition-colors ${currentView === 'history' ? 'text-warden-accent bg-warden-accent/10' : 'text-warden-text-dim hover:text-warden-text hover:bg-warden-border/30'}`}
               >
-                History
+                <span className="relative inline-block">
+                  History
+                  {budgetAlertLevel !== 'ok' && (
+                    <span className={`absolute -top-1 -right-2 w-2 h-2 rounded-full ${
+                      budgetAlertLevel === 'exceeded' ? 'bg-red-500' : 'bg-amber-500 animate-pulse'
+                    }`} />
+                  )}
+                </span>
               </button>
               <button
                 onClick={() => { handleViewChange('agents'); setShowMobileMenu(false); }}
