@@ -8,7 +8,7 @@
 - ✅ **v2.1 GSD Manager Plugin** — Phases 12-14 (shipped 2026-02-18)
 - ✅ **v2.3 Code Hygiene & Token Usage** — Phases 15-18 (shipped 2026-03-03)
 - ✅ **v3.0 Operator Awareness & Terminal Power Tools** — Phases 19-20 (shipped 2026-03-04)
-- 🚧 **v3.1 Agent Control & Deep Insights** — Phases 21-25 (in progress)
+- 🚧 **v3.1 Agent Control & Deep Insights** — Phases 21-26 (in progress)
 
 ## Phases
 
@@ -68,13 +68,14 @@
 
 </details>
 
-### v3.1 Agent Control & Deep Insights (Phases 21-25)
+### v3.1 Agent Control & Deep Insights (Phases 21-26)
 
 **Milestone Goal:** Advance Warden from a monitoring tool to an active operations platform — agent lifecycle control, cost velocity insights, and session recording.
 
 - [x] **Phase 21: Agent Lifecycle Controls** — Start, stop, restart agent sessions with safety guards and real-time transitional state badges (completed 2026-03-04)
 - [x] **Phase 22: Token Burn Rate & Budget Alerts** — Real-time cost velocity with sliding windows, budget thresholds, and cost projection (completed 2026-03-04)
 - [x] **Phase 23: Token Analytics & Export** — Model cost comparison view and CSV export of full token usage dataset (completed 2026-03-04)
+- [ ] **Phase 26: Token Analytics Polish & Tech Debt** — Fix agent filter accessibility on Model Costs tab, clean up unused imports and label semantics (gap closure)
 - [ ] **Phase 24: Session Recording & Replay** — Record terminal output as asciicast v2 files, replay at variable speed, browsable recording library
 - [ ] **Phase 25: Recording Automation** — Auto-record sessions based on configurable trigger rules (stretch goal)
 
@@ -229,6 +230,29 @@ Plans:
 
 ---
 
+### Phase 26: Token Analytics Polish & Tech Debt (Gap Closure)
+
+**Goal**: Fix agent filter accessibility on Model Costs tab so operators can filter without switching tabs, and clean up minor tech debt from Phases 21-23.
+
+**Depends on**: Phase 23 (existing TokenUsageView, ModelComparisonView)
+
+**Requirements**: None (integration/flow gap + tech debt — no new requirements)
+
+**Gap Closure:** Closes integration gap from v3.1 audit (TOKN-12 agent filter, Flow C)
+
+**Success Criteria** (what must be TRUE):
+  1. Agent filter input is accessible on both the Token Usage tab and the Model Costs tab — operator can change the filter without switching tabs
+  2. Flow C (Token usage → Model Costs tab → change agent filter → export) completes end to end
+  3. Unused `{ openSync, closeSync }` import removed from instanceRoutes.ts
+  4. `24h` time range label in ModelComparisonView clarified (either rename to "Today" or calculate rolling 24h)
+
+**Plans**: TBD
+
+Plans:
+- [ ] 26-01: Agent filter + tech debt — move agentFilter input to shared header visible on all tabs; remove unused fs import; fix 24h label semantics
+
+---
+
 ### Phase 24: Session Recording & Replay
 
 **Goal**: Operator can record any terminal session as a standard asciicast v2 file and replay it later at variable speed — every agent action becomes auditable.
@@ -296,6 +320,7 @@ Plans:
 | 20. Terminal Search & Browser Notifications | v3.0 | 2/2 | Complete | 2026-03-03 |
 | 21. Agent Lifecycle Controls | v3.1 | 3/3 | Complete | 2026-03-04 |
 | 22. Token Burn Rate & Budget Alerts | v3.1 | 2/2 | Complete | 2026-03-04 |
-| 23. Token Analytics & Export | 2/2 | Complete    | 2026-03-04 | - |
+| 23. Token Analytics & Export | v3.1 | 2/2 | Complete | 2026-03-04 |
+| 26. Token Analytics Polish & Tech Debt | v3.1 | 0/1 | Not started | - |
 | 24. Session Recording & Replay | v3.1 | 0/2 | Not started | - |
 | 25. Recording Automation | v3.1 | 0/1 | Not started | - |
