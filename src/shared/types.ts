@@ -47,3 +47,26 @@ export interface TokenUsageRow {
   cacheReadInputTokens: number;
   costUsd: number;
 }
+
+export type BurnWindow = 'today' | '2day' | '7day';
+
+export interface BurnRateEntry {
+  agentId: string;
+  windowCostUsd: number;
+  burnRatePerHour: number;
+  projectedDailyUsd: number;
+  projectedWeeklyUsd: number;
+}
+
+export interface BudgetConfig {
+  agentId: string;
+  dailyBudgetUsd: number;
+}
+
+export interface BudgetAlertStatus {
+  agentId: string;
+  todayCostUsd: number;
+  dailyBudgetUsd: number;
+  budgetPct: number;
+  alertLevel: 'ok' | 'warning' | 'exceeded';
+}

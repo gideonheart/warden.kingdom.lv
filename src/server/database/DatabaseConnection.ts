@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import type { AgentInstance, AgentInstanceCreateParams, AgentInstanceStatus, TokenUsageRow } from '../../shared/types.js';
+import type { AgentInstance, AgentInstanceCreateParams, AgentInstanceStatus, TokenUsageRow, BurnRateEntry, BudgetConfig, BudgetAlertStatus, BurnWindow } from '../../shared/types.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -226,6 +226,77 @@ class DatabaseConnection {
     `).all() as { agentId: string; totalInputTokens: number; totalOutputTokens: number; totalCacheCreationInputTokens: number; totalCacheReadInputTokens: number; totalCostUsd: number; dayCount: number }[];
   }
 
+  getBurnRate(window: BurnWindow): BurnRateEntry[] {
+    const windowHoursMap: Record<BurnWindow, number> = {
+      today: 24,
+      '2day': 48,
+      '7day': 168,
+    };
+    const windowDaysMap: Record<BurnWindow, number> = {
+      today: 1,
+      '2day': 2,
+      '7day': 7,
+    };
+    const hours = windowHoursMap[window];
+    const days = windowDaysMap[window];
+
+    return this.db.prepare(`
+      SELECT
+        agent_id AS agentId,
+        SUM(cost_usd) AS windowCostUsd,
+        SUM(cost_usd) / ${hours}.0 AS burnRatePerHour,
+        SUM(cost_usd) / ${hours}.0 * 24.0 AS projectedDailyUsd,
+        SUM(cost_usd) / ${hours}.0 * 168.0 AS projectedWeeklyUsd
+      FROM token_usage
+      WHERE date >= date('now', '-${days} days')
+      GROUP BY agent_id
+      ORDER BY burnRatePerHour DESC
+    `).all() as BurnRateEntry[];
+  }
+
+  getAllBudgetConfigs(): BudgetConfig[] {
+    return this.db.prepare(`
+      SELECT agent_id AS agentId, daily_budget_usd AS dailyBudgetUsd
+      FROM budget_config
+      WHERE daily_budget_usd > 0
+      ORDER BY agent_id
+    `).all() as BudgetConfig[];
+  }
+
+  upsertBudgetConfig(agentId: string, dailyBudgetUsd: number): void {
+    if (dailyBudgetUsd === 0) {
+      this.db.prepare('DELETE FROM budget_config WHERE agent_id = ?').run(agentId);
+      return;
+    }
+    this.db.prepare(`
+      INSERT INTO budget_config (agent_id, daily_budget_usd, updated_at)
+      VALUES (?, ?, CURRENT_TIMESTAMP)
+      ON CONFLICT(agent_id) DO UPDATE SET
+        daily_budget_usd = excluded.daily_budget_usd,
+        updated_at = CURRENT_TIMESTAMP
+    `).run(agentId, dailyBudgetUsd);
+  }
+
+  getBudgetAlertStatus(): BudgetAlertStatus[] {
+    return this.db.prepare(`
+      SELECT
+        bc.agent_id AS agentId,
+        COALESCE(tu.cost_usd, 0) AS todayCostUsd,
+        bc.daily_budget_usd AS dailyBudgetUsd,
+        COALESCE(tu.cost_usd, 0) / bc.daily_budget_usd * 100.0 AS budgetPct,
+        CASE
+          WHEN COALESCE(tu.cost_usd, 0) / bc.daily_budget_usd * 100.0 >= 100 THEN 'exceeded'
+          WHEN COALESCE(tu.cost_usd, 0) / bc.daily_budget_usd * 100.0 >= 80 THEN 'warning'
+          ELSE 'ok'
+        END AS alertLevel
+      FROM budget_config bc
+      LEFT JOIN token_usage tu
+        ON tu.agent_id = bc.agent_id AND tu.date = date('now')
+      WHERE bc.daily_budget_usd > 0
+      ORDER BY budgetPct DESC
+    `).all() as BudgetAlertStatus[];
+  }
+
   close(): void {
     console.log('[Database] Checkpointing WAL before close');
     this.db.pragma('wal_checkpoint(TRUNCATE)');
@@ -300,6 +371,16 @@ class DatabaseConnection {
         // Column already exists — safe to ignore
       }
     }
+
+    // Migration: budget_config table for per-agent daily budget thresholds
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS budget_config (
+        agent_id TEXT PRIMARY KEY,
+        daily_budget_usd REAL NOT NULL DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
   }
 }
 
