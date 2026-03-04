@@ -9,20 +9,20 @@ See: .planning/PROJECT.md (updated 2026-03-04)
 
 ## Current Position
 
-Phase: 32 — Bot Foundation
-Plan: 02 complete (2/2 plans done — Phase 32 complete)
-Status: Phase 32 complete — TelegramBotService wired into server lifecycle; BOT-01, BOT-02, BOT-03, BOT-04 satisfied
-Last activity: 2026-03-04 — 32-02-PLAN.md executed, TelegramBotService wired into Express server lifecycle
+Phase: 33 — Permission Prompt Detection and Forwarding
+Plan: 01 complete (1/2 plans done — Phase 33 in progress)
+Status: Phase 33 Plan 01 complete — NotificationDeduplicator and detectAgentState() TDD; PERM-04, PERM-05 satisfied
+Last activity: 2026-03-04 — 33-01-PLAN.md executed, NotificationDeduplicator built and tested with TDD
 
 ```
-Progress: [#░░░] 1/4 phases complete
+Progress: [##░░] 2/4 phases (Phase 32 complete, Phase 33 Plan 01 complete)
 Milestone: v3.3 Telegram Operator Awareness
 ```
 
 ## Performance Metrics
 
 **Completed milestones:** v1.0 (6 phases), v1.1 (2), v2.0 (3), v2.1 (3), v2.3 (4), v3.0 (2), v3.1 (6), v3.2 (4) = 31 phases shipped
-**Current milestone:** v3.3 — 1/4 phases complete (Phase 32 complete, Phase 33 next)
+**Current milestone:** v3.3 — Phase 32 complete, Phase 33 Plan 01 complete (2/4 phases)
 
 ## Accumulated Context
 
@@ -47,6 +47,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase 32-bot-foundation]: autoRetry() default config (unlimited retries) selected for Phase 32
 - [Phase 32-02]: handleShutdown() converted to async — await telegramBotService.stop() before httpServer.close() prevents 409 Conflict on rapid restart
 - [Phase 32-02]: Signal handlers use void pattern — () => { void handleShutdown('SIGTERM'); } correct async invocation without unhandled rejection
+- [Phase 33-01]: lastNotifiedAt reset to null on permission state exit — enables immediate re-notification on clean re-entry without cooldown wait
+- [Phase 33-01]: previousState checked BEFORE update in recordAndCheck() — transition detection requires reading old state before writing new state
 
 ### Research Flags
 
@@ -73,6 +75,6 @@ None
 
 ## Session Continuity
 
-Last session: 2026-03-04 (Plan 32-02 execution)
-Stopped at: Completed 32-02-PLAN.md — TelegramBotService wired into Express server lifecycle, Phase 32 complete
-Next step: Execute Phase 33 — notifications (NotificationPoller, detectAgentState, message sending)
+Last session: 2026-03-04 (Plan 33-01 execution)
+Stopped at: Completed 33-01-PLAN.md — NotificationDeduplicator built with TDD; detectAgentState() extracted; PERM-04, PERM-05 satisfied
+Next step: Execute Phase 33 Plan 02 — NotificationPoller service wiring
