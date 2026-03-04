@@ -1,216 +1,190 @@
 # Project Research Summary
 
-**Project:** Warden Dashboard v3.0 — Operator Awareness & Terminal Power Tools
-**Domain:** Browser-based terminal multiplexer operator workstation (additive milestone)
-**Researched:** 2026-03-03
+**Project:** Warden Dashboard v3.2 — Mobile Operations & UX Polish
+**Domain:** Additive milestone on a shipping browser-based terminal multiplexer dashboard
+**Researched:** 2026-03-04
 **Confidence:** HIGH
 
 ## Executive Summary
 
-Warden v3.0 is a tightly scoped additive milestone on top of a validated production stack (Express 5, Socket.IO 4, React 19, xterm.js 5.3.0, better-sqlite3). The milestone adds operator situational awareness features — permission prompt detection, context pressure surfacing, terminal text search, and keyboard navigation shortcuts — without introducing new infrastructure, namespaces, or architectural patterns. All data signals required for awareness features already exist in the running system: `useAgentLiveStatus` polls `/api/gsd/agents/live-status` every 5 seconds and delivers `{ state, contextPressure, contextPressureLevel }` per agent; the only missing piece is wiring this data into the terminals view UI and `InstanceTabBar`. Existing `StateBadge` and `PressureIndicator` components in `gsdShared.tsx` can be reused directly, making most of the "build" work a wiring exercise.
+Warden v3.2 is a tightly scoped additive milestone on a stable, production-shipping application. The research confirms that all five feature areas — mobile Enter button, keyboard persistence, clickable history rows, auto-record per agent, and storage rotation — can be completed without adding any new npm dependencies. Every capability builds on existing primitives: the `onTouchStart` + `preventDefault()` pattern already used in `MobileKeyToolbar`, the `RecordingCaptureService` and `DatabaseConnection` services already in production, and callback prop chains already stubbed in `HistoryView`. This is execution work, not exploration work.
 
-The recommended implementation approach phases from lowest-risk infrastructure first: permission badge and context pressure wiring (pure prop-plumbing on existing data), then keyboard shortcuts (`useGlobalHotkeys` hook with `document.addEventListener`), then terminal text search (one new npm dependency), and finally browser notifications (Web Notification API, opt-in only). The architecture is strictly additive throughout: two new files (`TerminalSearchOverlay.tsx`, `useGlobalHotkeys.ts`), five modified files (`TerminalView`, `InstanceTabBar`, `useTerminalSocket`, `App.tsx`, `TerminalStreamService`), and one new devDependency.
+The recommended implementation approach is additive and sequential: fix mobile toolbar friction first (zero-risk, client-only changes), then wire up the history navigation (also client-only against existing API), then implement auto-record server-side, then add storage rotation as a safety layer for auto-record. Each phase is independently shippable. The dependency that matters most is that auto-record and storage rotation must ship together — enabling auto-record without a storage cap creates unbounded disk growth. No phase requires a major refactor or new infrastructure.
 
-The most significant risks are keyboard event handling correctness (xterm.js `attachCustomKeyEventHandler` requires both `event.preventDefault()` AND `return false` to fully suppress a key), search addon performance on large terminal buffers (keep `highlightLimit` at 1000 and debounce search input at 300ms), and permission prompt detection accuracy (use `tmux capture-pane` polling via the existing `detectAgentState()` path — not raw PTY stream regex, which false-positives on ANSI-contaminated output). A critical cross-researcher package conflict also exists: STACK.md verified that the project must use `xterm-addon-search@0.13.0` (non-scoped), NOT `@xterm/addon-search`, because the project's client code imports from `'xterm'` (non-scoped v5.3.0). This package decision must be resolved before Phase 2 implementation begins.
+The primary risks are all well-defined and avoidable with explicit acceptance criteria. The two most consequential pitfalls are (1) the iOS keyboard dismissal problem — `terminal.focus()` does not work; `terminal.textarea?.focus()` called synchronously in `onTouchStart` is the only correct path — and (2) the auto-record race condition where recording starts before the PTY `onData` tap is registered, causing missing first frames. Both are point-in-code fixes, not architectural problems. The frame buffer memory growth risk under long auto-recorded sessions is a known limitation to document and monitor, not a blocker.
 
 ## Key Findings
 
 ### Recommended Stack
 
-The existing stack needs exactly one new npm dependency for this entire milestone. All other capabilities are implemented using React, DOM APIs, and infrastructure already in the project.
+All v3.2 capabilities use the existing stack with zero new npm dependencies. The production base — Express 5, Socket.IO 4, React 19, xterm.js 5.3.0, better-sqlite3 with WAL mode, node-pty, Tailwind CSS 4, TypeScript 5 — is unchanged. The only new server-side I/O primitives used are `fs.statSync()` and `fs/promises.statfs()`, both verified available on Node.js 22.22.0 running on this server.
 
-**Core technologies for new capabilities:**
+See: `.planning/research/STACK.md`
 
-- `xterm-addon-search@0.13.0` (non-scoped): Terminal buffer search with decorations, match count events, and scrollbar gutter markers. This is the only correct version given the project imports `from 'xterm'` (non-scoped v5.3.0). The scoped `@xterm/addon-search` has a peer dependency on `@xterm/xterm` (scoped package), not `xterm` (non-scoped), creating a TypeScript interface incompatibility. Install as `devDependency` matching existing addon pattern.
-- `window.Notification` (Web API): Browser notifications for permission prompts — zero library, no service worker required. Fully supported on desktop Chrome/Firefox/Edge/Safari 16.4+. The `tag` option deduplicates notifications per session automatically.
-- `document.addEventListener('keydown')` in `useEffect`: Global keyboard shortcut handling — zero library. The established project pattern; handles global shortcuts (tab switch, sidebar toggle) where `attachCustomKeyEventHandler` is insufficient because it only fires when the terminal canvas has focus.
-- Existing `useAgentLiveStatus` hook + `AgentStateHint` / `PressureLevel` types: Already delivers all awareness data every 5 seconds; no new endpoint or data model needed.
-- Existing `StateBadge` + `PressureIndicator` from `gsdShared.tsx`: Reuse in terminal header — the "build" task becomes a wiring task for state chip and context pressure badge.
-
-**Critical non-obvious requirement:** `overviewRulerWidth: 15` must be added to the `Terminal` constructor options in `TerminalView.tsx` to enable scrollbar gutter markers. Without this option, `matchOverviewRuler` color settings are silently ignored by xterm.js.
-
-**Installation:**
-```bash
-npm install --save-dev xterm-addon-search@0.13.0
-```
+**Core technologies:**
+- `onTouchStart` + `terminal.textarea?.focus()`: mobile keyboard control — pattern already used on all toolbar buttons; the only gap is the missing Enter entry and the explicit `textarea` re-focus call
+- `better-sqlite3` singleton-row pattern: configuration persistence — all new config (auto-record trigger, rotation policy) follows the established `budget_config` table precedent
+- `fs.statSync()` + `fs/promises.statfs()`: storage accounting — Node.js 22 built-ins verified on this server; no external disk-usage package needed
+- `setImmediate()` + `try/catch`: fire-and-forget side effects — defers storage rotation off the PTY callback chain without blocking
+- React `useCallback` with ref: stable callback props at `TerminalView` boundary — mandatory to preserve `React.memo` effectiveness
 
 ### Expected Features
 
-**Must have (P1 — milestone feels incomplete without these):**
+See: `.planning/research/FEATURES.md`
 
-- Agent state chip in terminal header — exposes `detectAgentState()` output (working/idle/perm/etc.) in the terminal header where the operator spends most time. Existing `StateBadge` component, new `agentState` prop on `TerminalView`. LOW implementation cost, HIGH daily value.
-- Context pressure badge in terminal header — exposes `contextPressure` percentage with color thresholds (green <70%, amber 70-89%, pulsing red >=90%). Same prop wiring path as state chip. Must handle `null` gracefully (show "—") since the detection heuristic is fragile.
-- Permission prompt tab badge — pulsing amber dot overlay on `InstanceTabBar` tab when `state === 'permission_prompt'`. Operator sees it across all agent tabs without watching every terminal. MEDIUM implementation cost.
-- Terminal text search (Ctrl+F) — in-buffer search with match highlighting, scrollbar gutter markers, Prev/Next navigation, match count display. One new dependency. MEDIUM implementation cost.
-- Keyboard tab navigation — Ctrl+1-9, Ctrl+[/] cycle, Ctrl+B sidebar toggle. `useGlobalHotkeys` hook, no library. LOW implementation cost.
+**Must have (P1 — v3.2 launch blockers):**
+- Enter button in mobile toolbar — operators cannot submit commands without it; one-line addition to `MOBILE_KEYS` array
+- Keyboard persistence after toolbar button tap — current behavior dismisses keyboard on every tap; fix via `terminal.textarea?.focus()` synchronously in `onTouchStart`
+- Clickable history session rows — active sessions navigate to terminal tab; stopped sessions with recording open player; stopped sessions without recording show explanatory toast
+- Auto-record on session start (per-agent config) — deferred REC-05 from v3.1; stored in SQLite `auto_record_config` table; triggered from `TerminalStreamService` after PTY `onData` is registered
+- Storage rotation with configurable cap — must co-ship with auto-record; two-axis policy: max total bytes + max age days; oldest-first deletion; runs on stop and server start
 
-**Should have (P2 — add in same milestone if time allows):**
+**Should have (P2 — add when P1s are done):**
+- Storage rotation UI in `RecordingLibrary` — visual usage bar, current stats, "Run Now" button
+- Events tab row click navigates to terminal — same navigation pattern as history rows once App.tsx callback is threaded
 
-- Browser notifications for permission prompts — requires opt-in UI and transition detection logic. MEDIUM cost. Add after tab badge is confirmed working (same data source, lower urgency).
-- Search match count display ("3 / 12") — `onDidChangeResults` event, minimal code once search is working. LOW cost.
-- Scrollbar gutter markers — requires `overviewRulerWidth: 15` in Terminal constructor + `matchOverviewRuler` color in search options. LOW cost once search addon is loaded.
-
-**Defer (P3 — v3.1+):**
-
-- Search highlight persistence across tab switches — requires per-session search state management and SearchAddon re-initialization on tab return. MEDIUM complexity.
-- Keyboard shortcut help overlay — nice UX polish for a single operator who configured the system.
-
-**Anti-features to reject:**
-
-- Cross-session search (all buffers simultaneously) — contradicts PTY keepalive design.
-- Auto-answering permission prompts — removes the safety check that prompts provide.
-- `react-hotkeys-hook` or other keyboard libraries — unnecessary dependency; custom `useEffect` is <50 LOC.
-- Raw PTY stream regex for permission detection — high false positive rate from ANSI-contaminated output; use `tmux capture-pane` polling.
-- `Notification.requestPermission()` on page load — browsers silently block it; must be user-gesture triggered.
+**Defer (v3.3+):**
+- Auto-record on permission-prompt detection — depends on `detectAgentState()` reliability flagged as fragile tech debt
+- Recording external sharing (S3, asciinema.org) — out of scope for single-operator tool
+- Streaming write mode for frame buffer — significant refactor; mitigate in v3.2 with buffer-size warning log only
 
 ### Architecture Approach
 
-All v3.0 features integrate into the existing two-tier architecture (Express 5 server + React 19 SPA) without new namespaces, services, or database tables. The client architecture follows a props-down pattern: `App.tsx` calls `useAgentLiveStatus()`, derives per-session status from `selectedInstance.agentId`, and passes it to `InstanceTabBar` (badge) and `TerminalView` (header chips). The server contribution is limited to a single architectural decision: whether to use PTY stream tap or `tmux capture-pane` polling for permission detection. Research is clear — use `tmux capture-pane` (existing `detectAgentState()` path) to avoid ANSI false positives.
+V3.2 makes surgical additions to the existing two-tier architecture (React 19 SPA + Express 5 server). Three new server-side files are needed: `AutoRecordConfigService.ts` (singleton config + `shouldRecord()` method), `RecordingRotationService.ts` (pruning algorithm), and `autoRecordRoutes.ts` (REST endpoints). No new shared types are required — all new data shapes are simple enough to type inline. The correct build order within each server feature is: database migration first, then service, then route, then integration hook point, then client UI.
 
-**Major components:**
+See: `.planning/research/ARCHITECTURE.md`
 
-1. `useGlobalHotkeys` (new hook, `src/client/hooks/useGlobalHotkeys.ts`) — document-level keydown listener for Ctrl+1-9 tab selection, Ctrl+[/] cycling, Ctrl+B sidebar toggle. Uses callback-ref stability pattern (store callbacks in `useRef`, update each render, empty `useEffect` deps) to prevent listener churn.
-2. `TerminalSearchOverlay` (new component, `src/client/components/TerminalSearchOverlay.tsx`) — search input, Prev/Next/Close buttons, match count display. Rendered conditionally inside `TerminalView`. Receives `SearchAddon` ref. Restores terminal focus on close via `requestAnimationFrame(() => terminal.focus())`.
-3. `TerminalView` (modified) — loads `SearchAddon` in terminal init `useEffect` alongside existing addons, adds `overviewRulerWidth: 15` to Terminal constructor, renders context pressure badge and agent state chip in header bar, conditionally renders `TerminalSearchOverlay`, handles Ctrl+F via `terminal.attachCustomKeyEventHandler`.
-4. `InstanceTabBar` (modified) — accepts `permissionBadgeSessions: Set<string>` prop, renders pulsing amber badge dot on matching tabs.
-5. `App.tsx` (modified) — orchestrates new state: calls `useAgentLiveStatus()`, derives `selectedLiveStatus`, passes pressure/state props to `TerminalView`, mounts `useGlobalHotkeys`, collects `permissionBadgeSessions`.
-
-**No changes needed to:** `src/server/index.ts`, `gsdRoutes.ts`, `src/shared/gsdTypes.ts`, `useAgentLiveStatus.ts`.
+**Major components (modified or new):**
+1. `MobileKeyToolbar` in `TerminalView.tsx` — add Enter key to `MOBILE_KEYS`; add `onAfterInput` prop; call `terminal.textarea?.focus()` synchronously in every `onTouchStart` handler
+2. `SessionHistory.tsx` + `HistoryView.tsx` + `App.tsx` — wire the already-stubbed `onNavigateToSession` callback; add recording lookup in `App.tsx` to decide navigation target per session state
+3. `AutoRecordConfigService.ts` (new) — singleton SQLite config; `shouldRecord(sessionName, agentId)` method; hooked into `TerminalStreamService.attachSocketToSession()` after `ptyProcess.onData()` registration
+4. `RecordingRotationService.ts` (new) — age + size + count policy; called via `setImmediate()` after `stopRecording()`; two-phase deletion with `deletion_pending` DB flag protects concurrent playback
+5. `DatabaseConnection.ts` — two new inline migrations (`auto_record_config`, `recording_rotation_config`); four new query methods for rotation
 
 ### Critical Pitfalls
 
-1. **xterm.js key suppression requires both `event.preventDefault()` AND `return false`** — `attachCustomKeyEventHandler` returning `false` stops xterm.js from sending the character to the PTY, but does NOT stop browser default behavior. For Ctrl+F, call `event.preventDefault()` (prevents browser find bar) AND `return false` (prevents PTY injection). Missing either causes the browser's native find bar to open alongside the custom overlay.
+See: `.planning/research/PITFALLS.md`
 
-2. **Global `document.addEventListener` fires even when terminal has focus** — keyboard events on the xterm.js canvas bubble to `document`. Without `event.stopPropagation()` in `attachCustomKeyEventHandler` for global shortcuts, tab-switch shortcuts send escape sequences to the PTY AND switch tabs simultaneously. Two-part defense required: `stopPropagation()` in the xterm handler + input-element focus guard in the document handler.
+1. **iOS keyboard dismissal via `terminal.focus()`** — xterm.js `terminal.focus()` calls `textarea.focus({preventScroll:true})` on the container div, not the `<textarea>` element iOS requires. Fix: use `terminal.textarea?.focus()` synchronously inside `onTouchStart`, never in `requestAnimationFrame` or `setTimeout`. Must test on a real iPhone — Simulator behaves differently.
 
-3. **Search overlay steals focus; terminal must be explicitly refocused on close** — when `TerminalSearchOverlay` unmounts, browser returns focus to `document.body`, not the terminal. Call `requestAnimationFrame(() => terminalInstanceRef.current?.focus())` in the close handler. Easy to miss during development since testing always starts with keyboard focus in the terminal.
+2. **Auto-record race (missing first PTY frames)** — triggering auto-record from `InstanceTracker` or Socket.IO connection before the PTY `onData` tap is registered means the capture tap does not yet exist. Only trigger from inside `TerminalStreamService.attachSocketToSession()` immediately after `ptyProcess.onData()` is registered. Acceptance criteria: replay of a 5-second auto-recorded session must show first-line output.
 
-4. **SearchAddon highlight performance degrades catastrophically above default `highlightLimit`** — searching a common term in a 50,000-line session can yield 72,000+ matches. Decoration creation at that scale blocks the main thread for ~470ms (verified from xterm.js issue #5176 profiling). Keep `highlightLimit` at the default (1,000), debounce search input at 300ms minimum, and display "1000+" when `resultIndex === -1` from `onDidChangeResults`.
+3. **Storage rotation deletes files being streamed for playback** — `fs.unlinkSync()` while `res.sendFile()` has an open fd causes inconsistency. Prevention: add `deletion_pending` column to `recordings` table; content route returns `410 Gone` if flag is set; actual file deletion deferred to next cycle. Never rotate sessions where `isRecording()` is true.
 
-5. **Permission prompt detection via raw PTY stream regex causes false positives** — PTY output includes ANSI escape codes, partial lines, and mid-render sequences. The pattern `/permission|allow|dangerous/i` false-positives on `npm install` output and custom shell prompts. Use `detectAgentState()` via `tmux capture-pane` (existing, already returns `'permission_prompt'`). Stronger anchor if tightening is needed: `/Do you want to proceed\?|❯\s+1\.\s+Yes/i`.
+4. **Clickable history rows navigating to unavailable sessions** — `useSessionSelection` silently substitutes the first valid session when an unknown session name is passed. Prevention: check `activeInstances` membership and `recordingId` presence before any navigation call; show a toast ("Session ended, no recording available") for the dead-end case.
 
-6. **Wrong search package version** — ARCHITECTURE.md and PITFALLS.md recommend `@xterm/addon-search` (scoped). STACK.md researcher verified this is incorrect for this project. Use `xterm-addon-search@0.13.0` (non-scoped, peer `xterm@^5.0.0`). Verify with `npm ls xterm-addon-search` after install.
+5. **Frame buffer OOM with long auto-recorded sessions** — `frameBuffer` grows unbounded; a 4-hour high-activity session can accumulate ~48MB per agent; 5 agents simultaneously = ~240MB heap pressure. Mitigation for v3.2: add `console.warn` at 50MB threshold; default auto-record to `false` (opt-in). Streaming write mode deferred to v3.3.
 
 ## Implications for Roadmap
 
-Based on research, the milestone maps to two phases with a clear dependency order. Phase 1 establishes the data flow and keyboard infrastructure (no new dependencies). Phase 2 adds the search UI and browser notifications (one new dependency, more complex interaction patterns).
+Based on combined research, the following phase structure is recommended. All four phases are independently shippable; phases 1 and 2 can be developed in parallel.
 
-### Phase 1: Operator Awareness Wiring
+### Phase 1: Mobile Toolbar Fixes
 
-**Rationale:** All data already exists in `useAgentLiveStatus`. This phase is pure prop-threading with zero new dependencies and zero integration risk. Permission badge and context pressure are immediately useful, and building them first validates the data flow before Phase 2 adds the more complex `SearchAddon` lifecycle. The `useGlobalHotkeys` hook belongs here because the Ctrl+F handler must be established before Phase 2 wires the terminal search response.
+**Rationale:** Client-only changes with zero server dependencies. Zero risk of breaking existing behavior. Highest daily operator friction in current state. Can be tested on a real iPhone immediately after deploy.
+**Delivers:** Enter button in toolbar; keyboard stays open after every toolbar tap (Enter, Tab, Ctrl+C, arrows, PgUp/PgDn, Copy, Paste).
+**Addresses:** "Enter button" and "Keyboard persistence" P1 features.
+**Avoids:** Pitfall 1 (iOS keyboard dismissal) — use `terminal.textarea?.focus()` synchronously in `onTouchStart`; do NOT use `requestAnimationFrame`, `setTimeout`, or `terminal.focus()`.
+**Scope estimate:** ~12 lines in `TerminalView.tsx`; no server changes; no new files.
 
-**Delivers:**
-- Agent state chip + context pressure badge in `TerminalView` header
-- Permission prompt pulsing badge on `InstanceTabBar` tabs
-- Keyboard navigation shortcuts (`useGlobalHotkeys` hook: Ctrl+1-9, Ctrl+[/], Ctrl+B)
-- Ctrl+F handler stub (opens search, which Phase 2 implements)
+### Phase 2: Clickable History Session Rows
 
-**Addresses:** All P1 features except terminal text search
+**Rationale:** Client-only against existing API endpoints. The `onNavigateToSession` prop stub already exists in `HistoryView` with an `_` prefix (declared but unused). This phase activates it. The recording lookup in `App.tsx` must handle the stopped-session case explicitly to avoid Pitfall 4's silent navigation to the wrong session.
+**Delivers:** Session rows in `SessionHistory` navigate to live terminal, recording player, or explanatory toast depending on session state. `_onNavigateToSession` dead-code resolved.
+**Addresses:** "Clickable history session rows" P1 feature; UX cleanup of history view.
+**Avoids:** Pitfall 4 (silent redirect to wrong session) — check `activeInstances` membership and `recordingId` before any navigation call.
+**Scope estimate:** ~15 lines `SessionHistory.tsx`, ~8 lines `HistoryView.tsx`, ~35 lines `App.tsx`; no server changes.
 
-**Avoids:**
-- PTY stream regex for permission detection (use `detectAgentState()` polling — Pitfall 5)
-- `event.stopPropagation()` omission in global key handling (Pitfall 2)
-- Socket.IO namespace pollution (decision: polling only, no new socket events)
-- Strengthened permission regex applied to `detectAgentState()` in `gsdRoutes.ts` to reduce badge noise
+### Phase 3: Auto-Record Per Agent
 
-**No new npm dependencies for this phase.**
+**Rationale:** Server-side feature with new SQLite table, new service, new route, and a hook into `TerminalStreamService`. Default trigger mode is `manual` so existing behavior is unchanged until the operator explicitly opts in. Must be built in dependency order: migration → service → route → hook point → client UI.
+**Delivers:** Per-agent auto-record config via UI toggle in `RecordingLibrary`; sessions for configured agents start recording automatically on PTY spawn; `isRecording()` indicator in terminal header lights up automatically via existing polling.
+**Addresses:** "Auto-record on session start" P1 feature (completes deferred REC-05 from v3.1).
+**Avoids:** Pitfall 2 (auto-record race) — trigger exclusively from inside `TerminalStreamService.attachSocketToSession()` after `ptyProcess.onData()` is registered; Pitfall 5 (frame buffer OOM) — add 50MB warning log, default to `false`.
+**Scope estimate:** 1 new service file, 1 new route file, 1 migration, ~15 lines `TerminalStreamService.ts`, ~60 lines `RecordingLibrary.tsx` for config UI.
 
-### Phase 2: Terminal Search + Browser Notifications
+### Phase 4: Storage Rotation
 
-**Rationale:** Depends on Phase 1's `useGlobalHotkeys` Ctrl+F handler and permission detection infrastructure. `xterm-addon-search@0.13.0` is the one new dependency for the entire milestone. Browser notifications depend on the same `useAgentLiveStatus` state transition data surfaced in Phase 1.
-
-**Delivers:**
-- `TerminalSearchOverlay` component with Prev/Next/Close
-- Match count display ("3 / 47")
-- Scrollbar gutter markers (`overviewRulerWidth: 15` + `matchOverviewRuler`)
-- Browser notifications for permission prompts (opt-in, state-transition-triggered)
-- `usePermissionNotifications` hook with `Notification.permission` state machine (default/granted/denied)
-
-**Uses:** `xterm-addon-search@0.13.0` (non-scoped), Web Notification API
-
-**Avoids:**
-- `highlightLimit` above default 1000 — debounce search input at 300ms (Pitfall 4)
-- Missing `event.preventDefault()` in Ctrl+F handler (Pitfall 1)
-- Missing terminal focus restoration after overlay close (Pitfall 3)
-- Wrong package install (`@xterm/addon-search` instead of `xterm-addon-search`) (Pitfall 6)
-- `Notification.requestPermission()` outside user gesture (browser policy)
-- Notification `denied` state without recovery UX — show "unblock in browser settings" message (Pitfall: browser notification denied state is permanent until user takes manual action in browser settings)
+**Rationale:** Safety layer for auto-record. Build after Phase 3 so there are real auto-generated recordings to test rotation behavior against. All rotation policies default to zero (all axes disabled), so shipping the service before the config UI is safe — no recordings are deleted until the operator sets a cap. Two-phase deletion must be spec'd before any file deletion code is written.
+**Delivers:** Configurable storage cap (bytes, age, count); oldest-first pruning on server start and after each recording stop; manual "Run Now" API endpoint; storage stats UI in `RecordingLibrary`.
+**Addresses:** "Storage rotation" P1 feature; "Storage rotation UI" P2 feature.
+**Avoids:** Pitfall 3 (rotation deletes in-use files) — `deletion_pending` flag in DB; content route checks flag; async `fs.promises.unlink()` only; active recordings excluded from rotation candidates via `isRecording()` check.
+**Scope estimate:** 1 new service file, 4 new DB methods + 2 migrations, ~5 lines `RecordingCaptureService.ts`, ~40 lines `recordingRoutes.ts`, ~40 lines `RecordingLibrary.tsx` for settings UI.
 
 ### Phase Ordering Rationale
 
-- Phase 1 before Phase 2 because awareness wiring (pure prop-passing) has zero integration risk and validates the data flow before adding `SearchAddon` lifecycle management.
-- Keyboard shortcuts belong in Phase 1 because the Ctrl+F global handler must be in place before Phase 2 wires the search response; establishing `useGlobalHotkeys` also defines the focus guard approach used throughout.
-- Browser notifications belong in Phase 2 because they depend on permission detection working correctly (Phase 1), and the opt-in UI placement is informed by Phase 1 UI additions.
-- Search and notifications grouped in Phase 2 because both require new code infrastructure and share the same risk profile — they can be tested together.
+- Phases 1 and 2 are fully client-only and have no mutual dependencies — they can be built and tested independently or in parallel.
+- Phase 3 (auto-record) before Phase 4 (rotation) because: (a) rotation test coverage needs real auto-generated recordings to verify prune behavior against; (b) the hard dependency is explicit — auto-record without rotation causes unbounded disk growth — but rotation defaults to disabled so Phase 3 ships safely before Phase 4 is complete.
+- The `deletion_pending` two-phase flag in Phase 4 requires a DB migration; this schema decision should be made before writing any file-deletion code so the migration is not altered later.
 
 ### Research Flags
 
-**Standard patterns — no additional research needed:**
+All four phases have well-documented patterns with implementation-level detail already in the research files. No phase requires a `/gsd:research-phase` invocation.
 
-- **Phase 1:** All implementations are pure prop-threading on existing hooks and components. `useAgentLiveStatus`, `StateBadge`, `PressureIndicator`, `InstanceTabBar`, and `App.tsx` patterns are all direct-read from codebase. The `useGlobalHotkeys` hook is <50 LOC using established `document.addEventListener` + callback-ref pattern already in `useTerminalSocket`.
+**Standard patterns — skip research-phase for all phases:**
+- **Phase 1:** Pattern fully documented in codebase; `onTouchStart` + `terminal.textarea?.focus()` is the complete implementation. `MOBILE_KEYS` array structure and button handler shape confirmed by direct source read.
+- **Phase 2:** Callback threading against existing prop stubs; no new API endpoints needed for basic flow; recording lookup uses existing `GET /api/recordings`.
+- **Phase 3:** Singleton-row SQLite config pattern established (`budget_config` table precedent); `TerminalStreamService` hook point identified with file + approximate line number in ARCHITECTURE.md; `agentId` extraction via `sessionName.split('-')[0]` is the existing convention.
+- **Phase 4:** Two-phase deletion pattern fully specified in PITFALLS.md; all DB query method signatures specified in ARCHITECTURE.md; `setImmediate()` fire-and-forget pattern established in codebase.
 
-- **Phase 2 (notifications):** MDN Notification API is fully documented. Three-state machine (default/granted/denied) is straightforward.
-
-**Needs careful verification during implementation:**
-
-- **Phase 2 (search addon package):** Verify with `npm show xterm-addon-search@0.13.0 peerDependencies` and `npm show @xterm/addon-search peerDependencies` before installing. STACK.md finding (non-scoped package) is authoritative but contradicts two other research files — confirm before committing.
-
-- **Phase 2 (keyboard event handling):** The `attachCustomKeyEventHandler` + `document.addEventListener` interaction has multiple edge cases (Pitfalls 1, 2, 3). Execute the "Looks Done But Isn't" checklist from PITFALLS.md before marking Phase 2 complete: browser find bar test, PTY escape injection test, focus restoration test, overview ruler visibility test.
-
-- **Phase 1 (useAgentLiveStatus call location):** Currently called in `AgentsTab.tsx`. Must also be called in `App.tsx` for terminal view features. Calling in `App.tsx` and passing as props is architecturally cleaner than calling in both places. Confirm the hook deduplicates internally (it uses JSON comparison — confirmed) so the additional call is safe.
+**Needs verification during Phase 3 implementation:**
+- `TerminalStreamService.attachSocketToSession()` exact PTY spawn sequence — confirm `ptyProcess.onData()` registration position and that `agentId` extraction from `sessionName.split('-')[0]` is correct before writing the hook.
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH | STACK.md researcher read npm pack output directly, checked peer dependency declarations, read `TerminalView.tsx` source. Package conflict finding is verified against actual npm metadata. |
-| Features | HIGH | Feature list derives directly from existing `useAgentLiveStatus` data structure and existing `gsdShared.tsx` components. All P1 features are wiring existing data, not building new data sources. |
-| Architecture | HIGH | All component interfaces read directly from source files. Props-down pattern is established in codebase. File change map is precise. |
-| Pitfalls | HIGH | Verified against xterm.js GitHub issues (issue numbers cited), MDN, and running project source. Performance figures from actual profiling data (issue #5176, 470ms for 72k matches). |
+| Stack | HIGH | All capabilities use verified existing stack; `fs.statfsSync()` and `fs/promises.statfs()` verified on Node.js 22.22.0 on this server; no new dependencies required |
+| Features | HIGH | Scope derived from direct codebase inspection; prop stubs confirmed; existing patterns confirmed; REC-05 deferred ticket confirmed in project docs |
+| Architecture | HIGH | Direct source code analysis of all modified files; hook points, prop names, integration boundaries, and scope estimates all identified from source |
+| Pitfalls | HIGH | Three pitfalls sourced from direct xterm.js source reading + iOS behavior verification (multiple consistent sources); two from codebase control-flow analysis; all have specific, testable acceptance criteria |
 
-**Overall confidence:** HIGH
+**Overall confidence: HIGH**
 
 ### Gaps to Address
 
-- **Package conflict resolution (critical):** STACK.md says `xterm-addon-search@0.13.0` (non-scoped); ARCHITECTURE.md and PITFALLS.md say `@xterm/addon-search`. This contradiction between research files must be verified at Phase 2 start. Run `npm show xterm-addon-search@0.13.0 peerDependencies` and `npm show @xterm/addon-search@latest peerDependencies` and compare against the project's `from 'xterm'` import.
+- **`terminal.textarea?.focus()` on Android Chrome:** The fix is confirmed correct for iOS Safari. Android behavior has MEDIUM confidence (community sources, not device-verified). Low priority — Android is not the primary target, but include in the test matrix for Phase 1 acceptance.
 
-- **Context pressure regex reliability:** `extractContextPressure()` is documented as a fragile heuristic — Claude Code's status bar format is unversioned and changes across releases. The badge must handle `null` gracefully (display "—"). This is display-only and not a blocker; confirm the null path is rendered correctly in Phase 1.
+- **`RecordingLibrary.tsx` settings UI scope:** ARCHITECTURE.md estimates ~60 lines for auto-record config and ~40 lines for rotation config added to `RecordingLibrary`. Actual scope may be larger depending on UX layout decisions. Treat as rough estimate during task breakdown.
 
-- **Permission prompt regex strength:** Current `detectAgentState()` pattern `/permission|allow|dangerous/i` has known false positives. PITFALLS.md provides a stronger anchor: `/Do you want to proceed\?|❯\s+1\.\s+Yes/i`. Apply this as part of Phase 1 badge work to reduce noise before the badge ships.
+- **`TerminalStreamService` agentId extraction path:** `agentId = sessionName.split('-')[0]` is the documented convention used in `TmuxSessionManager.listAgentSessions()`, but has not been verified against the actual `TerminalStreamService.ts` service code path. Verify before writing the Phase 3 hook point.
 
-- **Notification click focus cross-browser:** `notification.onclick → window.focus()` is unreliable on macOS Chrome and blocked in Firefox (bug #874050). Accept and document the limitation; do not attempt Service Worker solution for this use case.
+- **Frame buffer memory monitoring:** Pitfall 5 documents the risk but v3.2 mitigation is a warning log only. If any agent runs long auto-recorded sessions before the warning is tested in production, OOM is possible. Document the limitation explicitly in the Phase 3 implementation notes.
+
+- **Recording library pagination:** PITFALLS.md flags potential sluggishness at 100-200 recordings on mobile. Not in v3.2 scope but worth noting: if any new `listRecordings()` calls are added without `LIMIT`, add a comment to track this as v3.3 work.
 
 ## Sources
 
 ### Primary (HIGH confidence — direct source inspection)
 
-- `src/client/components/TerminalView.tsx` — addon loading pattern, header structure, existing props interface
-- `src/client/hooks/useAgentLiveStatus.ts` — confirmed data shape `{ state, contextPressure, contextPressureLevel }`
-- `src/client/components/gsdShared.tsx` — `StateBadge`, `PressureIndicator`, `STATE_BADGE_COLORS`, `STATE_BADGE_LABELS` confirmed present and reusable
-- `src/client/components/InstanceTabBar.tsx` — tab rendering structure, badge insertion point
-- `src/client/App.tsx` — `useSessionSelection`, `activeInstances`, `selectedInstance`, `showSidebar` state
-- `src/server/services/TerminalStreamService.ts` — `SharedPtySession` interface, `onData` broadcast loop pattern
-- `src/server/routes/gsdRoutes.ts` — `detectAgentState()` regex, `extractContextPressure()`, live-status endpoint
-- `src/shared/gsdTypes.ts` — `AgentStateHint`, `PressureLevel` types confirmed correct for v3.0
-- `node_modules/xterm/typings/xterm.d.ts` — confirmed `overviewRulerWidth` option existence
-- npm pack output for `xterm-addon-search@0.13.0` — full API confirmed: `ISearchOptions`, `ISearchDecorationOptions.matchOverviewRuler`, `onDidChangeResults`, `clearDecorations()`, `highlightLimit`
-- `npm show xterm-addon-search@0.13.0 peerDependencies` → `{ "xterm": "^5.0.0" }` (compatible)
-- `npm show @xterm/addon-search@0.16.0 peerDependencies` → `{ "@xterm/xterm": "^5.0.0" }` (incompatible with project)
+- `src/client/components/TerminalView.tsx` — MOBILE_KEYS array, MobileKeyToolbar onTouchStart pattern, terminalInstanceRef, focus chain
+- `src/client/components/HistoryView.tsx` — `_onNavigateToSession` unused prop confirmed; MobileAccordionSection max-h CSS
+- `src/client/components/SessionHistory.tsx` — row structure, absence of click handlers, AgentInstance data shape
+- `src/client/components/EventsTab.tsx` — accessible row pattern (role="button", tabIndex, onKeyDown) as precedent for SessionHistory
+- `src/client/App.tsx` — view routing, setActiveRecording, stable callback patterns, useSessionSelection behavior
+- `src/server/services/TerminalStreamService.ts` — PTY spawn branch, onData tap sequence, attachSocketToSession control flow
+- `src/server/services/RecordingCaptureService.ts` — stopRecording flow, writeAsciicastFile, database.finaliseRecording
+- `src/server/database/DatabaseConnection.ts` — budget_config singleton-row migration pattern, deleteRecording method, recordings schema
+- `src/server/routes/recordingRoutes.ts` — existing DELETE handler pattern for file + DB row deletion
+- `node_modules/xterm/lib/xterm.js:25971` — confirmed `focus(){this.textarea&&this.textarea.focus({preventScroll:!0})}` (programmatic focus does not trigger iOS keyboard)
+- Node.js 22.22.0 on server — `fs.statfsSync('/')` and `fs/promises.statfs('/')` both verified returning `{blocks, bfree, bsize, ...}`
 
-### Secondary (HIGH confidence — official docs and verified GitHub issues)
+### Secondary (MEDIUM confidence — official docs and issue tracker)
 
-- xterm.js issue #5176 — search addon performance profiling data (470ms blocking for 72,960 matches)
-- xterm.js issue #2293 — `attachCustomKeyEventHandler` keyup event gap
-- xterm.js issue #4859 — v5 scoped package migration documentation
-- MDN Notification API — `requestPermission()` user gesture requirement, three permission states
-- Firefox bug #874050 — `window.focus()` blocked in notification onclick
-- cc-hook GitHub — `"Do you want to proceed?"` as Claude Code permission prompt detection anchor
+- xterm.js issue #5377 — Limited touch support on mobile; focus-loss root cause for mobile toolbar interactions
+- xterm.js issue #2403 — Accommodate predictive keyboard on mobile
+- xterm.js issue #1101 — Support mobile platforms; iOS hidden textarea mechanism
+- MDN HTMLElement.focus() — focus within touchstart gesture context requirements
+- Apple WebKit bug #195884 — Autofocus on text input does not show keyboard
+- iOS Safari keyboard behavior — `onTouchStart` + `preventDefault()` established technique; multiple WebSearch sources consistent
+- Prior Warden phase research: `.planning/phases/11.1-fix-tmux-visibility-when-mobile-keyboard-opens/11.1-RESEARCH.md`
 
-### Tertiary (MEDIUM confidence — MDN prescriptive guidance and inferred)
+### Tertiary (MEDIUM confidence — community/blog sources)
 
-- Claude Code issue #5428 — ANSI status bar format fragility (confirms context pressure regex is inherently fragile)
-- web.dev Push Notifications Permission UX — opt-in pattern guidance
+- Termius, NewTerm, Blink Shell toolbar implementation patterns — consistent with codebase approach
+- MDN VirtualKeyboard API — Chrome 94+ only; confirmed not applicable to iOS Safari target
+- Node.js log rotation conventions — age + size two-axis policy is the established pattern (PM2, winston-daily-rotate-file, logrotate)
 
 ---
-*Research completed: 2026-03-03*
+*Research completed: 2026-03-04*
 *Ready for roadmap: yes*

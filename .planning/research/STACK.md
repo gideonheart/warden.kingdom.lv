@@ -1,294 +1,292 @@
 # Stack Research
 
-**Domain:** Warden Dashboard v3.0 — Operator Awareness & Terminal Power Tools (additive milestone)
-**Researched:** 2026-03-03
+**Domain:** Warden Dashboard v3.2 — Mobile Operations & UX Polish (additive milestone)
+**Researched:** 2026-03-04
 **Confidence:** HIGH
 
 ---
 
-## Context: Milestone v3.0 — Additive Only
+## Context: Milestone v3.2 — Additive Only
 
-This file covers ONLY the new technical capabilities needed for v3.0. The following are validated production stack — do not re-research:
+This file covers ONLY the new technical capabilities needed for v3.2. The following are the validated production stack — do not re-research:
 
 | Already Present | Version | Notes |
 |-----------------|---------|-------|
-| Express 5 | ^5.0.0 | Stable, no changes needed |
-| Socket.IO 4 | ^4.8.0 | `/terminal` and `/gsd` namespaces active |
-| React 19 | ^19.0.0 | SPA, hook-based state |
-| xterm.js | 5.3.0 | `import { Terminal } from 'xterm'` — the non-scoped package |
-| @xterm/addon-fit | 0.10.0 | Loaded in TerminalView.tsx |
-| @xterm/addon-web-links | 0.11.0 | Loaded in TerminalView.tsx |
-| better-sqlite3 | ^11.0.0 | WAL-mode SQLite |
+| Express 5 | ^5.0.0 | Stable |
+| Socket.IO 4 | ^4.8.0 | Terminal namespace active |
+| React 19 | ^19.0.0 | Hook-based, memo-stabilized |
+| xterm.js | 5.3.0 | Non-scoped `xterm` package |
+| better-sqlite3 | ^11.0.0 | WAL-mode, inline migrations |
 | node-pty | ^1.0.0 | PTY bridge for tmux |
-| Tailwind CSS 4 | ^4.0.0 | `warden-*` tokens established |
+| Tailwind CSS 4 | ^4.0.0 | `warden-*` color tokens |
 | TypeScript 5 | ^5.7.0 | Strict ESM |
-| socket.io-client | ^4.8.0 | Client-side Socket.IO |
-| useAgentLiveStatus | (hook) | Polls `/api/gsd/agents/live-status` every 5s |
-| detectAgentState() | (server fn) | Returns `AgentStateHint` incl. `permission_prompt` |
-| extractContextPressure() | (server fn) | Returns `{contextPressure, contextPressureLevel}` |
-| AgentStateHint | (shared type) | `'working' | 'idle' | 'menu' | 'permission_prompt' | 'error'` |
-| PressureLevel | (shared type) | `'ok' | 'warning' | 'critical'` |
+| MobileKeyToolbar | (component in TerminalView.tsx) | onTouchStart + preventDefault pattern established |
+| RecordingCaptureService | (service) | In-memory frame buffer, asciicast v2, auto-stop on PTY exit |
+| recordings table | (SQLite) | id, session_name, agent_id, file_path, file_size_bytes, started_at, stopped_at |
+| Node.js | 22.22.0 | fs.statfsSync, fs/promises statfs — available |
 
 ---
 
 ## New Capability Analysis
 
-### Capability 1: Terminal Text Search (xterm-addon-search)
+### Capability 1: Mobile Keyboard Persistence (Enter Button + Keep Keyboard Open)
 
-**Requirement:** Ctrl+F opens a search bar in the terminal header. User types a term, matches highlight, navigation with Enter/Shift+Enter, match count shown (e.g. "3/12"), scrollbar gutter markers show match positions.
+**Requirement:** Add an Enter button to `MobileKeyToolbar`. Tapping any toolbar button must not dismiss the iOS soft keyboard.
 
-**Decision: `xterm-addon-search@0.13.0` — ONE new npm dependency.**
+**Decision: `onTouchStart` + `event.preventDefault()` — zero new dependency. Already used in the codebase.**
 
-This is the only npm addition required for the entire milestone.
+**Why it works (verified against xterm v5.3.0 source and iOS behavior):**
 
-**Why `xterm-addon-search` (non-scoped) not `@xterm/addon-search`:**
+iOS Safari dismisses the soft keyboard when focus leaves an input element. When a button is tapped, iOS moves focus from the current element (xterm's hidden `textarea`) to the button, which dismisses the keyboard. However, if `event.preventDefault()` is called in `onTouchStart`, iOS does not move focus — the `click` event still fires synthetically, but the focus change is suppressed. The keyboard stays open.
 
-The codebase imports `import { Terminal } from 'xterm'` (non-scoped, v5.3.0). `xterm-addon-search@0.13.0` has `peerDependency: { "xterm": "^5.0.0" }` — compatible. `@xterm/addon-search@0.16.0` has `peerDependency: { "@xterm/xterm": "^5.0.0" }` — the *scoped* package, which is a *separate* package that happens to also be installed as a transitive dependency of `@xterm/addon-fit`. Using `@xterm/addon-search` with `xterm@5.3.0` would require migrating all imports to `@xterm/xterm` first, which is out of scope.
+This is exactly the pattern already used by every button in `MobileKeyToolbar`:
 
-Verified: `xterm-addon-search@0.13.0` is the latest stable on npm as of 2026-03-03 (last published ~2 years ago; the library is maintained via the monorepo at `@xterm/addon-search` for xterm@6+ users).
-
-**API confirmed by reading typings directly:**
-
-```typescript
-import { SearchAddon, ISearchOptions, ISearchDecorationOptions } from 'xterm-addon-search';
-
-// Instantiate with highlight limit
-const searchAddon = new SearchAddon({ highlightLimit: 1000 });
-terminal.loadAddon(searchAddon);
-
-// Search options with decorations for highlighting + scrollbar gutter
-const searchOptions: ISearchOptions = {
-  caseSensitive: false,
-  regex: false,
-  wholeWord: false,
-  incremental: true,   // expands selection as user types
-  decorations: {
-    matchBackground: '#f59e0b33',       // amber tint for all matches
-    matchBorder: '#f59e0b80',
-    matchOverviewRuler: '#f59e0b',      // scrollbar gutter markers
-    activeMatchBackground: '#f59e0b',   // solid amber for active match
-    activeMatchBorder: '#f59e0bff',
-    activeMatchColorOverviewRuler: '#ef4444',  // red for active in ruler
-  },
-};
-
-searchAddon.findNext(term, searchOptions);    // returns boolean (found or not)
-searchAddon.findPrevious(term, searchOptions);
-searchAddon.clearDecorations();              // call on search close
-searchAddon.clearActiveDecoration();         // call on search blur
-
-// Match count for display
-searchAddon.onDidChangeResults(({ resultIndex, resultCount }) => {
-  // e.g. resultIndex=2, resultCount=12 → show "3 / 12"
-  // resultIndex is -1 when count exceeds highlightLimit
-  setMatchInfo({ current: resultIndex + 1, total: resultCount });
-});
+```tsx
+// Existing pattern — proven working for Ctrl+C, Tab, arrows, etc.
+<button
+  onTouchStart={(event) => {
+    event.preventDefault();   // Suppresses iOS focus-move → keyboard stays open
+    sendInput(key.seq);
+  }}
+  onClick={() => sendInput(key.seq)}  // Fallback for non-touch (desktop)
+>
 ```
 
-**Scrollbar gutter markers require `overviewRulerWidth` in Terminal constructor:**
+**The Enter button is simply missing from `MOBILE_KEYS`:**
 
 ```typescript
-const terminal = new Terminal({
-  overviewRulerWidth: 15,   // ADD THIS — hidden when not set
-  // ... existing options
-});
+const MOBILE_KEYS: Array<{ label: string; seq: string }> = [
+  { label: 'Enter', seq: '\r' },   // ADD THIS — carriage return is correct for PTY
+  { label: 'Tab', seq: '\t' },
+  // ... rest unchanged
+];
 ```
 
-This is a non-breaking addition to the existing `Terminal` instantiation in `TerminalView.tsx`.
+**Limitation confirmed:** Calling `terminal.focus()` programmatically in `onTouchStart` does NOT re-open the keyboard on iOS — `terminal.focus()` calls `textarea.focus({preventScroll: true})` (confirmed in xterm source at `node_modules/xterm/lib/xterm.js:25971`), but iOS only opens the keyboard in response to a direct user gesture on an input, not a programmatic call. The `preventDefault()` approach is the only reliable way to keep it open.
 
-**Integration point:** `TerminalView.tsx` — add `searchAddonRef`, expose `searchAddon.findNext`/`findPrevious` via a `ref` handle or through a new `onSearch` prop. The search bar UI is a new component rendered in the terminal header area (conditionally shown when Ctrl+F pressed).
+**Secondary protection — if keyboard is dismissed:**
+
+If the user manages to dismiss the keyboard (e.g. by tapping outside), a subsequent tap on the xterm canvas (which holds `terminal.focus()` on tap) will re-open it because xterm's hidden textarea IS an input element — the re-focus happens as a direct user gesture. No extra code needed for this path.
+
+**Integration point:** `MobileKeyToolbar` in `TerminalView.tsx` — add `{ label: 'Enter', seq: '\r' }` to `MOBILE_KEYS` array at the front. No prop changes, no new hooks, no new files.
 
 ---
 
-### Capability 2: Keyboard Navigation Shortcuts
+### Capability 2: Auto-Record Per Agent (Configurable Triggers)
 
-**Requirement:** Ctrl+1/2/3... switches tabs, Ctrl+[ / Ctrl+] navigates prev/next tab, Ctrl+B toggles sidebar, Ctrl+F opens terminal search.
+**Requirement:** Each agent can have auto-record enabled. When a session starts (InstanceTracker discovers it), recording begins automatically without operator intervention.
 
-**Decision: Native `document.addEventListener('keydown', ...)` in a `useEffect` in App.tsx — zero new dependency.**
+**Decision: SQLite `agent_record_config` table + `RecordingCaptureService.startRecording()` call from `InstanceTracker` — zero new dependency.**
 
-This is the established project pattern. No keyboard shortcut library (hotkeys-js, mousetrap, react-hotkeys-hook) is needed. The pattern is safe with xterm.js: xterm.js only intercepts keyboard events when its canvas has focus. `document`-level listeners still fire for global shortcuts when the terminal has focus, but Ctrl+F/1/2/3 are NOT forwarded to the PTY — xterm.js forwards `event.key` characters, not control sequences from blocked events.
+**Why no new dependency:** The recording infrastructure already exists. `RecordingCaptureService.startRecording()` is a synchronous call that returns a recording ID. `InstanceTracker` already runs the session-discovery loop and calls `database.upsertInstance()`. The only additions are:
 
-**Ctrl+F conflict avoidance:** xterm.js does not capture `Ctrl+F` by default (it's not a standard terminal control sequence). The keydown handler must call `event.preventDefault()` on Ctrl+F to suppress the browser's native find dialog.
+1. A new `agent_record_config` SQLite table (inline migration — existing pattern)
+2. A check in `InstanceTracker` after `upsertInstance()`: if the agent has auto-record enabled and the session is new/just-became-active, call `recordingCaptureService.startRecording()`
+3. API endpoints for reading/writing per-agent record config (same pattern as budget_config)
+4. A UI toggle in `AgentSidebar` or the terminal header
 
-```typescript
-// In App.tsx or a new useKeyboardShortcuts hook:
-useEffect(() => {
-  const handleKeyDown = (event: KeyboardEvent) => {
-    if (event.ctrlKey && event.key === 'f') {
-      event.preventDefault();
-      setSearchOpen(true);
-      return;
-    }
-    if (event.ctrlKey && event.key === 'b') {
-      event.preventDefault();
-      setShowSidebar((prev) => !prev);
-      return;
-    }
-    if (event.ctrlKey && event.key === ']') {
-      event.preventDefault();
-      selectNextTab();
-      return;
-    }
-    if (event.ctrlKey && event.key === '[') {
-      event.preventDefault();
-      selectPreviousTab();
-      return;
-    }
-    if (event.ctrlKey && /^[1-9]$/.test(event.key)) {
-      event.preventDefault();
-      const index = parseInt(event.key, 10) - 1;
-      selectTabAtIndex(index);
-      return;
-    }
-  };
-  document.addEventListener('keydown', handleKeyDown);
-  return () => document.removeEventListener('keydown', handleKeyDown);
-}, [selectNextTab, selectPreviousTab, selectTabAtIndex]);
+**SQLite schema (new table — inline migration):**
+
+```sql
+CREATE TABLE IF NOT EXISTS agent_record_config (
+  agent_id TEXT PRIMARY KEY,
+  auto_record INTEGER NOT NULL DEFAULT 0,  -- 1 = enabled
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
 ```
 
-**Scope:** Global shortcuts belong in `App.tsx` (or a `useKeyboardShortcuts` hook called from App). Search-specific shortcuts (Escape to close, Enter/Shift+Enter to navigate) belong in the search bar component's own `onKeyDown`.
+**Why SQLite (not openclaw.json):** Recording config is Warden-specific operator preference, not agent identity. The openclaw.json defines agent identity; the Warden DB defines Warden operator config. Established precedent: `budget_config` table follows the same pattern.
 
----
-
-### Capability 3: Browser Notifications for Permission Prompts
-
-**Requirement:** When `detectAgentState()` returns `permission_prompt`, fire an opt-in browser notification so the operator sees it even if the browser tab is in the background.
-
-**Decision: Native `Notification` Web API — zero new dependency, zero service worker.**
-
-The Notification API is available directly in the browser at `window.Notification`. No service worker, no push server, no Web Push subscription required. This is the correct approach for a single-operator local monitoring tool.
-
-**Browser support:** Fully supported in Chrome, Firefox, Edge, Safari 16.4+. Since Warden is IP-whitelisted and single-operator (desktop browser on server LAN), compatibility is not a concern.
-
-**Implementation pattern (no library needed):**
+**Trigger logic in `InstanceTracker`:**
 
 ```typescript
-// In a new usePermissionNotifications hook:
-
-function requestNotificationPermission(): void {
-  if (!('Notification' in window)) return;
-  if (Notification.permission === 'default') {
-    Notification.requestPermission();  // prompts user once
-  }
-}
-
-function firePermissionPromptNotification(agentId: string, sessionName: string): void {
-  if (!('Notification' in window) || Notification.permission !== 'granted') return;
-  new Notification(`${agentId} needs permission`, {
-    body: `Session ${sessionName} is waiting for approval`,
-    tag: `warden-perm-${sessionName}`,  // deduplicates: one notif per session
-    icon: '/favicon.ico',
-  });
-}
-```
-
-**Deduplication:** The `tag` option on `Notification` causes a new notification with the same tag to replace the previous one rather than stacking. Use `warden-perm-${sessionName}` as the tag — one notification per session at most.
-
-**Opt-in flow:** Add a "Enable notifications" button to the terminal header or a settings area. Call `requestNotificationPermission()` only on explicit user gesture (button click) — browsers block `requestPermission()` calls not triggered by user interaction.
-
-**Integration point:** `useAgentLiveStatus` already returns `state` per agent. A new `usePermissionNotifications` hook consumes the status map and fires notifications when any agent transitions to `permission_prompt` state. Track previous states to fire only on transition (not on every 5-second poll).
-
-```typescript
-// Transition detection — fire once per state entry, not on every poll:
-const previousStatesRef = useRef<Map<string, AgentStateHint | null>>(new Map());
-
-useEffect(() => {
-  for (const [agentId, status] of liveStatusMap) {
-    const previous = previousStatesRef.current.get(agentId) ?? null;
-    if (status.state === 'permission_prompt' && previous !== 'permission_prompt') {
-      firePermissionPromptNotification(agentId, ...);
-    }
-    previousStatesRef.current.set(agentId, status.state);
-  }
-}, [liveStatusMap]);
-```
-
----
-
-### Capability 4: Permission Prompt Tab Badges
-
-**Requirement:** When an agent's state is `permission_prompt`, show a visual badge on its `InstanceTabBar` tab.
-
-**Decision: Wire `useAgentLiveStatus` into `InstanceTabBar` — zero new dependency, pure React state.**
-
-`useAgentLiveStatus` is already called in `AgentsTab.tsx`. For the terminal view, `App.tsx` needs to call `useAgentLiveStatus()` and pass the resulting map to `InstanceTabBar` as a new `agentLiveStatus` prop. The badge is a `<span>` with the `warden-warning` color token.
-
-`InstanceTabBar` currently matches agents to instances by `tmuxSessionName`. The `useAgentLiveStatus` map is keyed by `agentId`. The join requires parsing `agentId` from `tmuxSessionName` (first segment before `-`), which is already the established pattern in the codebase (see `detectAgentState` caller).
-
-**Concern:** `useAgentLiveStatus` polls `/api/gsd/agents/live-status` which calls `tmux capture-pane` for each agent. This adds per-poll overhead to the terminals view (previously only active in AgentsTab). Verify the endpoint's 5s poll interval is acceptable when the terminals view is active. Based on Phase 14 research, the endpoint was designed to be called from the agents tab; adding it to the terminals view is fine as the underlying tmux calls are fast (<100ms each).
-
----
-
-### Capability 5: Agent State Chip and Context Pressure Badge in Terminal Header
-
-**Requirement:** Show a small state chip (e.g. "working", "perm") and context pressure percentage (e.g. "72% ctx") in the `TerminalView` header area alongside the session name.
-
-**Decision: Props passed from `App.tsx` → `TerminalView` — zero new dependency.**
-
-`TerminalView` currently receives only `tmuxSessionName` and `onSessionExit`. Add `agentState?: AgentStateHint | null` and `contextPressure?: number | null` props. The parent (`App.tsx`) derives these from `useAgentLiveStatus()` by looking up the agentId extracted from `selectedSessionName`.
-
-Style guidance: use `gsdShared.tsx`'s existing `STATE_BADGE_COLORS` map and `STATE_BADGE_LABELS` map — these are already defined for the same `AgentStateHint` type. Import and reuse them in the terminal header to avoid duplicating color definitions.
-
----
-
-### Capability 6: Search Match Count and Highlight Persistence
-
-**Requirement:** Show "3 / 12" match count in the search UI. Highlights persist while the search bar is open (navigating between matches keeps all highlights visible).
-
-**Decision: React state driven by `onDidChangeResults` event — zero new dependency.**
-
-`SearchAddon.onDidChangeResults` fires on every term change or navigation with `{resultIndex, resultCount}`. Feed this into local component state. Highlights persist automatically while `decorations` is set in the search options (the addon manages decoration lifecycle). Calling `clearDecorations()` only on search bar close removes all highlights — correct behavior.
-
-```typescript
-const [matchInfo, setMatchInfo] = useState<{ current: number; total: number } | null>(null);
-
-searchAddon.onDidChangeResults(({ resultIndex, resultCount }) => {
-  if (resultCount === 0) {
-    setMatchInfo(null);
-  } else {
-    setMatchInfo({
-      current: resultIndex === -1 ? resultCount : resultIndex + 1,  // -1 = exceeds limit
-      total: resultCount,
+// After upsertInstance() returns the instance:
+const recordConfig = database.getAgentRecordConfig(instance.agentId);
+if (recordConfig?.autoRecord && !recordingCaptureService.isRecording(instance.tmuxSessionName)) {
+  // Only start if session just became active (new insert or status transition from stopped)
+  const isNewlyActive = prevStatus !== 'active';  // track previous status
+  if (isNewlyActive) {
+    recordingCaptureService.startRecording({
+      sessionName: instance.tmuxSessionName,
+      agentId: instance.agentId,
+      agentName: instance.agentName,
+      projectPath: instance.projectPath,
+      cols: 220,  // default — PTY will be resized by client on first connect
+      rows: 50,
     });
   }
-});
+}
 ```
+
+**Integration points:**
+- `DatabaseConnection.ts` — add `agent_record_config` table migration + `getAgentRecordConfig(agentId)` and `setAgentAutoRecord(agentId, enabled)` methods
+- `InstanceTracker.ts` — add auto-record check after successful upsert
+- `instanceRoutes.ts` or new `recordingRoutes.ts` — add `GET/PUT /api/agents/:agentId/record-config` endpoints
+- Client: `AgentSidebar.tsx` — add toggle per agent (or terminal header alongside the manual REC button)
+
+---
+
+### Capability 3: Recording Storage Rotation (Disk Usage Monitoring + Auto-Prune)
+
+**Requirement:** Cap total recording storage (configurable, e.g. 500 MB default). When the cap is exceeded, auto-delete the oldest recordings to bring usage under the cap.
+
+**Decision: `fs.statSync()` for per-file sizes (already used) + `fs/promises.statfs()` for disk-level stats — zero new dependency.**
+
+**Why no external disk-usage library:** Node.js 22 has `fs.statfsSync()` and `fs/promises.statfs()` built in (verified on this server — returns `{blocks, bfree, bsize, ...}`). Per-directory size is computed by summing `fs.statSync(filePath).size` for each `.cast` file — simple and accurate since all recordings are in `data/recordings/`. No `du` subprocess, no `check-disk-space` npm package needed.
+
+**Storage cap config — SQLite table (new):**
+
+```sql
+CREATE TABLE IF NOT EXISTS storage_config (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+-- Keys: 'recordings_max_bytes' (default: 524288000 = 500 MB)
+```
+
+Alternative: store in `agent_record_config` as a single global row. Using a key-value `storage_config` table is more flexible for future storage settings.
+
+**Rotation algorithm (pure Node.js, no library):**
+
+```typescript
+async function enforceStorageRotation(): Promise<void> {
+  const maxBytes = getStorageConfig('recordings_max_bytes') ?? 524_288_000; // 500 MB default
+
+  // Sum all finalised recording sizes from DB (file_size_bytes column already populated)
+  const totalBytes = database.getTotalRecordingBytes();  // SUM(file_size_bytes) WHERE stopped_at IS NOT NULL
+
+  if (totalBytes <= maxBytes) return;
+
+  // Get recordings ordered by started_at ASC (oldest first), skip active recordings
+  const candidates = database.listRecordingsForPrune();  // stopped_at IS NOT NULL, ORDER BY started_at ASC
+
+  let freed = 0;
+  for (const rec of candidates) {
+    if (totalBytes - freed <= maxBytes) break;
+    freed += rec.fileSizeBytes ?? 0;
+    // Delete file + DB row (same logic as DELETE /api/recordings/:id)
+    try { fs.unlinkSync(rec.filePath); } catch {}
+    database.deleteRecording(rec.id);
+    console.log(`[StorageRotation] Pruned recording ${rec.id} (${rec.filePath})`);
+  }
+}
+```
+
+**When to run rotation:**
+- On server startup (in `RecordingCaptureService` constructor or `index.ts`)
+- After every `stopRecording()` call in `RecordingCaptureService`
+- No cron job, no setInterval — event-driven is sufficient
+
+**Disk-level check (optional guard):**
+
+```typescript
+import { statfs } from 'fs/promises';
+
+async function isDiskSpaceLow(): Promise<boolean> {
+  const stats = await statfs('/home/forge/warden.kingdom.lv/data');
+  const freeBytes = stats.bfree * stats.bsize;
+  return freeBytes < 1_073_741_824; // warn if < 1 GB free
+}
+```
+
+Use this as an emergency guard: if disk is low, prune more aggressively regardless of the cap setting. Not required for MVP but useful as a safety net.
+
+**API endpoints needed:**
+- `GET /api/storage/status` — returns `{ totalBytes, maxBytes, recordingCount, diskFreeBytes }`
+- `PUT /api/storage/config` — body `{ maxBytes: number }` to update the cap
+- `POST /api/storage/prune` — manually trigger rotation
+
+**Integration points:**
+- `DatabaseConnection.ts` — add `storage_config` table migration + `getTotalRecordingBytes()` + `listRecordingsForPrune()`
+- `RecordingCaptureService.ts` — call `enforceStorageRotation()` at end of `stopRecording()`
+- New `StorageRotationService.ts` — owns the rotation logic; called by `RecordingCaptureService` and on startup
+- `recordingRoutes.ts` or new `storageRoutes.ts` — storage status + config endpoints
+- `RecordingLibrary.tsx` — show storage usage summary (total used / cap)
+
+---
+
+### Capability 4: Clickable History Session Rows
+
+**Requirement:** Clicking a row in `SessionHistory` navigates to the terminal tab for that session (if active) or opens the recording replay (if a recording exists for that session).
+
+**Decision: Navigation callback prop + existing `React.useState` in App.tsx — zero new dependency.**
+
+**Why no router library:** Warden is a single-page app with two views (terminals / history) and no URL-based navigation. Adding `react-router-dom` for this would be grossly overengineered. The pattern is:
+
+1. `App.tsx` passes `onNavigateToSession: (sessionName: string) => void` to `HistoryView` → `SessionHistory`
+2. `SessionHistory` checks: is `sessionName` in `activeInstances`? If yes, switch to terminals view + select that tab. If no, check if a recording exists for that session — if yes, open `RecordingPlayer` in a modal or navigate to History > Recordings tab.
+3. The callback updates existing state: `setCurrentView('terminals')` + `setSelectedSession(sessionName)` already possible via existing App state.
+
+**`HistoryView.tsx` already has the prop stub** (`onNavigateToSession?: (sessionName: string) => void`) but it is unused (`_onNavigateToSession`). This is the wired-but-not-used extension point — confirmed in the file.
+
+**Integration pattern:**
+
+```typescript
+// SessionHistory.tsx — row click handler
+<tr
+  onClick={() => onNavigateToSession?.(session.tmuxSessionName)}
+  className="cursor-pointer hover:bg-warden-border/20 transition-colors"
+>
+```
+
+```typescript
+// App.tsx — handler
+const handleNavigateToSession = useCallback((sessionName: string) => {
+  const activeInstance = activeInstances.find(i => i.tmuxSessionName === sessionName);
+  if (activeInstance) {
+    setCurrentView('terminals');
+    setSelectedSession(sessionName);
+  } else {
+    // Navigate to History view, Recordings tab, filtered by sessionName
+    setCurrentView('history');
+    setHistoryTab('recordings');
+    setRecordingFilter(sessionName);
+  }
+}, [activeInstances]);
+```
+
+No new dependencies. This is pure React state threading.
+
+---
+
+### Capability 5: History/Events View Cleanup
+
+**Requirement:** Make the Sessions and Events tabs actionable or reduce noise. Sessions tab should be clickable (covered above). Events tab may need filtering/pagination or removal.
+
+**Decision: React state + existing component props — zero new dependency.**
+
+The `EventsTab.tsx` is the GSD event log. If it's noisy, add a filter or collapse inactive agents. This is pure UI work — conditionally render, filter arrays, add a "Show only errors" toggle via `useState`. No new libraries needed.
+
+**Integration point:** `EventsTab.tsx` — add severity filter or time window filter. No new files unless the cleanup is substantial.
 
 ---
 
 ## Recommended Stack Summary
 
-### One New Dependency
+### Zero New Dependencies
 
-| Package | Version | Purpose | Why |
-|---------|---------|---------|-----|
-| `xterm-addon-search` | `0.13.0` | Terminal buffer search with decorations and match count | Official xterm.js search addon; peers with `xterm@^5.0.0` (matches project's `xterm@5.3.0`); provides `ISearchDecorationOptions.matchOverviewRuler` for scrollbar gutter markers |
+All five capabilities for v3.2 are implementable using existing stack:
 
-### All Other Capabilities: Zero New Dependencies
+| Capability | Implementation Approach | Existing Primitive Used |
+|------------|------------------------|------------------------|
+| Mobile Enter button | Add to `MOBILE_KEYS` array | `onTouchStart` + `preventDefault()` — already in codebase |
+| Keyboard persistence | Same `onTouchStart` + `preventDefault()` | Already used on all other toolbar buttons |
+| Auto-record per agent | `agent_record_config` SQLite table + `InstanceTracker` check | `RecordingCaptureService.startRecording()` already exists |
+| Storage rotation | `fs.statSync()` + `fs/promises.statfs()` | Node.js 22 built-ins — verified on server |
+| Clickable history rows | Callback prop threading `App.tsx` → `SessionHistory` | Existing `onNavigateToSession` prop stub |
+| History/Events cleanup | `useState` filter in existing components | React built-ins |
 
-| Capability | Implementation | Uses |
-|------------|---------------|------|
-| Keyboard shortcuts | `document.addEventListener('keydown')` in `useEffect` | React + DOM built-ins |
-| Browser notifications | `window.Notification` constructor | Web API built-in |
-| Permission prompt badges | `useAgentLiveStatus` map → `InstanceTabBar` props | Existing hook + React |
-| Agent state chip | Props from `App.tsx` → `TerminalView` | Existing types + React |
-| Context pressure badge | Props from `App.tsx` → `TerminalView` | Existing data + React |
-| Match count display | `searchAddon.onDidChangeResults` + `useState` | React + xterm-addon-search event |
-| Highlight persistence | `decorations` option in `ISearchOptions` | xterm-addon-search built-in behavior |
-| Scrollbar gutter markers | `overviewRulerWidth: 15` + `matchOverviewRuler` color | xterm.js built-in + addon |
-| Notification dedup | `tag` option on `new Notification()` | Web API built-in |
-| State transition detection | `useRef` for previous state map | React built-in |
+**No npm installs required for v3.2.**
 
 ---
 
 ## Installation
 
 ```bash
-# One new dependency
-npm install --save-dev xterm-addon-search@0.13.0
+# No new dependencies for v3.2.
+# All capabilities use existing stack + Node.js built-in fs APIs.
 ```
-
-Note: `--save-dev` is correct — it matches the project's pattern of keeping `xterm`, `@xterm/addon-fit`, and `@xterm/addon-web-links` in devDependencies (they are bundled by Vite, not required at runtime on the server).
 
 ---
 
@@ -296,12 +294,14 @@ Note: `--save-dev` is correct — it matches the project's pattern of keeping `x
 
 | Recommended | Alternative | Why Not |
 |-------------|-------------|---------|
-| `xterm-addon-search@0.13.0` | `@xterm/addon-search@0.16.0` | Scoped package peers with `@xterm/xterm`, not `xterm`; migration to scoped imports is a separate refactor out of scope for v3.0 |
-| `xterm-addon-search@0.13.0` | Build custom search via `terminal.buffer.active` iteration | Terminal buffer has no text search API; character-by-character iteration is complex and slow; the addon is purpose-built and battle-tested |
-| `window.Notification` | `react-toastify` / `notistack` for in-app alerts | In-app notifications miss the "tab in background" use case entirely; native browser notifications work across tabs and browser minimize |
-| `window.Notification` | Web Push API | Requires service worker, push subscription, backend push server; massively overengineered for a single-operator LAN tool |
-| `document.addEventListener('keydown')` | `hotkeys-js` / `react-hotkeys-hook` | Unnecessary abstraction; project already uses raw event listeners; single hook file is <50 LOC |
-| `document.addEventListener('keydown')` | xterm.js `terminal.attachCustomKeyEventHandler` | Only fires for keys when terminal has focus; global shortcuts (tab switch, sidebar toggle) must work regardless of focus |
+| `onTouchStart` + `preventDefault()` for keyboard persistence | `terminal.focus()` after button tap | Programmatic `.focus()` does NOT open iOS keyboard — verified. iOS only opens keyboard on direct user gesture, not programmatic calls |
+| `onTouchStart` + `preventDefault()` for keyboard persistence | `virtualKeyboardPolicy` attribute (VirtualKeyboard API) | Chrome-only as of 2026; not supported in iOS Safari — wrong platform for this use case |
+| SQLite `agent_record_config` table for auto-record config | Extend `openclaw.json` with `warden.autoRecord` field | openclaw.json is agent identity config, not Warden operator config. Changes require editing external file. Established project pattern: Warden-specific preferences go in SQLite (see `budget_config`) |
+| SQLite `storage_config` table for cap | Hardcode 500 MB default | Makes cap untunable without code changes; operator may want to increase/decrease as disk fills |
+| `fs.statSync()` for per-file sizes | `check-disk-space` npm package | Node.js 22 has `fs.statfsSync()` built-in — verified working on this server. No external dependency needed |
+| `fs.statSync()` for per-file sizes | `diskusage` npm package (native bindings) | Native bindings require build tools; overkill when built-in `fs.statfsSync()` provides same data |
+| `du` subprocess | `du` subprocess (`execFile('du', ['-sb', dir])`) | Spawning a subprocess just to count bytes is wasteful when `readdirSync + statSync` achieves the same result synchronously in <5ms for typical recording volumes |
+| Callback prop for session navigation | `react-router-dom` | Single-page app with two views — full router is massively overengineered. The `onNavigateToSession` prop stub already exists in the codebase |
 
 ---
 
@@ -309,72 +309,81 @@ Note: `--save-dev` is correct — it matches the project's pattern of keeping `x
 
 | Avoid | Why | Use Instead |
 |-------|-----|-------------|
-| `@xterm/addon-search@0.16.0` | Peer dependency mismatch — requires `@xterm/xterm` (scoped package), but project imports `xterm` (non-scoped 5.3.0) | `xterm-addon-search@0.13.0` which peers with `xterm@^5.0.0` |
-| Service workers for notifications | Requires registration, install events, cache strategy — overkill for local alerts | `new Notification()` directly via Web API |
-| `hotkeys-js` / `mousetrap` | Adds a dependency for functionality achievable in <50 LOC of vanilla JS | `document.addEventListener('keydown')` in a `useEffect` |
-| `react-hotkeys-hook` | External dependency; its `useHotkeys` API has React strict-mode edge cases | Plain `useEffect` + `document.addEventListener` — already used in project |
-| `chokidar` / `fs.watch` for notifications | Permission prompts are detected via tmux pane capture, not file system events | Poll `/api/gsd/agents/live-status` (already exists) |
-| A new `/api/permissions` endpoint | Permission state is already computed in live-status | Consume existing `useAgentLiveStatus` hook data |
+| `terminal.focus()` to re-open iOS keyboard | iOS Safari ignores programmatic `.focus()` for keyboard display — works only on direct user gesture. Confirmed in xterm v5.3.0 source: `focus()` calls `textarea.focus({preventScroll: true})` which does not trigger iOS keyboard | `onTouchStart` + `event.preventDefault()` to prevent keyboard dismissal in the first place |
+| VirtualKeyboard API (`navigator.virtualKeyboard`) | Chrome 94+ only; not supported in iOS Safari — the primary mobile platform for this use case | `onTouchStart` + `event.preventDefault()` |
+| `check-disk-space` npm | External dependency for functionality available in Node.js 22 built-ins | `fs/promises.statfs()` — verified on this server |
+| `diskusage` npm | Native bindings require compilation; fragile on managed servers (Laravel Forge) | `fs/promises.statfs()` |
+| `react-router-dom` | Overengineered for a two-view SPA with no URL navigation requirement | Callback prop threading through existing component tree |
+| `node-cron` or `setInterval` for storage rotation | Storage rotation only needs to run on session stop events, not on a schedule | Event-driven: call `enforceStorageRotation()` in `stopRecording()` |
+
+---
+
+## Key Integration Points
+
+### `TerminalView.tsx` — `MobileKeyToolbar`
+- Add `{ label: 'Enter', seq: '\r' }` as first item in `MOBILE_KEYS` array
+- All existing buttons already use the correct `onTouchStart` + `preventDefault()` pattern
+- No other changes needed for keyboard persistence
+
+### `DatabaseConnection.ts`
+- Add `agent_record_config` table migration (idempotent `CREATE TABLE IF NOT EXISTS`)
+- Add `storage_config` table migration
+- Add methods: `getAgentRecordConfig()`, `setAgentAutoRecord()`, `getTotalRecordingBytes()`, `listRecordingsForPrune()`
+
+### `InstanceTracker.ts`
+- After `database.upsertInstance()`: check `agent_record_config` for the agent
+- If `autoRecord = 1` and session is newly-active and not currently recording, call `recordingCaptureService.startRecording()`
+- Track previous session status in the InstanceTracker poll map to detect "newly active" transitions
+
+### `RecordingCaptureService.ts`
+- At end of `stopRecording()`: call `storageRotationService.enforceRotationIfNeeded()`
+- On construction: call rotation check once (handles files left by previous server crash)
+
+### New file: `src/server/services/StorageRotationService.ts`
+- Owns rotation logic: sum bytes, compare to cap, delete oldest stopped recordings
+- Uses `fs.unlinkSync()` + `database.deleteRecording()` (same as existing DELETE route)
+- Exposes `enforceRotationIfNeeded()` and `getStorageStatus()`
+
+### `SessionHistory.tsx`
+- Accept `onNavigateToSession?: (sessionName: string) => void` prop
+- Add `onClick` to table rows with `cursor-pointer hover:bg-warden-border/20`
+
+### `HistoryView.tsx`
+- Thread `onNavigateToSession` through to `SessionHistory`
+- Remove the `_` prefix (the prop is already declared but unused)
+
+### `App.tsx`
+- Implement `handleNavigateToSession` callback
+- If session is active: switch to terminals view + select tab
+- If session is stopped but has recording: switch to history view, recordings tab, filtered
 
 ---
 
 ## Version Compatibility
 
-| Package | Version | Peer Requirement | Status |
-|---------|---------|-----------------|--------|
-| `xterm-addon-search` | 0.13.0 | `xterm@^5.0.0` | Compatible — project has `xterm@5.3.0` |
-| `@xterm/addon-fit` | 0.10.0 | `@xterm/xterm@^5.0.0` | Already working — `@xterm/xterm@5.5.0` installed as transitive dep |
-| `xterm` | 5.3.0 | — | Client code imports from `'xterm'`, not `'@xterm/xterm'` |
-| `overviewRulerWidth` | xterm 5.x | xterm >= 4 | Confirmed in `node_modules/xterm/typings/xterm.d.ts` |
-| `Notification` Web API | — | HTTPS or localhost | Warden runs behind Nginx with SSL — satisfied |
-| `document.addEventListener` | — | All browsers | No compatibility concern |
+All capabilities use existing packages. No version compatibility concerns.
 
-**Critical note on xterm package split:** xterm.js v6+ migrated to `@xterm/xterm` (scoped). The project currently uses v5.3.0 (non-scoped `xterm`). The scoped addons `@xterm/addon-fit` and `@xterm/addon-web-links` happen to work because they also install `@xterm/xterm@5.5.0` as their own dep, but the client code still imports from `'xterm'`. For v3.0, stay on the non-scoped `xterm` ecosystem. Do not mix scoped `@xterm/*` addons with `xterm-addon-search`.
-
----
-
-## Integration Points with Existing Code
-
-### `TerminalView.tsx`
-- Add `searchAddonRef` alongside `fitAddonRef`
-- Add `overviewRulerWidth: 15` to Terminal constructor options
-- Load `SearchAddon` after `FitAddon` and `WebLinksAddon`
-- Add `agentState?: AgentStateHint | null` and `contextPressure?: number | null` props for header display
-- Add `searchOpen` state + search bar UI in the header (conditionally rendered)
-- Ctrl+F opens search: handled by global keydown listener, passed to TerminalView via ref or prop callback
-
-### `InstanceTabBar.tsx`
-- Add `agentLiveStatus?: Map<string, AgentLiveStatus>` prop
-- Derive `agentId` from `instance.tmuxSessionName.split('-')[0]` (established project pattern)
-- Show badge `span` when `liveStatus?.state === 'permission_prompt'`
-
-### `App.tsx`
-- Call `useAgentLiveStatus()` (currently only called in AgentsTab — move to App level or duplicate call)
-- Pass live status map to `InstanceTabBar` and `TerminalView`
-- Add global `useEffect` for keyboard shortcut handler
-- Add `usePermissionNotifications` hook invocation
-
-### New files
-- `src/client/hooks/usePermissionNotifications.ts` — wraps `window.Notification` with transition detection and opt-in management
-- `src/client/components/TerminalSearchBar.tsx` — search input, nav buttons, match count display
-- `src/client/hooks/useKeyboardShortcuts.ts` (optional) — extract global keydown logic from App.tsx for testability
+| API | Node.js Requirement | Status on This Server |
+|-----|---------------------|----------------------|
+| `fs.statfsSync()` | Node.js 19+ | Available — Node.js 22.22.0 verified |
+| `fs/promises.statfs()` | Node.js 19+ | Available — verified returns disk stats |
+| `readdirSync({ recursive: true })` | Node.js 18.17+ | Available — verified returns flat file list |
 
 ---
 
 ## Sources
 
-- `/home/forge/warden.kingdom.lv/node_modules/xterm/typings/xterm.d.ts` — confirmed `overviewRulerWidth` option, `IDecorationOverviewRulerOptions` (HIGH confidence, read directly)
-- `/tmp/package/typings/xterm-addon-search.d.ts` — extracted from `xterm-addon-search@0.13.0.tgz` via npm pack; confirmed full API: `ISearchOptions`, `ISearchDecorationOptions.matchOverviewRuler`, `onDidChangeResults`, `clearDecorations()`, `clearActiveDecoration()` (HIGH confidence, read directly)
-- `npm show @xterm/addon-search@0.16.0 peerDependencies` → `{ "@xterm/xterm": "^5.0.0" }` (HIGH confidence, executed)
-- `npm show xterm-addon-search@0.13.0 peerDependencies` → `{ "xterm": "^5.0.0" }` (HIGH confidence, executed)
-- `npm ls @xterm/xterm` → `@xterm/xterm@5.5.0` installed as transitive dep of addon-fit/addon-web-links (HIGH confidence, executed)
-- `/home/forge/warden.kingdom.lv/src/client/components/TerminalView.tsx` — confirmed import is `from 'xterm'` (non-scoped), FitAddon/WebLinksAddon loaded via `terminal.loadAddon()` (HIGH confidence, read directly)
-- `/home/forge/warden.kingdom.lv/src/server/routes/gsdRoutes.ts` — `detectAgentState()` returns `'permission_prompt'`, `extractContextPressure()` returns `{contextPressure, contextPressureLevel}` already implemented (HIGH confidence, read directly)
-- `/home/forge/warden.kingdom.lv/src/client/hooks/useAgentLiveStatus.ts` — confirmed polls `/api/gsd/agents/live-status` every 5s, returns `Map<string, AgentLiveStatus>` (HIGH confidence, read directly)
-- MDN Notifications API — `new Notification(title, options)` works without service worker on desktop; `tag` deduplicates; `Notification.requestPermission()` must be called from user gesture (MEDIUM confidence, WebSearch + MDN docs)
-- `window.Notification` browser support — Chrome, Firefox, Edge, Safari 16.4+ (HIGH confidence for desktop operator use case)
+- `/home/forge/warden.kingdom.lv/src/client/components/TerminalView.tsx` — confirmed `onTouchStart` + `event.preventDefault()` pattern already used on all `MobileKeyToolbar` buttons; `MOBILE_KEYS` array does not contain Enter; `terminal.focus()` is `textarea.focus({preventScroll:true})` (HIGH confidence, read directly)
+- `/home/forge/warden.kingdom.lv/node_modules/xterm/lib/xterm.js:25971` — confirmed `focus(){this.textarea&&this.textarea.focus({preventScroll:!0})}` — programmatic focus does not trigger iOS keyboard (HIGH confidence, read directly)
+- `/home/forge/warden.kingdom.lv/src/server/services/RecordingCaptureService.ts` — confirmed `startRecording()` API, in-memory frame buffer pattern, auto-stop on PTY exit (HIGH confidence, read directly)
+- `/home/forge/warden.kingdom.lv/src/server/database/DatabaseConnection.ts` — confirmed `budget_config` table as precedent for per-agent config, inline migration pattern, `file_size_bytes` column on recordings table (HIGH confidence, read directly)
+- `/home/forge/warden.kingdom.lv/src/client/components/HistoryView.tsx` — confirmed `onNavigateToSession` prop exists as `_onNavigateToSession` (declared but unused — extension point ready) (HIGH confidence, read directly)
+- Node.js 22.22.0 on server — `fs.statfsSync('/')` and `fs/promises.statfs('/')` both verified working, returning `{blocks, bfree, bsize, ...}` (HIGH confidence, executed)
+- `readdirSync({ recursive: true })` — verified working on Node.js 22 for directory size sum (HIGH confidence, executed)
+- iOS Safari keyboard behavior — `onTouchStart` + `event.preventDefault()` is the established technique to prevent focus-move on button tap; programmatic `focus()` cannot re-open iOS keyboard (MEDIUM confidence, multiple WebSearch sources consistent)
+- MDN VirtualKeyboard API — Chrome 94+ only, not iOS Safari (MEDIUM confidence, WebSearch)
 
 ---
 
-*Stack research for: Warden Dashboard v3.0 — Operator Awareness & Terminal Power Tools*
-*Researched: 2026-03-03*
+*Stack research for: Warden Dashboard v3.2 — Mobile Operations & UX Polish*
+*Researched: 2026-03-04*

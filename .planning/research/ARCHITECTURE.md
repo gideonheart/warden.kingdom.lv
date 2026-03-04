@@ -1,680 +1,722 @@
-# Architecture Research: v3.0 Operator Awareness & Terminal Power Tools
+# Architecture Research
 
-**Domain:** Warden Dashboard — feature integration for milestone v3.0
-**Researched:** 2026-03-03
-**Confidence:** HIGH (direct codebase inspection + npm registry verification)
+**Domain:** Warden Dashboard v3.2 — mobile terminal UX, auto-record triggers, storage rotation
+**Researched:** 2026-03-04
+**Confidence:** HIGH — direct source code analysis of the shipped v3.1 codebase
 
 ---
 
 ## System Overview
 
-The four v3.0 feature areas map cleanly onto the existing two-tier architecture. No new
-namespaces, services, or infrastructure are required. The diagram below shows where each
-feature lands, with v3.0 additions marked `[NEW]`.
+The five v3.2 feature areas all integrate into the existing two-tier architecture. No new infrastructure is required. The diagram below shows where each feature lands, with v3.2 additions marked `[NEW]` or `[MOD]`.
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                        BROWSER CLIENT (React 19 SPA)                         │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                               │
-│  App.tsx                                                                      │
-│  ├── header                (nav, [NEW] useGlobalHotkeys hook)                 │
-│  ├── InstanceTabBar        [MODIFIED: permission badge per tab]                │
-│  └── TerminalView          [MODIFIED: search overlay, context pressure        │
-│       ├── header bar         badge, agent state chip, Ctrl+F handler]        │
-│       ├── xterm.js canvas                                                     │
-│       │    └── @xterm/addon-search [NEW dependency, loaded once at init]     │
-│       └── TerminalSearchOverlay [NEW component, conditionally rendered]       │
-│                                                                               │
-│  useTerminalSocket         [MODIFIED: handle terminal:permission_prompt]      │
-│  useAgentLiveStatus        [EXISTING: already has contextPressure data]       │
-│  useGlobalHotkeys          [NEW hook: document-level keydown handler]         │
-│                                                                               │
-└────────────────────────────────┬────────────────────────────────────────────┘
-                                 │  Socket.IO /terminal namespace
-                                 │  (existing — new event types added)
-┌────────────────────────────────▼────────────────────────────────────────────┐
-│                       EXPRESS 5 SERVER (src/server/)                          │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                               │
-│  TerminalStreamService     [MODIFIED: PTY output tap → permission detection] │
-│  ├── ptyProcess.onData()   taps each chunk before fan-out to subscribers     │
-│  ├── permissionPromptState Map<sessionName, boolean> tracks per-session flag  │
-│  └── emits terminal:permission_prompt  /  clears on terminal:input           │
-│                                                                               │
-│  gsdRoutes.ts              [EXISTING: /api/gsd/agents/live-status]           │
-│  └── extractContextPressure() already running every 5s poll from client      │
-│                                                                               │
-└─────────────────────────────────────────────────────────────────────────────┘
-         │ node-pty / tmux attach-session
-         ▼
-  [tmux sessions with agent prefixes]
+┌────────────────────────────────────────────────────────────────────────┐
+│                          React 19 Client (SPA)                          │
+├────────────────────────────────────────────────────────────────────────┤
+│  App.tsx (view router, hash nav, stable prop refs, recording state)     │
+│  [MOD: session-click routing logic, recording lookup]                   │
+│                                                                         │
+│  ┌──────────────────────────────┐  ┌────────────────────────────────┐  │
+│  │TerminalView (xterm.js)       │  │HistoryView                     │  │
+│  │[MOD] MobileKeyToolbar:       │  │[MOD] SessionHistory rows       │  │
+│  │  + Enter key in MOBILE_KEYS  │  │  + clickable with onSessionClick│  │
+│  │  + onAfterInput re-focus     │  │[MOD] onNavigateToSession wired │  │
+│  └──────────────────────────────┘  └────────────────────────────────┘  │
+│                                                                         │
+│  ┌──────────────────────────────┐                                       │
+│  │RecordingLibrary              │  [MOD: auto-record + rotation        │
+│  │[NEW] RecordingSettings panel │   config UI added inside library]    │
+│  └──────────────────────────────┘                                       │
+│                                                                         │
+│  Hooks: useTerminalSocket, useRecordingState, useActiveInstances        │
+│  useSessionSelection, useAgentLiveStatus, useBudgetAlerts               │
+├─────────────────────────────────┬──────────────────────────────────────┤
+│       Socket.IO /terminal       │     REST /api/*                       │
+├─────────────────────────────────┼──────────────────────────────────────┤
+│                         Express 5 Server                                │
+│  ┌──────────────────┐  ┌──────────────────┐  ┌─────────────────────┐  │
+│  │TerminalStream    │  │InstanceTracker   │  │RecordingCapture     │  │
+│  │Service           │  │(10s poll loop)   │  │Service              │  │
+│  │[MOD] check auto- │  │                  │  │[MOD] call rotation  │  │
+│  │record after spawn│  │                  │  │after stopRecording  │  │
+│  └────────┬─────────┘  └──────────────────┘  └──────┬──────────────┘  │
+│           │ PTY onData tap (existing)                │                 │
+│           └──────────────────────────────────────────┘                 │
+│  ┌──────────────────────┐  ┌────────────────────────────────────────┐  │
+│  │AutoRecordConfig      │  │RecordingRotation                       │  │
+│  │Service [NEW]         │  │Service [NEW]                           │  │
+│  └──────────────────────┘  └────────────────────────────────────────┘  │
+│  ┌─────────────────────────────────────────────────────────────────┐   │
+│  │  DatabaseConnection (better-sqlite3, WAL)                        │   │
+│  │  Tables: instances · session_logs · token_usage · recordings     │   │
+│  │  [NEW] auto_record_config · recording_rotation_config            │   │
+│  └─────────────────────────────────────────────────────────────────┘   │
+│  ┌──────────────────────────┐                                          │
+│  │  data/recordings/*.cast  │  (asciicast v2, subject to rotation)    │
+│  └──────────────────────────┘                                          │
+└────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
 ## Component Responsibilities
 
-### New Components
+### Existing Components (modified)
+
+| Component | File | Change for v3.2 |
+|-----------|------|-----------------|
+| `MobileKeyToolbar` | inside `TerminalView.tsx` | Add Enter key to `MOBILE_KEYS`; add `onAfterInput` prop; call it from each button's `onTouchStart` |
+| `TerminalView` | `src/client/components/TerminalView.tsx` | Provide stable `onAfterInput` callback that calls `terminalInstanceRef.current?.focus()` |
+| `SessionHistory` | `src/client/components/SessionHistory.tsx` | Add `onSessionClick?: (session: AgentInstance) => void` prop; make rows `role="button"` with click handler |
+| `HistoryView` | `src/client/components/HistoryView.tsx` | Route `onSessionClick` up to App.tsx via existing `onNavigateToSession` prop (remove `_` prefix) |
+| `App.tsx` | `src/client/App.tsx` | Implement session-click routing: active → terminal, has-recording → player, stopped → terminal+overlay |
+| `RecordingLibrary` | `src/client/components/RecordingLibrary.tsx` | Add settings panel UI for auto-record trigger and rotation config |
+| `RecordingCaptureService` | `src/server/services/RecordingCaptureService.ts` | Call `RecordingRotationService.runRotation()` (fire-and-forget) after `stopRecording` |
+| `TerminalStreamService` | `src/server/services/TerminalStreamService.ts` | Call `AutoRecordConfigService.shouldRecord()` after PTY spawn; start recording if true |
+| `DatabaseConnection` | `src/server/database/DatabaseConnection.ts` | Add migrations for 2 new config tables; add 3 new query methods for rotation |
+
+### New Components / Services
 
 | Component | File | Responsibility |
 |-----------|------|----------------|
-| `TerminalSearchOverlay` | `src/client/components/TerminalSearchOverlay.tsx` | Search input, Prev/Next/Close buttons, match counter display. Receives `SearchAddon` ref and renders over terminal canvas. |
-| `useGlobalHotkeys` | `src/client/hooks/useGlobalHotkeys.ts` | Single `document` keydown listener for Ctrl+1-9 tab switching, Alt+Left/Right cycling, Ctrl+B sidebar toggle. Scope-guarded against text inputs. |
-
-### Modified Components
-
-| Component | File | What Changes |
-|-----------|------|--------------|
-| `TerminalStreamService` | `src/server/services/TerminalStreamService.ts` | Add permission prompt detection in `ptyProcess.onData()` tap. Track per-session boolean flag. Emit `terminal:permission_prompt` event. Clear on `terminal:input`. |
-| `TerminalView` | `src/client/components/TerminalView.tsx` | Load `@xterm/addon-search`. Render `TerminalSearchOverlay` conditionally. Accept `contextPressure` and `agentState` props. Display context pressure badge and agent state chip in header bar. Wire Ctrl+F keydown. |
-| `InstanceTabBar` | `src/client/components/InstanceTabBar.tsx` | Accept `permissionBadgeSessions: Set<string>` prop. Render red badge dot on tabs in this set. |
-| `useTerminalSocket` | `src/client/hooks/useTerminalSocket.ts` | Handle new `terminal:permission_prompt` event from server. Expose `hasPermissionPrompt` boolean in return value. |
-| `App.tsx` | `src/client/App.tsx` | Mount `useGlobalHotkeys`. Pass `permissionBadgeSessions` to `InstanceTabBar`. Pass `contextPressure` and `agentState` from `useAgentLiveStatus` to `TerminalView`. Request browser `Notification` permission on first permission prompt (Phase 20). |
+| `AutoRecordConfigService` | `src/server/services/AutoRecordConfigService.ts` | Singleton config (trigger mode, agent IDs); `shouldRecord(sessionName, agentId): boolean` |
+| `RecordingRotationService` | `src/server/services/RecordingRotationService.ts` | Prune recordings by size/age/count using `deleteRecording()` + `fs.unlinkSync()` |
+| `autoRecordRoutes` | `src/server/routes/autoRecordRoutes.ts` | `GET /api/auto-record/config` and `PUT /api/auto-record/config` |
 
 ---
 
 ## Detailed Integration Points
 
-### 1. Permission Prompt Detection (PTY Tap)
+### 1. Mobile Enter Button
 
-**Where it lives:** `TerminalStreamService.attachSocketToSession()` in the `ptyProcess.onData()` handler.
+**Location:** `MOBILE_KEYS` constant array in `TerminalView.tsx` (line 78–88).
 
-The existing broadcast loop already iterates over all subscribers per data chunk. The tap inserts a regex test before (or alongside) the fan-out, with no change to the fan-out logic itself.
-
+**Change:** Add one entry:
 ```typescript
-// Inside TerminalStreamService — ptyProcess.onData callback
-ptyProcess.onData((terminalOutput: string) => {
-  // [NEW] Permission prompt detection tap
-  if (PERMISSION_PROMPT_PATTERN.test(terminalOutput) && !session.hasPermissionPrompt) {
-    session.hasPermissionPrompt = true;
-    for (const subscriberId of session.subscribers) {
-      const subscriberSocket = this.findSocketById(subscriberId);
-      subscriberSocket?.emit('terminal:permission_prompt', { sessionName, detected: true });
-    }
-  }
-
-  // [EXISTING] Fan-out to all subscribers unchanged
-  for (const subscriberId of session.subscribers) {
-    const subscriberSocket = this.findSocketById(subscriberId);
-    subscriberSocket?.emit('terminal:output', terminalOutput);
-  }
-});
+const MOBILE_KEYS: Array<{ label: string; seq: string }> = [
+  { label: 'Tab', seq: '\t' },
+  { label: 'Ctrl+C', seq: '\x03' },
+  { label: 'Ctrl+D', seq: '\x04' },
+  { label: 'Enter', seq: '\r' },        // [NEW]
+  { label: '\u2191', seq: '\x1b[A' },
+  // ... existing arrows, PgUp, PgDn
+];
 ```
 
-The `hasPermissionPrompt` boolean is added to `SharedPtySession`. It is cleared in `setupSocketInputHandlers` when `terminal:input` is received.
+The existing `onTouchStart` map in `MobileKeyToolbar` handles all keys uniformly — no additional wiring.
 
-**Pattern used:** `session.hasPermissionPrompt` lives on the existing `SharedPtySession` interface — no new Map or service. The emit is the same `socket.emit()` call pattern already used for `terminal:reset` and `terminal:exit`.
-
-**Regex patterns to detect (Phase 19 baseline):**
-
-```typescript
-const PERMISSION_PROMPT_PATTERN =
-  /Do you want to|Allow|Press Enter to continue|\(y\/N\)|Overwrite\?|permission|bypass/i;
-```
-
-These patterns should be refined by inspecting actual Claude Code permission prompt output. The regex is intentionally broad for Phase 19 and can be tightened in Phase 20 after real-world observation.
+**Scope:** 1 line added to a constant array.
 
 ---
 
-### 2. Context Pressure Surfacing (useAgentLiveStatus → TerminalView)
+### 2. Keyboard Persistence (Re-focus xterm After Toolbar Button)
 
-**Data is already computed.** `extractContextPressure()` runs server-side on every `GET /api/gsd/agents/live-status` call, which `useAgentLiveStatus` polls every 5 seconds. The data reaches the client as `{ contextPressure: number | null, contextPressureLevel: PressureLevel | null }` per agent.
+**Root cause:** On iOS Safari, tapping a button can briefly shift focus away from xterm.js. Calling `event.preventDefault()` on `onTouchStart` prevents the default focus change, but if xterm.js still loses focus for any reason (browser inconsistency), the soft keyboard dismisses.
 
-**The missing link:** `TerminalView` does not currently consume `useAgentLiveStatus`. The hook is called in `AgentsTab.tsx` (GSD view) and not wired into the terminal header.
+**Current pattern:** Every toolbar button already uses:
+```typescript
+onTouchStart={(event) => {
+  event.preventDefault();
+  sendInput(key.seq);
+}}
+```
 
-**Integration path (Option B from v3.0-SCOPE.md — preferred):**
+**Missing:** Explicit `terminal.focus()` call after each input send.
 
-`App.tsx` already calls `useAgentLiveStatus` (or can be made to). It derives `selectedInstance` from `activeInstances`. The mapping from `selectedInstance.agentId` to a live status entry is a Map lookup:
+**Integration approach:** `MobileKeyToolbar` receives a new optional prop `onAfterInput?: () => void`. `TerminalView` provides a stable callback:
 
 ```typescript
-// In App.tsx
-const liveStatusMap = useAgentLiveStatus();
-const selectedLiveStatus = selectedInstance
-  ? liveStatusMap.get(selectedInstance.agentId) ?? null
-  : null;
+// In TerminalView (stable via useCallback with no deps, reads ref)
+const handleAfterMobileInput = useCallback(() => {
+  terminalInstanceRef.current?.focus();
+}, []); // no deps — terminalInstanceRef is a ref, not reactive
 
-// Pass to TerminalView:
-<TerminalView
-  tmuxSessionName={selectedSessionName}
-  onSessionExit={handleSessionExit}
-  contextPressure={selectedLiveStatus?.contextPressure ?? null}
-  contextPressureLevel={selectedLiveStatus?.contextPressureLevel ?? null}
-  agentState={selectedLiveStatus?.state ?? null}     // Phase 20
+// Passed to MobileKeyToolbar:
+<MobileKeyToolbar
+  sendInput={sendInput}
+  selectMode={selectMode}
+  onToggleCopyMode={handleToggleCopyMode}
+  onAfterInput={handleAfterMobileInput}   // [NEW]
 />
 ```
 
-`TerminalView` receives these as props and renders them in the existing header bar `<div>`. No new API endpoint required — this reuses the existing polling infrastructure.
+Each `onTouchStart` in `MobileKeyToolbar`:
+```typescript
+onTouchStart={(event) => {
+  event.preventDefault();
+  sendInput(key.seq);
+  onAfterInput?.();     // [NEW]
+}}
+```
 
-**Context pressure badge color rules:**
+**Important:** `onAfterInput` must be called synchronously inside `onTouchStart`, before the browser evaluates whether to dismiss the keyboard. Do not defer with `setTimeout` or `requestAnimationFrame`.
 
-| Threshold | Color token | Label |
-|-----------|-------------|-------|
-| No data (null) | hidden | — |
-| < 70% | `text-warden-success` | `{n}%` |
-| 70–89% | `text-warden-warning` | `{n}%` |
-| >= 90% | `text-warden-error` animate-pulse | `{n}%` |
+**Scope:** `MobileKeyToolbar` gains 1 prop. All 12 button handlers get 1 line added. `TerminalView` gains 1 `useCallback`. Zero server changes.
 
 ---
 
-### 3. xterm-addon-search Integration
+### 3. Clickable History Session Rows
 
-**Package:** `@xterm/addon-search@0.16.0`
+**Location:** `SessionHistory.tsx` rows, `HistoryView.tsx` prop wiring, `App.tsx` routing.
 
-This is the official scoped package. The project already uses `@xterm/addon-fit` and `@xterm/addon-web-links` from the same `@xterm` namespace — the pattern is identical.
+**Current state:** Session rows are plain `<div>` elements. `HistoryView` has `onNavigateToSession` prop but it is named `_onNavigateToSession` (unused, passed to `SessionHistory` via a dead code path).
 
-**Compatibility:** `@xterm/addon-search` requires `xterm.js v4+`. The project uses `xterm@^5.3.0`. Confirmed compatible.
+**New prop chain:**
 
-**Installation:**
-
-```bash
-npm install -D @xterm/addon-search
+```
+SessionHistory
+  onSessionClick?: (session: AgentInstance) => void
+    ↓ (row click)
+HistoryView
+  onNavigateToSession?: (sessionName: string) => void   [rename from _onNavigateToSession]
+    ↓ (wrapped in adapter)
+App.tsx
+  handleHistorySessionClick(session: AgentInstance)
+    → navigate based on session.status + recording lookup
 ```
 
-Note: existing addons (`@xterm/addon-fit`, `@xterm/addon-web-links`) are devDependencies in this project's `package.json` even though they are used at runtime in the client bundle. Vite bundles them into the client output, so devDependency placement is correct here.
+**Row click pattern (following EventsTab.tsx precedent for accessibility):**
 
-**Loading pattern** (matches how `FitAddon` and `WebLinksAddon` are loaded in `TerminalView.tsx`):
-
-```typescript
-import { SearchAddon } from '@xterm/addon-search';
-
-// Inside TerminalView useEffect (terminal init block)
-const searchAddon = new SearchAddon();
-terminal.loadAddon(searchAddon);
-terminal.loadAddon(fitAddon);
-terminal.loadAddon(new WebLinksAddon());
-
-searchAddonRef.current = searchAddon;
+```tsx
+<div
+  key={session.id}
+  role="button"
+  tabIndex={0}
+  onClick={() => onSessionClick?.(session)}
+  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onSessionClick?.(session); }}
+  className="... cursor-pointer hover:bg-warden-border/40 ..."
+>
 ```
 
-**Key API:**
+**Navigation logic in App.tsx:**
 
 ```typescript
-// Forward search
-searchAddon.findNext(term, {
-  caseSensitive: false,
-  regex: false,
-  wholeWord: false,
-  incremental: true,         // re-search from start on each keypress
-  decorations: {
-    matchBackground: '#4f46e5',          // warden-accent
-    matchBorder: '#6366f1',
-    matchOverviewRuler: '#6366f1',
-    activeMatchBackground: '#f59e0b',    // warden-warning
-    activeMatchBorder: '#f59e0b',
-    activeMatchColorOverviewRuler: '#f59e0b',
-  },
-});
-
-// Backward search
-searchAddon.findPrevious(term, { /* same options */ });
-```
-
-The `decorations.matchOverviewRuler` option renders markers in xterm.js's built-in overview ruler (the thin scrollbar on the right edge of the terminal). This gives Phase 19 basic scrollbar markers without custom canvas work — the "scrollbar gutter markers" Phase 20 feature may be satisfied by this built-in behavior.
-
-**Addon lifecycle:** `SearchAddon` is loaded once when the terminal is created and lives for the duration of the `TerminalView` mount. It is not reloaded on search term changes. The terminal `dispose()` in the cleanup function implicitly disposes all loaded addons.
-
----
-
-### 4. TerminalSearchOverlay Component
-
-A new component rendered conditionally inside `TerminalView`'s terminal content area:
-
-```typescript
-// Positioning: overlaid at top of terminal canvas, z-index above terminal content
-// (similar to the existing connecting overlay, but at the top)
-{isSearchOpen && (
-  <TerminalSearchOverlay
-    searchAddon={searchAddonRef.current}
-    onClose={() => setIsSearchOpen(false)}
-  />
-)}
-```
-
-**Props interface:**
-
-```typescript
-interface TerminalSearchOverlayProps {
-  searchAddon: SearchAddon | null;
-  onClose: () => void;
-}
-```
-
-The overlay is self-contained: it manages its own search term state, calls `searchAddon.findNext()` / `searchAddon.findPrevious()` directly, and handles its own Escape key. Match count display (Phase 20) requires the `ISearchDecorations` callback API — verify availability in `@xterm/addon-search@0.16.0` before Phase 20 implementation.
-
-**Ctrl+F handling:** The `Ctrl+F` keypress must open the overlay. xterm.js captures keypresses when the terminal has focus, so the handler must be registered at the `document` level (same approach as `useGlobalHotkeys`). Alternatively, it can be registered in `TerminalView`'s `useEffect` on `terminalContainerRef.current` — but document-level is simpler and consistent with the hotkeys pattern.
-
-```typescript
-// Inside TerminalView useEffect or useGlobalHotkeys
-const handleKeyDown = (event: KeyboardEvent) => {
-  if (event.ctrlKey && event.key === 'f') {
-    // Only intercept when terminal is the active view
-    event.preventDefault();
-    setIsSearchOpen(true);
+const handleHistorySessionClick = useCallback((session: AgentInstance) => {
+  if (session.status === 'active' || session.status === 'idle') {
+    selectSession(session.tmuxSessionName);
+    setCurrentView('terminals');
+    return;
   }
-};
-document.addEventListener('keydown', handleKeyDown);
+  // Check if stopped session has a recording
+  const matchingRecording = recordingsList.find(
+    (r) => r.sessionName === session.tmuxSessionName && r.stoppedAt !== null
+  );
+  if (matchingRecording) {
+    setActiveRecording(matchingRecording);
+    setCurrentView('recordings');
+    return;
+  }
+  // No recording — navigate to terminal view (shows stopped overlay)
+  selectSession(session.tmuxSessionName);
+  setCurrentView('terminals');
+}, [selectSession, recordingsList]);
 ```
+
+**Recording list source:** `App.tsx` needs access to the recordings list for the lookup. Options:
+- Option A (recommended, zero new endpoints): `App.tsx` fetches `GET /api/recordings` once and caches it locally (a `useState` + `useEffect` at the App level). This is the same list `RecordingLibrary` fetches — small duplication but clean.
+- Option B: Add `?sessionName=X` filter to `GET /api/recordings`. Server-side filter; slightly cleaner but requires route change.
+
+Start with Option A. The recordings list is small (single-server, controlled retention) and fetching once on mount is acceptable.
+
+**Scope:** `SessionHistory.tsx` ~15 lines, `HistoryView.tsx` ~5 lines, `App.tsx` ~30 lines. No server changes required for the basic flow.
 
 ---
 
-### 5. Keyboard Navigation Shortcuts (useGlobalHotkeys)
+### 4. Auto-Record with Configurable Triggers
 
-A single document-level keydown listener handles all global shortcuts. This is the established pattern for browser apps where a canvas (xterm.js) captures keyboard events.
+**Location:** New `AutoRecordConfigService`, `TerminalStreamService` hook point, new SQLite table, new route.
 
-**Focus guard:** Do not intercept shortcuts when focus is in a text input, textarea, or select (except the terminal canvas itself). xterm.js terminal canvas is a `<div>` or `<canvas>`, not an input, so `event.target instanceof HTMLInputElement` etc. is a sufficient guard.
+**New SQLite table:**
+
+```sql
+CREATE TABLE IF NOT EXISTS auto_record_config (
+  id INTEGER PRIMARY KEY CHECK (id = 1),  -- singleton row
+  trigger_mode TEXT NOT NULL DEFAULT 'manual',
+  -- 'manual' | 'on_session_start' | 'on_agent_ids'
+  agent_ids TEXT,
+  -- JSON array of agent ID strings, e.g. '["gideon","scout"]'
+  -- null means apply to all agents (when trigger_mode = 'on_session_start')
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+**`AutoRecordConfigService` interface:**
 
 ```typescript
-// src/client/hooks/useGlobalHotkeys.ts
-export interface UseGlobalHotkeysParams {
-  sessions: string[];                          // ordered list of tmux session names
-  onSelectSession: (sessionName: string) => void;
-  onCycleSessionForward: () => void;
-  onCycleSessionBackward: () => void;
-  onToggleSidebar: () => void;
-}
-
-export function useGlobalHotkeys({
-  sessions,
-  onSelectSession,
-  onCycleSessionForward,
-  onCycleSessionBackward,
-  onToggleSidebar,
-}: UseGlobalHotkeysParams): void {
-  // Stable ref for callbacks — avoids listener churn on re-render
-  const callbacksRef = useRef({ sessions, onSelectSession, onCycleSessionForward, onCycleSessionBackward, onToggleSidebar });
-  callbacksRef.current = { sessions, onSelectSession, onCycleSessionForward, onCycleSessionBackward, onToggleSidebar };
-
-  useEffect(() => {
-    const handler = (event: KeyboardEvent) => {
-      // Focus guard: ignore when in text input
-      if (event.target instanceof HTMLInputElement ||
-          event.target instanceof HTMLTextAreaElement ||
-          event.target instanceof HTMLSelectElement) {
-        return;
-      }
-
-      const { sessions, onSelectSession, onCycleSessionForward, onCycleSessionBackward, onToggleSidebar } = callbacksRef.current;
-
-      // Ctrl+1 through Ctrl+9 — select session by index
-      if (event.ctrlKey && !event.shiftKey && !event.altKey) {
-        const digit = parseInt(event.key, 10);
-        if (digit >= 1 && digit <= 9) {
-          const targetSession = sessions[digit - 1];
-          if (targetSession) {
-            event.preventDefault();
-            onSelectSession(targetSession);
-          }
-          return;
-        }
-        // Ctrl+B — toggle sidebar
-        if (event.key === 'b') {
-          event.preventDefault();
-          onToggleSidebar();
-          return;
-        }
-      }
-
-      // Alt+Left / Alt+Right — cycle tabs
-      if (event.altKey && !event.ctrlKey && !event.shiftKey) {
-        if (event.key === 'ArrowLeft') {
-          event.preventDefault();
-          onCycleSessionBackward();
-          return;
-        }
-        if (event.key === 'ArrowRight') {
-          event.preventDefault();
-          onCycleSessionForward();
-          return;
-        }
-      }
-    };
-
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, []); // Empty deps — callbacks accessed via ref
+export class AutoRecordConfigService {
+  getConfig(): { triggerMode: 'manual' | 'on_session_start' | 'on_agent_ids'; agentIds: string[] }
+  setConfig(triggerMode: string, agentIds: string[]): void
+  shouldRecord(sessionName: string, agentId: string): boolean
 }
 ```
 
-**Mounting in App.tsx:**
+`shouldRecord` logic:
+- `'manual'` → always false
+- `'on_session_start'` → always true
+- `'on_agent_ids'` → true if `agentId` is in `agentIds` array
+
+**Hook point in `TerminalStreamService.attachSocketToSession()`:**
 
 ```typescript
-useGlobalHotkeys({
-  sessions: activeInstances.map((i) => i.tmuxSessionName),
-  onSelectSession: handleSelectSession,
-  onCycleSessionForward: () => {
-    const idx = activeInstances.findIndex((i) => i.tmuxSessionName === selectedSessionName);
-    const next = activeInstances[(idx + 1) % activeInstances.length];
-    if (next) handleSelectSession(next.tmuxSessionName);
-  },
-  onCycleSessionBackward: () => {
-    const idx = activeInstances.findIndex((i) => i.tmuxSessionName === selectedSessionName);
-    const prev = activeInstances[(idx - 1 + activeInstances.length) % activeInstances.length];
-    if (prev) handleSelectSession(prev.tmuxSessionName);
-  },
-  onToggleSidebar: () => setShowSidebar((v) => !v),
+// After ptyProcess = pty.spawn(...), inside the new-PTY branch only
+const cols = ptyProcess.cols;
+const rows = ptyProcess.rows;
+if (autoRecordConfigService.shouldRecord(sessionName, derivedAgentId)) {
+  try {
+    recordingCaptureService.startRecording({
+      sessionName,
+      agentId: derivedAgentId,
+      agentName: '',           // no agentName in TerminalStreamService scope
+      projectPath: '',
+      cols,
+      rows,
+    });
+  } catch (error) {
+    console.warn(`[TerminalStream] Auto-record start failed for ${sessionName}:`, error);
+  }
+}
+```
+
+Note: `TerminalStreamService` does not currently have access to `agentId` from the session name parsing. `TmuxSessionManager` splits session names by the `{agentId}-{projectSlug}-{shortUuid}` convention. The `agentId` can be extracted from `sessionName.split('-')[0]` for this purpose (already done in `TmuxSessionManager.listAgentSessions()`).
+
+**New routes (`autoRecordRoutes.ts`):**
+
+```
+GET  /api/auto-record/config    → return current config
+PUT  /api/auto-record/config    → update config (body: { triggerMode, agentIds })
+```
+
+**Client settings UI:** A small form section at the top or bottom of `RecordingLibrary`, showing:
+- Trigger mode selector (Manual / All sessions / Specific agents)
+- Agent ID multi-select (shown only when mode is "Specific agents")
+- Save button
+
+**Scope:** 1 new service, 1 new route file, 1 migration in `DatabaseConnection`, ~5 lines in `TerminalStreamService`, small UI in `RecordingLibrary`.
+
+---
+
+### 5. Storage Rotation
+
+**Location:** New `RecordingRotationService`, new SQLite table, `RecordingCaptureService` trigger point, extended routes.
+
+**New SQLite table:**
+
+```sql
+CREATE TABLE IF NOT EXISTS recording_rotation_config (
+  id INTEGER PRIMARY KEY CHECK (id = 1),  -- singleton row
+  max_storage_bytes INTEGER DEFAULT 0,    -- 0 = disabled
+  max_age_days INTEGER DEFAULT 0,         -- 0 = disabled
+  max_count INTEGER DEFAULT 0,            -- 0 = disabled
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+**New query methods on `DatabaseConnection`:**
+
+```typescript
+getTotalRecordingStorageBytes(): number
+// SELECT COALESCE(SUM(file_size_bytes), 0) FROM recordings WHERE stopped_at IS NOT NULL
+
+getOldestFinishedRecordings(limit: number): RecordingEntry[]
+// SELECT * FROM recordings WHERE stopped_at IS NOT NULL ORDER BY started_at ASC LIMIT ?
+
+getRecordingsOlderThan(ageDays: number): RecordingEntry[]
+// SELECT * FROM recordings
+// WHERE stopped_at IS NOT NULL
+//   AND started_at < datetime('now', '-' || ? || ' days')
+// ORDER BY started_at ASC
+
+countFinishedRecordings(): number
+// SELECT COUNT(*) FROM recordings WHERE stopped_at IS NOT NULL
+```
+
+**`RecordingRotationService` interface:**
+
+```typescript
+export class RecordingRotationService {
+  runRotation(): void   // synchronous, fire-and-forget
+}
+```
+
+Rotation algorithm:
+
+```
+runRotation():
+  config = get rotation config (cached in memory, refreshed every call or on config update)
+
+  if config.maxAgeDays > 0:
+    old = getRecordingsOlderThan(config.maxAgeDays)
+    for each: deleteFile + database.deleteRecording(id)
+
+  if config.maxCount > 0:
+    total = countFinishedRecordings()
+    if total > config.maxCount:
+      oldest = getOldestFinishedRecordings(total - config.maxCount)
+      for each: deleteFile + database.deleteRecording(id)
+
+  if config.maxStorageBytes > 0:
+    while getTotalRecordingStorageBytes() > config.maxStorageBytes:
+      oldest = getOldestFinishedRecordings(10)  // batch of 10
+      if oldest is empty: break
+      for each: deleteFile + database.deleteRecording(id)
+```
+
+**Trigger point in `RecordingCaptureService.stopRecording()`:**
+
+```typescript
+// After database.finaliseRecording(...)
+setImmediate(() => {
+  try {
+    recordingRotationService.runRotation();
+  } catch (error) {
+    console.warn('[RecordingCapture] Rotation failed:', error);
+  }
 });
 ```
 
+Using `setImmediate` keeps rotation off the PTY data path and ensures `stopRecording` returns promptly.
+
+**New routes (extend `recordingRoutes.ts` or add `recordingRotationRoutes.ts`):**
+
+```
+GET  /api/recordings/rotation-config    → return current rotation config
+PUT  /api/recordings/rotation-config    → update rotation config
+POST /api/recordings/rotate             → manually trigger rotation (for admin use)
+```
+
+**Client settings UI:** Section in `RecordingLibrary` showing:
+- Max storage (input, MB units, converts to bytes before saving)
+- Max age (input, days)
+- Max count (input)
+- Save + "Run Now" buttons
+
+**Scope:** 1 new service, 3 new DB methods + 1 migration, ~3 lines in `RecordingCaptureService`, extended routes, small config UI.
+
 ---
 
-## File Change Map
+### 6. History/Events View Cleanup
 
-### New Files
+**Current issues:**
+- `_onNavigateToSession` prop in `HistoryView` is prefixed with `_` (unused). Fixed by Feature 3.
+- Session rows are non-interactive. Fixed by Feature 3.
+- `EventsTab` lives in `GsdView` (correct conceptual home — keep it there).
+- Mobile accordion `max-h-[60vh]` on `MobileAccordionSection` is tight on phones. Bump to `max-h-[80vh]`.
 
-```
-src/
-├── client/
-│   ├── components/
-│   │   └── TerminalSearchOverlay.tsx     # Search input + Prev/Next/Close + match counter (Phase 20)
-│   └── hooks/
-│       └── useGlobalHotkeys.ts           # document keydown handler for all global shortcuts
-```
-
-### Modified Files
-
-```
-src/
-├── server/
-│   └── services/
-│       └── TerminalStreamService.ts      # SharedPtySession: add hasPermissionPrompt boolean
-│                                         # ptyProcess.onData: permission regex tap
-│                                         # setupSocketInputHandlers: clear flag on terminal:input
-│                                         # emit terminal:permission_prompt event
-├── client/
-│   ├── App.tsx                           # Mount useGlobalHotkeys
-│                                         # Call useAgentLiveStatus
-│                                         # Derive selectedLiveStatus from selectedInstance
-│                                         # Pass contextPressure+contextPressureLevel+agentState to TerminalView
-│                                         # Collect hasPermissionPrompt from useTerminalSocket (via tab state)
-│                                         # Pass permissionBadgeSessions to InstanceTabBar
-│   ├── components/
-│   │   ├── TerminalView.tsx              # import @xterm/addon-search
-│                                         # Add searchAddonRef, isSearchOpen state
-│                                         # Load SearchAddon in terminal init useEffect
-│                                         # Add props: contextPressure, contextPressureLevel, agentState
-│                                         # Render: context pressure badge + agent state chip in header
-│                                         # Render: <TerminalSearchOverlay> when isSearchOpen
-│                                         # document keydown handler for Ctrl+F
-│   │   └── InstanceTabBar.tsx            # Accept permissionBadgeSessions prop
-│                                         # Render red badge dot on matching tabs
-│   └── hooks/
-│       └── useTerminalSocket.ts          # Handle terminal:permission_prompt event
-│                                         # Expose hasPermissionPrompt in return value
-```
-
-**No changes needed to:**
-- `src/server/index.ts` — no new namespace or service initialization
-- `src/server/routes/gsdRoutes.ts` — `extractContextPressure()` and live-status endpoint unchanged
-- `src/shared/gsdTypes.ts` — existing `AgentStateHint` and `PressureLevel` types are already correct
-- `src/client/hooks/useAgentLiveStatus.ts` — already returns the needed data
+**Scope:** CSS change in `HistoryView.tsx` (1 line). Prop rename fix is part of Feature 3.
 
 ---
 
 ## Data Flow Diagrams
 
-### Permission Prompt Detection Flow
+### Mobile Enter / Re-focus Flow
 
 ```
-PTY output arrives at TerminalStreamService
-    |
-    ├── PERMISSION_PROMPT_PATTERN.test(chunk)
-    │     |
-    │     true and !session.hasPermissionPrompt
-    │     |
-    │     ├── session.hasPermissionPrompt = true
-    │     └── socket.emit('terminal:permission_prompt', { sessionName, detected: true })
-    │           |
-    │           v
-    │     useTerminalSocket receives event
-    │           |
-    │           v
-    │     setHasPermissionPrompt(true) (per-session local state)
-    │           |
-    │           v
-    │     App.tsx collects into permissionBadgeSessions Set
-    │           |
-    │           v
-    │     InstanceTabBar renders red badge dot on tab
-    │           |
-    │     [browser tab not focused? → Phase 20 Notification API]
-    │
-    └── Fan-out terminal:output to all subscribers (UNCHANGED)
-
-Operator presses key in terminal
-    |
-    v
-terminal:input event → TerminalStreamService.setupSocketInputHandlers
-    |
-    └── session.hasPermissionPrompt = false
-         └── socket.emit('terminal:permission_prompt', { sessionName, detected: false })
-              |
-              v
-         useTerminalSocket → setHasPermissionPrompt(false)
-              |
-              v
-         Badge removed from InstanceTabBar tab
+User taps Enter button on mobile toolbar
+  onTouchStart fires:
+    event.preventDefault()            → prevents browser from shifting focus
+    sendInput('\r')                   → Socket.IO terminal:input to PTY
+    onAfterInput?.()                  → [NEW] calls terminalInstanceRef.current?.focus()
+    terminal.focus()                  → xterm.js re-claims focus synchronously
+    iOS soft keyboard stays open
 ```
 
-### Context Pressure Surfacing Flow
+### Clickable Session Navigation Flow
 
 ```
-[EXISTING — runs every 5s]
-useAgentLiveStatus polls GET /api/gsd/agents/live-status
-    |
-    v
-Server: execFileAsync('tmux', ['capture-pane', ...])
-    → extractContextPressure(stdout)
-    → { contextPressure: 73, contextPressureLevel: 'warning' }
-    |
-    v
-useAgentLiveStatus returns Map<agentId, AgentLiveStatus>
+User taps session row in SessionHistory
+  onClick(session: AgentInstance)
+  → onSessionClick(session) [new prop]
+  → HistoryView passes to App.tsx
+  → App.tsx handleHistorySessionClick(session):
 
-[NEW wiring in App.tsx]
-selectedInstance = activeInstances.find(i => i.tmuxSessionName === selectedSessionName)
-selectedLiveStatus = liveStatusMap.get(selectedInstance?.agentId)
-    |
-    v
-<TerminalView contextPressure={73} contextPressureLevel="warning" />
-    |
-    v
-TerminalView header renders: [73% ctx] with amber color
+      session.status in ['active', 'idle']:
+        selectSession(session.tmuxSessionName) + setCurrentView('terminals')
+        → xterm.js terminal shows live session
+
+      session.status in ['stopped', 'error']:
+        recordingsList.find(r => r.sessionName === session.tmuxSessionName)
+          match found:
+            setActiveRecording(recording) + setCurrentView('recordings')
+            → RecordingPlayer renders with that recording
+          no match:
+            selectSession(session.tmuxSessionName) + setCurrentView('terminals')
+            → TerminalView shows "Session stopped" overlay
 ```
 
-### Terminal Search Flow
+### Auto-Record Start Flow
 
 ```
-Operator presses Ctrl+F
-    |
-    v
-document keydown handler in TerminalView (or useGlobalHotkeys)
-    → event.preventDefault()
-    → setIsSearchOpen(true)
-    |
-    v
-<TerminalSearchOverlay searchAddon={searchAddonRef.current} />
-renders at top of terminal canvas
+Client connects to socket → TerminalStreamService
+  session is new (no existing PTY):
+    ptyProcess = pty.spawn('tmux', ['attach-session', '-t', sessionName], ...)
+    agentId = sessionName.split('-')[0]         // extract from naming convention
+    [NEW] AutoRecordConfigService.shouldRecord(sessionName, agentId)
+      trigger_mode = 'on_session_start' OR
+      trigger_mode = 'on_agent_ids' AND agentId in agentIds list:
+        → RecordingCaptureService.startRecording({ sessionName, agentId, cols, rows })
+        → DB inserts recording row (started_at, file_path)
+        → PTY onData tap already wired → captureOutput() fills frameBuffer
+      trigger_mode = 'manual': no-op
 
-Operator types search term
-    |
-    v
-TerminalSearchOverlay onChange → searchAddon.findNext(term, { incremental: true })
-    |
-    v
-@xterm/addon-search highlights matches in xterm.js buffer
-Overview ruler markers appear in right-side scrollbar gutter (built-in)
+Client receives 'terminal:reset' and begins receiving PTY output (unchanged)
+```
 
-Operator presses Escape
-    |
-    v
-TerminalSearchOverlay onClose → setIsSearchOpen(false)
-    → terminal.focus() (restore focus to terminal canvas)
+### Storage Rotation Flow
+
+```
+RecordingCaptureService.stopRecording(sessionName, reason)
+  writeAsciicastFile(recording)              // write .cast to disk
+  database.finaliseRecording(id, { ... })   // update row with size + duration
+  setImmediate(() => {                       // [NEW] fire-and-forget
+    RecordingRotationService.runRotation()
+      [Age check] getRecordingsOlderThan(maxAgeDays)
+        → fs.unlinkSync(filePath) + database.deleteRecording(id) for each
+      [Count check] countFinishedRecordings() > maxCount
+        → getOldestFinishedRecordings(excess count)
+        → fs.unlinkSync + deleteRecording for each
+      [Size check] loop while getTotalRecordingStorageBytes() > maxStorageBytes
+        → getOldestFinishedRecordings(10)
+        → fs.unlinkSync + deleteRecording for each
+  })
 ```
 
 ---
 
-## Build Order
+## New vs Modified: Explicit Inventory
 
-Build order respects dependencies: shared types first, server modifications second (backend testable independently), then client additions.
+### New Files
 
-### Step 1: TerminalStreamService modification (backend only)
+| File | Purpose |
+|------|---------|
+| `src/server/services/AutoRecordConfigService.ts` | Singleton config for auto-record trigger mode + agent IDs; `shouldRecord()` method |
+| `src/server/services/RecordingRotationService.ts` | Prune recordings by size/age/count; called fire-and-forget after each stop |
+| `src/server/routes/autoRecordRoutes.ts` | `GET /PUT /api/auto-record/config` |
 
-Add `hasPermissionPrompt: boolean` to `SharedPtySession`. Add regex tap in `onData`. Add `terminal:permission_prompt` emit. Add clear on `terminal:input`.
+### Modified Files
 
-**Verify:** `npm run dev` starts without TypeScript errors. Test with a manual tmux session that echoes permission-like text; confirm event fires via browser DevTools Network/Socket panel.
+| File | Change | Estimated Lines |
+|------|--------|-----------------|
+| `src/client/components/TerminalView.tsx` | Add Enter to `MOBILE_KEYS`; add `onAfterInput` prop + stable callback; wire to all toolbar buttons | ~12 |
+| `src/client/components/SessionHistory.tsx` | Add `onSessionClick` prop; make rows `role="button"` with click + keydown | ~20 |
+| `src/client/components/HistoryView.tsx` | Remove `_` prefix from `onNavigateToSession`; route `onSessionClick` to App; CSS tweak | ~8 |
+| `src/client/components/RecordingLibrary.tsx` | Add auto-record + rotation config UI sections | ~60 |
+| `src/client/App.tsx` | `handleHistorySessionClick` routing; fetch recordings list for lookup | ~35 |
+| `src/server/services/RecordingCaptureService.ts` | Call `RecordingRotationService.runRotation()` in `setImmediate` after `stopRecording` | ~5 |
+| `src/server/services/TerminalStreamService.ts` | Extract `agentId` from `sessionName`; call `AutoRecordConfigService.shouldRecord()`; start recording if true | ~15 |
+| `src/server/routes/recordingRoutes.ts` | Add rotation config endpoints (`GET/PUT /api/recordings/rotation-config`, `POST /api/recordings/rotate`) | ~40 |
+| `src/server/database/DatabaseConnection.ts` | Add migrations for `auto_record_config` and `recording_rotation_config`; add 4 new query methods | ~60 |
+| `src/server/index.ts` | Mount `autoRecordRoutes`; instantiate and export new services | ~6 |
 
-### Step 2: useTerminalSocket modification (client, depends on Step 1)
+### No New Shared Types Required
 
-Add `terminal:permission_prompt` event handler. Expose `hasPermissionPrompt` in return value.
-
-**Verify:** Browser console logs permission prompt events when test pattern is triggered.
-
-### Step 3: InstanceTabBar + App.tsx badge wiring (client, depends on Step 2)
-
-Add `permissionBadgeSessions` prop to `InstanceTabBar`. Wire collection in `App.tsx`. Render badge dot.
-
-**Verify:** Badge appears on tab when permission prompt event fires. Badge disappears on next keypress.
-
-### Step 4: Context pressure badge + agent state chip in TerminalView (client)
-
-Add `contextPressure`, `contextPressureLevel`, `agentState` props to `TerminalView`. Render in header bar. Wire `useAgentLiveStatus` in `App.tsx`.
-
-**Verify:** Terminal header shows percentage with correct color. Updates every 5s as GSD live-status polls.
-
-### Step 5: @xterm/addon-search installation + TerminalSearchOverlay (client)
-
-```bash
-npm install -D @xterm/addon-search
-```
-
-Create `TerminalSearchOverlay.tsx`. Load `SearchAddon` in `TerminalView` init block. Wire Ctrl+F keydown. Render overlay conditionally.
-
-**Verify:** Ctrl+F opens overlay. Typing highlights matches. Next/Prev navigate. Escape closes and refocuses terminal.
-
-### Step 6: useGlobalHotkeys + App.tsx wiring (client, depends on nothing)
-
-Create `useGlobalHotkeys.ts`. Mount in `App.tsx` with session list and callbacks.
-
-**Verify:** Ctrl+1 navigates to first session tab. Alt+Right cycles forward. Ctrl+B toggles sidebar. None of these fire when typing in text inputs.
+All new data shapes (config objects) are simple enough to type inline in route files and components. No additions to `src/shared/types.ts` are necessary for v3.2.
 
 ---
 
-## Architectural Patterns
+## Recommended Build Order
 
-### Pattern 1: PTY Tap via onData Callback
+Build order driven by: (1) server changes before client consumption, (2) independent features parallizable, (3) rotation safe to build after auto-record is verified.
 
-**What:** Inspect PTY output chunks inside `TerminalStreamService.ptyProcess.onData()` before or alongside the existing fan-out to subscribers.
+**Phase 1 — Toolbar fixes (zero dependencies, ship first)**
 
-**When to use:** Any server-side detection that needs to react to raw terminal byte streams. Already established by the `setImmediate` tap in earlier phases.
+Step 1: Add Enter to `MOBILE_KEYS` constant — 1 line, verifiable on mobile immediately.
+Step 2: Add `onAfterInput` prop + wire to all toolbar buttons in `MobileKeyToolbar`.
 
-**Trade-offs:** Detection runs on every PTY data chunk (potentially high-frequency). Keep the regex test cheap — avoid stateful parsers. The `!session.hasPermissionPrompt` guard prevents repeated events on subsequent matching chunks.
+Rationale: Client-only. No API changes. Zero risk of breaking existing behavior. Can be tested immediately on iOS without any server changes.
 
-**Example:**
+**Phase 2 — Clickable history sessions (client-only)**
+
+Step 3: `SessionHistory.tsx` — add `onSessionClick` prop; make rows `role="button"` with handler.
+Step 4: `HistoryView.tsx` — remove `_` prefix, wire `onSessionClick` up.
+Step 5: `App.tsx` — add recordings list fetch; implement `handleHistorySessionClick`.
+
+Rationale: Client-only. The recording lookup works against the existing `GET /api/recordings` endpoint. No server changes. Can be tested against real session data immediately.
+
+**Phase 3 — Auto-record config service and triggers**
+
+Step 6: `DatabaseConnection.ts` migration — `auto_record_config` table.
+Step 7: `AutoRecordConfigService.ts` — read/write/query.
+Step 8: `autoRecordRoutes.ts` — REST endpoints.
+Step 9: `src/server/index.ts` — mount routes, wire service.
+Step 10: `TerminalStreamService.ts` — hook point after PTY spawn.
+Step 11: `RecordingLibrary.tsx` — auto-record settings UI.
+
+Rationale: Server migration first, then service, then route, then hook point, then UI. The `TerminalStreamService` change is additive (no existing code removed). Safe to ship with `trigger_mode = 'manual'` default so existing behavior is unchanged.
+
+**Phase 4 — Storage rotation (build after auto-record so rotation has recordings to prune)**
+
+Step 12: `DatabaseConnection.ts` migration — `recording_rotation_config` table + 4 new query methods.
+Step 13: `RecordingRotationService.ts` — pruning algorithm.
+Step 14: `RecordingCaptureService.ts` — fire-and-forget call after stop.
+Step 15: `recordingRoutes.ts` — rotation config endpoints.
+Step 16: `RecordingLibrary.tsx` — rotation config UI.
+
+Rationale: With auto-record running for a day first, there will be real recordings to test rotation against. The rotation config defaults to all-zeros (all policies disabled), so shipping Step 14 before the config UI is safe.
+
+---
+
+## Architecture Patterns to Follow
+
+### Pattern 1: Singleton Row Config (budget_config precedent)
+
+**What:** Store a single-row config in SQLite using `CHECK (id = 1)` constraint with upsert.
+**When to use:** Any global-scope Warden configuration needing persistence across restarts.
+**Existing precedent:** `budget_config` table in `DatabaseConnection.ts`.
+
 ```typescript
-ptyProcess.onData((chunk: string) => {
-  if (PERMISSION_PROMPT_PATTERN.test(chunk) && !session.hasPermissionPrompt) {
-    session.hasPermissionPrompt = true;
-    // emit to subscribers
+this.db.prepare(`
+  INSERT INTO auto_record_config (id, trigger_mode, agent_ids)
+  VALUES (1, @triggerMode, @agentIds)
+  ON CONFLICT(id) DO UPDATE SET
+    trigger_mode = excluded.trigger_mode,
+    agent_ids = excluded.agent_ids,
+    updated_at = CURRENT_TIMESTAMP
+`).run({ triggerMode, agentIds: JSON.stringify(agentIds) });
+```
+
+### Pattern 2: onTouchStart + preventDefault for Mobile Toolbar Buttons
+
+**What:** Use `onTouchStart` (not `onClick`) with `event.preventDefault()` for all mobile toolbar buttons.
+**When to use:** Every button in `MobileKeyToolbar`, including the new Enter button.
+**Why not onClick:** `onClick` fires after `touchend`, by which point iOS has already decided to dismiss the keyboard. `onTouchStart` fires before that decision.
+
+```tsx
+onTouchStart={(event) => {
+  event.preventDefault();   // prevent focus shift
+  sendInput(key.seq);
+  onAfterInput?.();         // re-focus xterm synchronously
+}}
+```
+
+### Pattern 3: Fire-and-Forget Service Call with setImmediate
+
+**What:** Use `setImmediate()` to defer non-critical work after a synchronous operation completes.
+**When to use:** Rotation after recording stop — should not block the stop response.
+**Existing precedent:** The recording tap in `TerminalStreamService.onData` is also a zero-overhead side effect.
+
+```typescript
+setImmediate(() => {
+  try {
+    recordingRotationService.runRotation();
+  } catch (error) {
+    console.warn('[RecordingCapture] Rotation failed:', error);
   }
-  // existing fan-out unchanged
 });
 ```
 
-### Pattern 2: Callback Ref Stability in Hooks
+### Pattern 4: Stable Callbacks via useCallback + ref for React.memo Boundaries
 
-**What:** Store callbacks in a `useRef` and assign `ref.current = callback` in the render body. The `useEffect` only references the ref, not the callback directly, so callbacks can change without triggering effect re-runs.
+**What:** Any new callback passed into `TerminalView` must be stable — `useCallback` with no deps (reading from a ref internally), not an inline arrow function.
+**When to use:** The `onAfterInput` callback added to `MobileKeyToolbar` via `TerminalView`.
+**Existing precedent:** `handleRestartSelectedInstance` in `App.tsx` uses a ref to avoid TerminalView re-renders.
 
-**When to use:** Any hook that sets up a long-lived listener (event listener, Socket.IO subscription) where the callback may change identity between renders. Already used in `useTerminalSocket` for `onTerminalOutput`, `onTerminalReset`, `onSessionExit`.
+```typescript
+// Stable — reads terminalInstanceRef (a ref, not reactive)
+const handleAfterMobileInput = useCallback(() => {
+  terminalInstanceRef.current?.focus();
+}, []);
+```
 
-**Apply to:** `useGlobalHotkeys` (callbacks ref pattern keeps the `document` event listener from being torn down and re-added on every render).
+### Pattern 5: Accessible Row Buttons (EventsTab precedent)
 
-### Pattern 3: Props-Down for Cross-Component Data
+**What:** Interactive list rows use `role="button"`, `tabIndex={0}`, and `onKeyDown` for Enter/Space.
+**When to use:** Any list row that gains click-to-navigate behavior (SessionHistory rows).
+**Existing precedent:** `EventsTab.tsx` event rows already implement this correctly.
 
-**What:** Data computed in `App.tsx` (from hooks) is passed down as props to child components (`TerminalView`, `InstanceTabBar`). No shared state store, no context.
-
-**When to use:** Data flows from one parent to specific children. The project's existing approach — `App.tsx` orchestrates all state, components receive props.
-
-**Apply to:** `contextPressure` / `agentState` passed into `TerminalView`, `permissionBadgeSessions` passed into `InstanceTabBar`.
-
-**Avoid:** Adding React Context or a state manager for this data — it is not shared across multiple unrelated component trees.
+```tsx
+<div
+  role="button"
+  tabIndex={0}
+  onClick={() => onSessionClick?.(session)}
+  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onSessionClick?.(session); }}
+  className="... cursor-pointer ..."
+>
+```
 
 ---
 
 ## Anti-Patterns to Avoid
 
-### Anti-Pattern 1: Detecting Permission Prompts with tmux capture-pane Poll
+### Anti-Pattern 1: Calling terminal.focus() in rAF or setTimeout After Toolbar Tap
 
-**What people do:** Poll `GET /api/gsd/agents/live-status` and add permission-prompt detection to `detectAgentState()` server-side, surfacing it via the live-status response.
+**What people do:** `requestAnimationFrame(() => terminal.focus())` or `setTimeout(() => terminal.focus(), 0)`.
+**Why it's wrong:** On iOS, the browser evaluates keyboard dismissal before the next frame. By the time rAF fires, the dismiss decision has already been made.
+**Do this instead:** Call `terminal.focus()` synchronously inside the `onTouchStart` handler, after `sendInput`.
 
-**Why it's wrong:** `detectAgentState()` already does this (it matches `permission|allow|dangerous` and returns `'permission_prompt'`), but it runs on a 5-second polling cycle. Permission prompt detection must be near-real-time (within 5 seconds per spec). The PTY `onData` tap fires within milliseconds of the output arriving. Using the poll-based path would require the badge to wait up to 5 seconds and would fire unreliably depending on poll timing.
+### Anti-Pattern 2: Blocking PTY onData for Rotation or Config Reads
 
-**Do this instead:** Detect via PTY tap in `TerminalStreamService.onData()` and emit a Socket.IO event. The live-status `state` field can still show `'permission_prompt'` for the GSD Agents tab — it is a separate signal for a different consumer.
+**What people do:** Running `runRotation()` synchronously inside the PTY's `onData` callback or `stopRecording`.
+**Why it's wrong:** `stopRecording` is called from `ptyProcess.onExit` which is on the node-pty callback chain. Blocking here delays all subsequent PTY processing.
+**Do this instead:** Use `setImmediate()` to defer rotation out of the callback.
 
-### Anti-Pattern 2: Loading SearchAddon Outside the Terminal Init useEffect
+### Anti-Pattern 3: Writing Warden Config to openclaw.json
 
-**What people do:** Create `new SearchAddon()` at module scope or in a separate `useEffect`, then try to call `terminal.loadAddon(searchAddon)` after the terminal has been created.
+**What people do:** Store auto-record or rotation config in `~/.openclaw/openclaw.json`.
+**Why it's wrong:** `openclaw.json` is read-only from Warden's perspective (`OpenClawConfigReader` only reads it, does not write). It is owned by the OpenClaw ecosystem.
+**Do this instead:** Use SQLite singleton-row pattern (as done for `budget_config`).
 
-**Why it's wrong:** `terminal.loadAddon()` must be called before `terminal.open()`, or the addon's decorations may not be properly registered. `TerminalView` initializes the terminal in a single `useEffect` — all addons must be loaded within that same effect.
+### Anti-Pattern 4: Adding onClick Without Keyboard Support to Session Rows
 
-**Do this instead:** Create `SearchAddon` inside the terminal init `useEffect`, call `terminal.loadAddon(searchAddon)` alongside `FitAddon` and `WebLinksAddon`, and store the instance in a `searchAddonRef`.
+**What people do:** Only wire `onClick`, no `onKeyDown`.
+**Why it's wrong:** Keyboard-only users and accessibility tooling cannot activate the row.
+**Do this instead:** Follow the `EventsTab.tsx` row pattern — `role="button"`, `tabIndex={0}`, `onKeyDown` for Enter/Space.
 
-### Anti-Pattern 3: Intercepting Ctrl+F Before Checking Terminal Focus
+### Anti-Pattern 5: Deleting Recordings Synchronously in a Loop Without Checking Existence
 
-**What people do:** Add `document.addEventListener('keydown', ...)` that captures `Ctrl+F` globally without checking whether the search overlay is already open or whether focus is in another input.
+**What people do:** Iterating over a list of recordings to delete and calling `fs.unlinkSync` without first checking `fs.existsSync`.
+**Why it's wrong:** If a file was already deleted manually (or a previous rotation run failed midway), `unlinkSync` throws `ENOENT` which surfaces as an unhandled exception.
+**Do this instead:** Use try/catch around `fs.unlinkSync`, log the error, and continue. The DB row should be deleted regardless of whether the file existed.
 
-**Why it's wrong:** If `isSearchOpen` is already true, toggling it closed on a second Ctrl+F is unexpected behavior. If focus is in `PromptPanel`'s textarea, Ctrl+F should open the browser's built-in find dialog (or do nothing for the textarea), not open the terminal search overlay.
+---
 
-**Do this instead:** Check `isSearchOpen` before acting on Ctrl+F. Check `event.target` for input elements before handling any shortcut. The terminal canvas is a `<div>`, not an `<input>`, so the focus guard naturally excludes the prompt textarea and other inputs.
+## Integration Boundaries Summary
 
-### Anti-Pattern 4: Forgetting to Refocus Terminal After Search Close
-
-**What people do:** Close the search overlay but leave focus on the overlay's input field, which is about to be unmounted.
-
-**Why it's wrong:** After unmounting a focused DOM element, focus is lost entirely (goes to `document.body`). The operator then has to click on the terminal to resume typing.
-
-**Do this instead:** In `TerminalSearchOverlay.onClose()` and the Escape keydown handler, call `terminalInstanceRef.current?.focus()` after setting `isSearchOpen(false)`. A `requestAnimationFrame` delay ensures the overlay is unmounted before focus is moved.
-
-### Anti-Pattern 5: Passing Session Index to useGlobalHotkeys as State
-
-**What people do:** Compute `selectedIndex` in `App.tsx` and pass it to `useGlobalHotkeys` as a dependency, causing the hook's effect to re-run (and the event listener to be torn down and re-added) on every tab switch.
-
-**Why it's wrong:** The event listener should be registered once. Adding it as a dep causes churn.
-
-**Do this instead:** Use the callback ref pattern. `sessions` and all callbacks are stored in a `useRef` inside `useGlobalHotkeys` and updated on every render without triggering the effect. The event listener is registered once in `useEffect` with empty deps `[]`.
+| Boundary | Communication | Notes |
+|----------|---------------|-------|
+| `MobileKeyToolbar` ↔ `TerminalView` | Props (`sendInput`, new `onAfterInput`) | Keep `terminalInstanceRef` private to `TerminalView` — do not pass it down |
+| `SessionHistory` ↔ `HistoryView` ↔ `App.tsx` | Props (callback chain) | `onSessionClick(session)` bubbles up unchanged; navigation logic lives in `App.tsx` only |
+| `App.tsx` ↔ recordings for lookup | `GET /api/recordings` fetch at App level | Small list, fetch once on mount; re-fetch after `onRecordingComplete` |
+| `TerminalStreamService` ↔ `AutoRecordConfigService` | Direct synchronous method call at PTY spawn | `shouldRecord()` is pure/fast; no await needed |
+| `RecordingCaptureService` ↔ `RecordingRotationService` | `setImmediate` fire-and-forget after `stopRecording` | Wrapped in try/catch; failures are logged and non-fatal |
+| `RecordingRotationService` ↔ `DatabaseConnection` | Direct synchronous calls (better-sqlite3) | 4 new query methods on `DatabaseConnection` |
+| `AutoRecordConfigService` ↔ `DatabaseConnection` | Direct synchronous calls | Singleton row reads/writes |
+| Client ↔ `AutoRecordConfigService` | REST `GET/PUT /api/auto-record/config` | JSON body, no real-time subscription needed |
+| Client ↔ rotation config | REST `GET/PUT /api/recordings/rotation-config` | Extend `recordingRoutes.ts` (or new file) |
 
 ---
 
 ## Scaling Considerations
 
-This is a single-operator dashboard. Scaling concerns are minimal.
+This is a single-operator dashboard. These considerations are informational only.
 
 | Concern | Approach |
 |---------|----------|
-| PTY tap performance | Regex test per chunk is O(n) on chunk length, ~microseconds. Negligible at < 10 concurrent sessions. |
-| Permission prompt false positives | Broad initial regex is acceptable for Phase 19. Tighten in Phase 20 after observing real Claude Code output. |
-| Multiple browser tabs with search open | Each tab has its own xterm.js instance and `SearchAddon` — fully independent. No coordination needed. |
-| useAgentLiveStatus poll frequency | Already 5s. Context pressure badge updates at this cadence — acceptable. No change needed. |
-| Notification API permission request | Request is shown at most once (browser remembers the answer). No server-side component. |
+| Rotation loop blocking | `setImmediate` defers out of PTY callback chain; SQLite queries are synchronous but fast (small table) |
+| Auto-record storage growth | Rotation policy caps it; default is all-zeros (unlimited) — operator must configure |
+| Re-focus on non-iOS | Desktop browsers: `terminal.focus()` after toolbar tap is a no-op since keyboard is always visible; safe |
+| Concurrent rotation runs | `runRotation()` is synchronous (better-sqlite3); no concurrency risk |
+| SessionHistory recording lookup | Linear scan of recordings list is fine for < 1,000 recordings |
 
 ---
 
 ## Sources
 
-All findings from direct codebase inspection (HIGH confidence) and npm registry (HIGH confidence):
+All findings from direct source code analysis (HIGH confidence):
 
-- `src/server/services/TerminalStreamService.ts` — `SharedPtySession` interface, `onData` broadcast loop, `setupSocketInputHandlers` pattern
-- `src/client/components/TerminalView.tsx` — addon loading in init `useEffect`, existing header bar structure, `FitAddon`/`WebLinksAddon` loading pattern
-- `src/client/hooks/useTerminalSocket.ts` — callback ref stability pattern, `terminal:reset`/`terminal:exit` event handling
-- `src/client/hooks/useAgentLiveStatus.ts` — existing data shape `{ contextPressure, contextPressureLevel, state }`
-- `src/server/routes/gsdRoutes.ts` — `extractContextPressure()` implementation, live-status endpoint
-- `src/shared/gsdTypes.ts` — `AgentStateHint`, `PressureLevel` types already defined and correct
-- `src/client/App.tsx` — `useSessionSelection`, `activeInstances` derivation, `selectedInstance` lookup pattern, `showSidebar` state
-- `src/client/components/InstanceTabBar.tsx` — tab rendering structure, badge insertion point
-- `package.json` — confirmed `@xterm/addon-fit@^0.10.0`, `@xterm/addon-web-links@^0.11.0` as devDependencies
-- npm registry: `@xterm/addon-search@0.16.0` — latest stable, requires xterm.js v4+, compatible with v5.3.0 [MEDIUM confidence — verified via `npm info` but not installed and integration-tested]
-- `.planning/milestones/v3.0-SCOPE.md` — feature specifications and technical notes
+- `src/client/components/TerminalView.tsx` — `MOBILE_KEYS` constant, `MobileKeyToolbar` props, `onTouchStart` pattern, `terminalInstanceRef`, `handleAfterMobileInput` hook point
+- `src/client/components/SessionHistory.tsx` — row structure, absence of click handlers, `AgentInstance` data shape
+- `src/client/components/HistoryView.tsx` — `_onNavigateToSession` unused prop, `MobileAccordionSection` max-h CSS
+- `src/client/components/EventsTab.tsx` — accessible row pattern (`role="button"`, `tabIndex`, `onKeyDown`) to replicate in `SessionHistory`
+- `src/client/App.tsx` — view routing, `setActiveRecording`, `recordingLibraryRefreshKey`, stable callback patterns, `selectedInstanceRef` precedent
+- `src/server/services/TerminalStreamService.ts` — PTY spawn branch (`pty.spawn`), `onData` tap for recording, `recordingCaptureService.captureOutput()` call
+- `src/server/services/RecordingCaptureService.ts` — `stopRecording()` control flow, `writeAsciicastFile()`, `database.finaliseRecording()` call
+- `src/server/database/DatabaseConnection.ts` — `budget_config` singleton-row migration pattern, `deleteRecording()` method, `recordings` table schema
+- `src/server/routes/recordingRoutes.ts` — existing recording endpoints, `DELETE` implementation pattern for file + DB row
+- `src/shared/types.ts` — `RecordingEntry` interface, `AgentInstance` interface
+- `.planning/PROJECT.md` — v3.2 milestone scope, constraints, out-of-scope items
 
 ---
 
-*Architecture research for: Warden v3.0 Operator Awareness & Terminal Power Tools*
-*Researched: 2026-03-03*
+*Architecture research for: Warden v3.2 — mobile toolbar, clickable history, auto-record, storage rotation*
+*Researched: 2026-03-04*

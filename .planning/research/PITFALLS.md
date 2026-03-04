@@ -1,433 +1,234 @@
-# Pitfalls Research: Operator Awareness & Terminal Power Tools (v3.0)
+# Pitfalls Research
 
-**Domain:** Adding permission prompt detection, context pressure badges, terminal text search, keyboard navigation shortcuts, agent state chips, browser notifications, and search enhancements to an existing xterm.js 5 + Socket.IO 4 terminal dashboard
-**Researched:** 2026-03-03
-**Confidence:** HIGH — verified against xterm.js source, MDN, project source code, and GitHub issues
+**Domain:** Adding mobile toolbar fixes, auto-record triggers, storage rotation, and clickable history to existing Warden dashboard (v3.2)
+**Researched:** 2026-03-04
+**Confidence:** HIGH — based on reading full codebase + cross-referencing xterm.js issue tracker, MDN, prior phase research
 
 ---
 
 ## Critical Pitfalls
 
-### Pitfall 1: xterm.js onData Fires Even After attachCustomKeyEventHandler Returns False
+### Pitfall 1: iOS Safari Dismisses Soft Keyboard When Toolbar Button Is Tapped
 
 **What goes wrong:**
-`terminal.attachCustomKeyEventHandler(handler)` is the documented way to intercept keys before xterm.js processes them. When the handler returns `false`, xterm.js is supposed to suppress the event. However, there is a documented edge case (xterm.js issue #2293) where `keyup` events are still processed even when the custom handler returned `false` for the corresponding `keydown`. More importantly: the `onData` event fires based on the OS-level character input, not purely on `attachCustomKeyEventHandler` — so returning `false` suppresses xterm.js default handling (sending the character to the PTY via `terminal.onData`) but does NOT prevent browser default behavior unless you also call `event.preventDefault()`.
-
-The practical consequence for the Ctrl+F search overlay: if the handler returns `false` but does not call `event.preventDefault()`, the browser may open its own native find bar simultaneously with the custom search overlay.
+Tapping any toolbar button (Tab, Ctrl+C, arrows, the new Enter button) collapses the iOS soft keyboard. No amount of `terminal.focus()` in the button handler brings it back. The operator expects to tap a key, the input is sent, and the keyboard stays open for continued typing. Instead, the keyboard disappears and they must tap the terminal area again to restore it — making the toolbar nearly unusable on iPhone.
 
 **Why it happens:**
-Developers read "returns whether the event should be processed by xterm.js" and assume `false` is sufficient. The xterm.js docs do not prominently state that browser default behavior is a separate concern requiring `event.preventDefault()`.
+iOS Safari only shows the soft keyboard in response to a trusted user gesture on a focusable element. xterm.js receives input through a hidden `<textarea class="xterm-helper-textarea">` positioned off-screen. When a toolbar button is tapped:
+
+1. The browser briefly transfers focus to the button (keyboard starts to close)
+2. The button's `onTouchStart` handler fires with `event.preventDefault()` (prevents the click, prevents default refocus)
+3. The handler calls `sendInput(seq)` and then `terminal.focus()` to restore focus
+
+The problem is that `terminal.focus()` routes through xterm.js's internal focus dispatch, which ends up calling `.focus()` on the terminal container `<div>` — not the `xterm-helper-textarea` directly. iOS requires the `<textarea>` itself to be focused synchronously within the original gesture event to keep the keyboard open. Calling `focus()` on a div, or after any async hop, does not satisfy this requirement.
 
 **How to avoid:**
-In `attachCustomKeyEventHandler`, for every key you intercept:
-1. Call `event.preventDefault()` on the KeyboardEvent object (prevents browser default)
-2. Return `false` (prevents xterm.js default — stops sending the character to PTY via onData)
+Access `terminal.textarea` directly (xterm.js 5 exposes it as a public getter on `Terminal`) and call `.focus()` synchronously inside the same `onTouchStart` handler, before any other action:
 
 ```typescript
-terminal.attachCustomKeyEventHandler((event: KeyboardEvent) => {
-  if (event.type === 'keydown') {
-    // Ctrl+F → open search overlay
-    if (event.ctrlKey && event.key === 'f') {
-      event.preventDefault();
-      openSearchOverlay();
-      return false; // stop xterm.js from sending ^F to PTY
-    }
-    // Escape when search is open → close overlay, restore terminal focus
-    if (event.key === 'Escape' && searchOverlayOpen) {
-      event.preventDefault();
-      closeSearchOverlay();
-      return false;
-    }
-  }
-  return true; // let all other keys pass through to terminal
-});
+// MobileKeyToolbar receives terminalRef: React.MutableRefObject<Terminal | null>
+onTouchStart={(event) => {
+  event.preventDefault();
+  // Focus the xterm hidden textarea synchronously — this is the iOS-compatible path
+  terminalRef.current?.textarea?.focus();
+  sendInput(key.seq);
+}}
 ```
 
+The `terminalRef` must be passed from `TerminalView` where `terminalInstanceRef.current` is accessible. This is a one-line addition to each button in `MobileKeyToolbar`. The `terminal.textarea` property is `HTMLTextAreaElement | undefined` — check for existence before calling `.focus()`.
+
+Do NOT use `requestAnimationFrame` or `setTimeout` wrappers — any async hop breaks the iOS user-gesture requirement.
+
 **Warning signs:**
-- Browser native find bar opens when pressing Ctrl+F in the terminal
-- The Ctrl+F character (`\x06`) appears in the terminal output when search should have been triggered
-- Tab navigation shortcuts (e.g., Alt+1 through Alt+5) are typed into the PTY as escape sequences
+- Keyboard collapses after tapping any toolbar button on a real iPhone (not simulator — simulator behaves differently)
+- Android works fine, only iOS exhibits the issue
+- `terminal.focus()` called in console shows no keyboard effect on iOS
 
 **Phase to address:**
-Phase 1 (keyboard shortcuts and Ctrl+F handler) — register the key handler at terminal initialization time in `TerminalView.tsx`'s `useEffect`. Must be established before any shortcut is wired.
+Phase covering mobile toolbar Enter button and keyboard persistence (first phase of v3.2). Include this in acceptance criteria: "after tapping Tab/Ctrl+C/arrows/Enter buttons on iOS, the keyboard remains visible."
 
 ---
 
-### Pitfall 2: Global document.addEventListener('keydown') Fires Even When Terminal Has Focus
+### Pitfall 2: Auto-Record Trigger Races the PTY onData Registration
 
 **What goes wrong:**
-Adding keyboard shortcuts (tab switching, sidebar toggle) via `document.addEventListener('keydown', handler)` in a React `useEffect` in `App.tsx` or a high-level component creates a conflict: the same event fires through two paths when the xterm.js terminal has focus. xterm.js captures keyboard input through its own canvas-level listeners and routes it to the PTY via `terminal.onData`. Then the `document.addEventListener` handler also fires, potentially triggering a tab switch mid-keystroke.
+When auto-record is configured to start on session creation, the recording start call reaches `RecordingCaptureService.startRecording()` before the PTY's `onData` callback is producing output. The first seconds of terminal output are dropped from the recording because `captureOutput()` is wired after `startRecording()` registers the session name in `activeRecordings` — but the PTY itself may not exist yet if no browser client has connected.
 
-The sequence: user presses `Alt+2` to jump to the second tab. The terminal's `onData` fires and sends the alt-sequence escape code `\x1b2` to the PTY. Then the global handler fires and switches tabs. Claude Code running in the terminal receives a spurious `\x1b2` escape.
-
-**Why it happens:**
-Keyboard events on the terminal canvas bubble up to `document`. The `attachCustomKeyEventHandler` only intercepts within xterm.js — it doesn't suppress bubbling. Without `event.stopPropagation()` in the xterm.js custom handler, global listeners see every key pressed in the terminal.
-
-**How to avoid:**
-Two-part solution:
-
-1. In `attachCustomKeyEventHandler`, for shortcuts that should be handled globally (tab switch, sidebar), also call `event.stopPropagation()`:
-```typescript
-terminal.attachCustomKeyEventHandler((event: KeyboardEvent) => {
-  if (event.type === 'keydown' && event.altKey && /^[1-9]$/.test(event.key)) {
-    event.preventDefault();
-    event.stopPropagation(); // prevent bubbling to document.addEventListener
-    selectTabByIndex(parseInt(event.key, 10) - 1);
-    return false;
-  }
-  return true;
-});
-```
-
-2. In the global `document.addEventListener('keydown', handler)`, check if the active element is inside the xterm.js container before acting:
-```typescript
-document.addEventListener('keydown', (event) => {
-  const activeEl = document.activeElement;
-  const isInsideTerminal = terminalContainerRef.current?.contains(activeEl);
-  if (isInsideTerminal) return; // terminal's attachCustomKeyEventHandler handles it
-  // ... handle shortcut
-});
-```
-
-Both guards must be in place. Either alone is insufficient because `document.activeElement` during canvas focus may point to `body`, not the canvas.
-
-**Warning signs:**
-- Tab switching shortcut also sends an escape sequence to the running process in the terminal
-- `Alt+number` in vim or htop triggers both a key action in the app AND a tab switch
-- Pressing Escape when search is open also sends ESC to the PTY
-
-**Phase to address:**
-Phase 1 (keyboard shortcuts) — the interaction between xterm.js key handling and document-level listeners is a design decision that must be established upfront. Retrofitting is messy.
-
----
-
-### Pitfall 3: Terminal Focus Lost When Search Overlay Input Field is Focused
-
-**What goes wrong:**
-When the search overlay appears with an `<input>` field and auto-focuses it, xterm.js loses focus. When the user closes the search overlay and expects to type in the terminal, the terminal may not have focus — meaning keystrokes either go nowhere or to the last-focused browser element. This is especially problematic if `terminal.focus()` is called inside a `setTimeout` or `requestAnimationFrame` that races with React re-renders.
-
-The existing `TerminalView.tsx` already has a working pattern for this: `requestAnimationFrame(() => terminalInstanceRef.current?.focus())` after copy mode toggle. The same pattern must be used when closing the search overlay.
+A more serious variant: auto-record is triggered from an external event (e.g. InstanceTracker detecting a new tmux session). At that moment, no Socket.IO client is connected, so no PTY exists in `TerminalStreamService`. The recording DB entry is created, `activeRecordings.set(sessionName, ...)` is called, but `captureOutput()` is never invoked because there is no PTY `onData` tap. When the client eventually connects and the PTY spawns, the 30-second keep-alive timer has not yet fired, but recording state is inconsistent — `isRecording()` returns true but the `frameBuffer` is empty. When the session ends, a 0-byte asciicast file is written to disk.
 
 **Why it happens:**
-React renders the search overlay and browser native focus management gives focus to the `<input>` automatically (via `autoFocus` prop or explicit `.focus()` in `useEffect`). When the overlay unmounts, the browser returns focus to `body` — not to the xterm.js terminal. The developer must explicitly restore it.
+`RecordingCaptureService` and `TerminalStreamService` are decoupled by design — capture is a "tap" on the PTY output stream. The tap only exists while a PTY is running. Auto-record triggered before PTY existence has no output channel.
 
-Additionally, xterm.js has an internal helper `textarea` element (class `xterm-helper-textarea`) that holds focus for xterm.js. If this element is positioned off-screen during a resize or layout transition when the search overlay opens, xterm.js may exhibit a rendering artifact (tracked in xterm.js issue #3065).
+Looking at `TerminalStreamService.attachSocketToSession()`: the sequence is:
+1. `socket.emit('terminal:reset')` — signal client to clear display
+2. `pty.spawn(...)` — create PTY process
+3. `ptyProcess.onData(...)` — register output tap (includes `captureOutput()` call)
+
+Any recording started before step 3 completes will miss all output produced in that window.
 
 **How to avoid:**
+Tie auto-record start to the PTY spawn event, not to the tmux session detection event. The only correct hook is inside `TerminalStreamService.attachSocketToSession()`, immediately after `ptyProcess.onData()` is registered:
+
 ```typescript
-const closeSearchOverlay = useCallback(() => {
-  setSearchOpen(false);
-  // Restore terminal focus after React finishes the re-render cycle
-  requestAnimationFrame(() => {
-    terminalInstanceRef.current?.focus();
+// In TerminalStreamService, after onData tap is live:
+ptyProcess.onData((terminalOutput: string) => {
+  // Broadcast to subscribers...
+  recordingCaptureService.captureOutput(session.sessionName, terminalOutput);
+});
+
+// Auto-record: check config AFTER onData is live — no race window
+if (shouldAutoRecord(params.sessionName)) {
+  recordingCaptureService.startRecordingIfNotActive({
+    sessionName: params.sessionName,
+    cols: params.cols,
+    rows: params.rows,
+    agentId: ...,
+    agentName: ...,
+    projectPath: ...,
   });
-}, []);
+}
 ```
 
-Also ensure the search input's `onKeyDown` handles `Escape` to close the overlay AND restore focus in one handler:
-```typescript
-<input
-  autoFocus
-  onKeyDown={(e) => {
-    if (e.key === 'Escape') {
-      e.stopPropagation(); // don't bubble to document
-      closeSearchOverlay();
-    }
-  }}
-/>
-```
+The `startRecordingIfNotActive()` method is a guard-wrapped version of `startRecording()` that no-ops if already recording.
+
+Do NOT trigger auto-record from:
+- `InstanceTracker` poll callbacks (no PTY guarantee)
+- Socket.IO connection event before PTY spawn completes
+- Any code path outside `TerminalStreamService`
 
 **Warning signs:**
-- After closing the search overlay, keyboard input is silently dropped (no PTY output)
-- `document.activeElement` is `body` after closing the overlay instead of the xterm canvas/textarea
-- Developers discover the bug only during UI testing because it requires focus state observation
+- Auto-recordings in the library show 0 bytes or 0 seconds duration
+- Replaying an auto-recording shows a blank terminal for the first 5-30 seconds
+- `stop_reason = 'session_ended'` in DB but `duration_secs = 0`
 
 **Phase to address:**
-Phase 1 (search overlay UI) — include focus restoration in the initial implementation. Easy to overlook during development (testing always starts with keyboard focus in the terminal).
+Auto-record feature phase. Acceptance criteria must include: "replay of auto-recorded session shows output from the first second of the session."
 
 ---
 
-### Pitfall 4: SearchAddon Highlight Performance Degrades Severely with Large PTY Buffers
+### Pitfall 3: Storage Rotation Deletes Files Being Streamed for Playback
 
 **What goes wrong:**
-`@xterm/addon-search` with decorations enabled (`ISearchDecorationOptions`) limits highlights to 1,000 matches by default. Exceeding this limit is silent — `onDidChangeResults` reports `resultIndex: -1` and `resultCount` shows the capped count. When you attempt to raise `highlightLimit` above 1,000, the profiling data from xterm.js issue #5176 shows catastrophic performance regression:
+The storage rotation job identifies `.cast` files exceeding the cap (oldest first, or by total directory size) and calls `fs.unlinkSync()` on them. At the same moment, another request is streaming the same file via `GET /api/recordings/:id/content` → `res.sendFile(entry.filePath)`. Express `sendFile` opens a file descriptor and streams chunks. On Linux, unlinking a file while it has an open fd allows the data to continue reading (the inode is not freed until all fds close), but the DB row is deleted atomically with the file — subsequent requests fail with 404 even though the player might still be mid-stream.
 
-- 72,960 matches → ~470ms blocking decoration time from marker creation alone
-- Event emitter creates 360,000 function allocations for 10,000 matches
-- GC pressure creates ~190ms pauses from anonymous arrow function churn
-- Deprecated `setTimeout`/`clearTimeout` calls add ~6.3 seconds overhead
-
-In Warden's context, agent terminals accumulate 50,000 lines of scrollback. A search for a common word like "error" or "the" could match thousands of times. With decorations enabled, the first search call blocks the browser's main thread.
+More critically: if rotation runs `database.deleteRecording(id)` BEFORE `fs.unlink()`, the DB entry is gone but the file persists on disk as an orphan. The opposite order (file deleted first, then DB row) causes the content route to return 404 for in-flight requests.
 
 **Why it happens:**
-The decoration system uses a linear marker-registration loop with synchronous event emitter notifications per match. This was designed for interactive editors where searches return dozens of results, not terminal scrollback buffers with arbitrarily large match counts.
+`deleteRecording()` currently does both operations in sequence (delete DB row, then delete file) without any concurrency guard. The `recordingRoutes.ts` `DELETE /api/recordings/:id` handler mirrors this. Rotation would use the same path. There is no locking between the rotation writer and the content reader.
 
 **How to avoid:**
-1. Use a two-step approach: `findNext`/`findPrevious` work without decorations and are fast (navigate only)
-2. Enable decorations only with a conservative `highlightLimit` (keep the default 1,000 or lower it to 500)
-3. Show match count via `onDidChangeResults` but clearly indicate "showing first 1,000 highlights" if count exceeds the limit
-4. For overview ruler markers (scrollbar gutter marks), leave decorations enabled at 1,000 — the performance at that count is acceptable
+Two-phase deletion:
+
+1. Add a `deletion_pending INTEGER DEFAULT 0` column to the `recordings` table.
+2. Rotation marks candidates as `deletion_pending = 1` first (one SQL UPDATE, fast).
+3. The `/api/recordings/:id/content` route checks `deletion_pending` and returns `410 Gone` immediately for marked recordings — preventing new file descriptor opens.
+4. Rotation then deletes the file (async `fs.promises.unlink()`) and removes the DB row after a brief delay (next rotation cycle or a `setTimeout(5000)`).
 
 ```typescript
-const searchAddon = new SearchAddon();
-terminal.loadAddon(searchAddon);
+// In rotation job:
+database.markRecordingForDeletion(recordingId);  // sets deletion_pending = 1
 
-// Configure: highlight up to 1000 matches in overview ruler
-const searchOptions: ISearchOptions = {
-  decorations: {
-    matchBackground: '#3d3d00',
-    matchBorder: undefined,
-    matchOverviewRuler: '#ffff00',
-    activeMatchBackground: '#ffff00',
-    activeMatchBorder: undefined,
-    activeMatchColorOverviewRuler: '#ff6600',
-  },
-};
-
-// Always call findNext/findPrevious for navigation — fast regardless of count
-searchAddon.findNext(query, searchOptions);
+// 5s later (or next cycle):
+const entry = database.findRecordingById(recordingId);
+if (entry?.deletionPending) {
+  await fs.promises.unlink(entry.filePath).catch(() => {});
+  database.deleteRecording(recordingId);
+}
 ```
 
+Additionally, never call rotation on sessions currently in `recordingCaptureService.activeRecordings` — those files are actively being written.
+
 **Warning signs:**
-- First search in a long-running session freezes the browser tab for >500ms
-- `onDidChangeResults` always returns `resultIndex: -1` for common search terms
-- User types in the search box and the UI stutters with each keystroke (if searching on every input change without debouncing)
+- Recording player shows partial content or blank terminal mid-playback
+- Server logs show `ENOENT` errors from `res.sendFile`
+- DB has `deletion_pending = 1` rows that never get cleaned up (rotation incomplete)
 
 **Phase to address:**
-Phase 1 (search implementation) — configure highlight limits from the start. Add 300ms debounce to search input before calling `findNext`. Do not raise `highlightLimit` beyond default without profiling.
+Storage rotation phase. Must be spec'd before any file deletion is implemented.
 
 ---
 
-### Pitfall 5: Permission Prompt Detection Regex Has High False Positive Rate from ANSI-Contaminated Output
+### Pitfall 4: Clickable History Rows Navigate to Terminals View for Non-Existent Sessions
 
 **What goes wrong:**
-The existing `detectAgentState()` in `gsdRoutes.ts` uses `/permission|allow|dangerous/i` on raw `tmux capture-pane` output. This works today because it runs against recent lines of pane content. Expanding detection to the PTY output stream (via `TerminalStreamService.onData`) for real-time alerting introduces a new problem: the PTY stream includes ANSI escape codes, cursor positioning sequences, partial lines from in-progress renders, and re-draws.
-
-The pattern `/permission|allow|dangerous/i` against raw PTY bytes will false-positive on:
-- Log output from npm scripts like "allowing node_modules access..."
-- Claude Code rendering ANSI sequences that happen to spell "permission" mid-sequence
-- Truncated lines where "permission" is split across chunk boundaries
-- Shell prompts containing "allow" in a custom PS1 theme
-
-Conversely, false negatives occur when Claude Code's permission prompt is spread across multiple data chunks (the prompt renders progressively), and the detection runs against an incomplete chunk.
+The operator clicks a session row in `SessionHistory`. The history table (`/api/history/sessions`) returns all historical sessions, including those with `status: stopped` from months ago. The click handler calls `selectSession(tmuxSessionName)` + `setCurrentView('terminals')`. But `useSessionSelection` validates the selection against `activeInstances`, which only includes sessions passing the 30-minute retention filter. For sessions older than 30 minutes, the session name is not in `activeInstances`. The selection falls back to the first active instance (hysteresis behavior in `useSessionSelection`). The operator lands on the Terminals view watching a completely different session — no error, no explanation.
 
 **Why it happens:**
-PTY output is a byte stream, not a line-oriented text stream. `tmux capture-pane` already strips ANSI and provides clean rendered text — which is why the existing server-side detection works. Moving detection to the raw PTY stream bypasses this sanitization. Searching across chunk boundaries requires buffering state.
+`SessionHistory` was built as a display-only list. Navigation was added as a later feature request but the session validity check was not added. `useSessionSelection` treats unknown session names as invalid and silently substitutes the first valid session. This "smart fallback" is correct for polling races but wrong for deliberate user navigation to a historical session.
 
 **How to avoid:**
-Keep permission prompt detection on the server side using `tmux capture-pane` (the existing approach). Do NOT add regex scanning to the `TerminalStreamService.onData` callback. The current 5-second polling via `/api/gsd/agents/live-status` is sufficient latency for operator alerting:
+Before calling `selectSession()`, inspect the session:
 
-1. `detectAgentState()` already returns `'permission_prompt'` — use this as the signal
-2. To surface it in the terminal tab bar, pass the state from `useAgentLiveStatus()` to `InstanceTabBar`
-3. To trigger browser notifications, watch for `state === 'permission_prompt'` transitions in `useAgentLiveStatus`
+1. Is it in `activeInstances` (status active/idle/stopping/starting, or stopped within 30 min)? → Navigate to Terminals view, select that session.
+2. Does it have a completed recording in the recordings table? → Navigate to Recordings view and auto-open the player.
+3. Neither? → Show a toast "Session ended [timestamp], no recording available" and stay on History view.
 
-If lower-latency detection (<5 seconds) is needed, reduce the `/api/gsd/agents/live-status` poll interval to 2-3 seconds, not add PTY-stream regex.
+This requires the history API to return recording metadata per session, or a second lightweight fetch. Add a `recordingId` field to the history query result (LEFT JOIN on recordings table by session_name).
 
-The existing regex also needs strengthening to avoid false positives. Current pattern: `/permission|allow|dangerous/i`. Stronger pattern anchored to Claude Code's actual prompt format:
 ```typescript
-// Claude Code permission prompt includes numbered options + "Do you want to proceed?"
-const PERMISSION_PROMPT_RE = /Do you want to proceed\?|❯\s+1\.\s+Yes/i;
-// Backup: detect the numbered list pattern that appears only in permission prompts
-const NUMBERED_OPTIONS_RE = /^\s+1\. Yes\s*$/m;
-```
-
-**Warning signs:**
-- Permission badge fires on `npm install` output containing "allowing optional peer deps"
-- Badge fires on shell history containing commands with "dangerous" in the name
-- Badge never fires during actual Claude Code permission prompts (false negative due to ANSI stripping gap)
-- PTY onData callback CPU usage spikes above 10% during heavy terminal output
-
-**Phase to address:**
-Phase 1 (permission badge detection) — use `tmux capture-pane` path exclusively. Strengthen the regex before exposing as badge/notification.
-
----
-
-### Pitfall 6: Browser Notification Permission Denied State Cannot Be Re-Requested Programmatically
-
-**What goes wrong:**
-`Notification.requestPermission()` returns `'denied'` if the user clicked "Block" in the browser prompt. Once denied, no code can re-prompt — `Notification.requestPermission()` immediately returns `'denied'` without showing any prompt. The only user path to undo this is through browser settings (`chrome://settings/content/notifications`), which is invisible to a typical user.
-
-If the operator dismisses the notification permission dialog hastily (clicks "Block" instead of "Allow"), the opt-in is silently broken forever for that browser profile. The UI may show "Enable notifications" button but clicking it does nothing and shows no error.
-
-Additionally: `Notification.requestPermission()` must be called in response to a user gesture (click, key press). Calling it on page load or in a `useEffect` without user interaction causes silent failure in modern browsers.
-
-**Why it happens:**
-The Notification API's permission model is intentionally one-shot to prevent harassment. Developers accustomed to other opt-in patterns assume they can re-prompt or show a fallback.
-
-**How to avoid:**
-1. Always check `Notification.permission` before showing the opt-in button:
-   - `'default'` → show button (user hasn't decided)
-   - `'granted'` → show active status, no button needed
-   - `'denied'` → show message: "Notifications blocked in browser settings" with link to instructions, hide button
-
-2. Request permission only on explicit button click:
-```typescript
-const handleEnableNotifications = async () => {
-  const result = await Notification.requestPermission();
-  if (result === 'denied') {
-    // Show: "To enable, click the lock icon in the address bar and allow notifications"
+// In SessionHistory row click handler:
+const handleRowClick = (session: AgentInstance) => {
+  const isActive = activeInstances.some(i => i.tmuxSessionName === session.tmuxSessionName);
+  if (isActive) {
+    onNavigateToSession(session.tmuxSessionName);
+    return;
   }
+  if (session.recordingId) {
+    onNavigateToRecording(session.recordingId);
+    return;
+  }
+  // Show informative toast — do not navigate
+  showToast(`Session ended ${formatRelative(session.lastActiveAt)}, no recording available`);
 };
 ```
 
-3. Persist the preference in `localStorage` so the UI doesn't re-prompt after the user already granted permission:
-```typescript
-const NOTIFICATION_OPT_IN_KEY = 'warden:notifications-enabled';
-```
-
-4. Test the denied path explicitly: Chrome DevTools → Application → Notifications → block the origin and verify the UI degrades gracefully.
-
 **Warning signs:**
-- Opt-in button visible and clickable when `Notification.permission === 'denied'`
-- No messaging explaining how to recover from denied state
-- `Notification.requestPermission()` called inside `useEffect` without user gesture guard
-- Console shows "Notification permission denied" but UI shows no feedback to the user
+- Clicking a stopped session row navigates to Terminals but displays a different session
+- No visual distinction between clickable (has terminal/recording) and non-clickable rows
+- `cursor: pointer` on all rows regardless of availability
 
 **Phase to address:**
-Phase 2 (browser notifications) — design the permission UX state machine (default/granted/denied) before writing any notification code. All three states must be handled.
+Clickable history sessions phase. History query must be updated to include `recordingId` in the response before the UI is built.
 
 ---
 
-### Pitfall 7: Notification Click Handler Cannot Focus the Tab Reliably Cross-Browser
+### Pitfall 5: In-Memory Frame Buffer Grows Unbounded During Long Agent Sessions
 
 **What goes wrong:**
-Clicking a browser notification should focus the Warden tab. The `notification.onclick` handler that calls `window.focus()` works in Chrome on most platforms but has documented failures:
-- Firefox has a long-standing bug (Bugzilla #874050) where `window.focus()` in `onclick` is blocked by the browser
-- macOS + Chrome focuses the Chrome application but not the specific tab
-- Mobile browsers (Safari iOS, Chrome Android) do not support the Notifications API at all
+`RecordingCaptureService` accumulates all PTY output in `frameBuffer: Array<[number, string]>` until `stopRecording()` is called. Claude Code sessions can run for 4-12 hours. During active file editing or npm install operations, PTY output can reach 50-200KB/minute. A 4-hour session generates approximately:
 
-Additionally: `window.focus()` only works on pages that are in the same origin. Warden is served from a single origin so this is not a problem, but cross-tab focus requires using the `clients.openWindow()` API from a Service Worker context — which Warden does not use (no Service Worker).
+- Low activity: 50KB/min × 240min = ~12MB per recording
+- High activity (builds, file writes): 200KB/min × 240min = ~48MB per recording
+
+With 5 agents all auto-recording simultaneously (the intended auto-record use case), this creates 60-240MB of heap pressure that is never garbage-collected until each session ends. On the production Ubuntu server with `node --max-old-space-size` at its default 1.5GB, this is manageable today but becomes a production risk as sessions lengthen.
 
 **Why it happens:**
-The Notification API was designed for Progressive Web Apps with Service Workers. The `notification.onclick` path for basic (non-persistent) notifications has inconsistent focus behavior because browsers apply different security policies to `window.focus()` calls outside user-gesture context.
+The in-memory buffer was chosen for simplicity: "no intermediate disk writes, full asciicast v2 on stop." This is noted in `PROJECT.md` decision table as "Good — clean files, no partial writes." It is correct for manually-triggered recordings of bounded length. Auto-record changes the assumption: sessions are now long-running without operator intervention.
 
 **How to avoid:**
-For Warden's use case (single tab, always-open dashboard), use the simplest fallback:
+Add a frame buffer size warning threshold. When `frameBuffer` exceeds 50MB (estimated via `frameBuffer.length * avgFrameSize`), emit a server log warning. Do not implement streaming write in v3.2 — it is a significant refactor — but add monitoring:
+
 ```typescript
-const notification = new Notification('Permission Prompt Detected', {
-  body: `${agentId} is waiting for approval`,
-  tag: agentId, // dedup: only one notification per agent at a time
-  requireInteraction: false, // auto-dismiss after a few seconds
-});
-
-notification.onclick = () => {
-  window.focus();
-  notification.close();
-};
+// In captureOutput(), after push:
+if (recording.frameBuffer.length % 10_000 === 0) {
+  const estimatedMB = recording.frameBuffer.length * 200 / 1_000_000; // rough estimate
+  if (estimatedMB > 50) {
+    console.warn(`[RecordingCapture] Large frame buffer for ${sessionName}: ~${estimatedMB.toFixed(0)}MB`);
+  }
+}
 ```
 
-Accept that `window.focus()` may not work on all platforms. Document the limitation: "Notifications require an Always-on tab; click the notification to attempt to focus it." This is acceptable for the single-operator model.
+For v3.2, document this as a known limitation. For v3.3+, implement streaming write mode (append to file as frames arrive, write final header on stop).
 
-Do NOT build the browser notification feature as a multi-window or Service Worker solution — the complexity is not warranted for this use case.
+Also: auto-record should default to `false` (opt-in), not `true`, to prevent accidental 12-hour recordings eating all available heap.
 
 **Warning signs:**
-- Notification click works in developer testing (Chrome on Linux) but fails for the operator (macOS Chrome)
-- No check for `'serviceWorker' in navigator` before attempting SW-based notifications
-- Notification appears but `window.focus()` has no visible effect
+- Node.js process RSS grows steadily and never drops while sessions are active
+- `process.memoryUsage().heapUsed` exceeds 500MB during multi-agent recording
+- Server OOM-killed or becomes unresponsive after 6+ hours of auto-recording
 
 **Phase to address:**
-Phase 2 (browser notifications) — document the limitation explicitly. Do not attempt to make focus reliable cross-browser; it is not possible without a Service Worker.
-
----
-
-### Pitfall 8: @xterm/addon-search Package vs. Legacy xterm-addon-search Package Conflict
-
-**What goes wrong:**
-The project already uses the scoped `@xterm/*` package pattern (confirmed in `package.json`: `@xterm/addon-fit`, `@xterm/addon-web-links`). The search addon must also use the scoped package: `@xterm/addon-search`. Installing the legacy `xterm-addon-search` package alongside `xterm@5.x` will fail at TypeScript compilation because the old package's types reference `ITerminal` from `xterm` v4, which has a different interface shape than `xterm@5`.
-
-**Why it happens:**
-The xterm.js team migrated all addons from individual scoped packages (`xterm-addon-*`) to the main repo under the `@xterm/*` namespace with xterm.js v5 (Issue #4859). The npm package `xterm-addon-search` still exists but has not received updates — its latest version (0.15.0) was published before the v5 migration and has incompatible types.
-
-**How to avoid:**
-Use the scoped package exclusively:
-```bash
-npm install --save-dev @xterm/addon-search
-```
-
-Import path:
-```typescript
-import { SearchAddon } from '@xterm/addon-search';
-```
-
-The current `package.json` has `xterm: ^5.3.0` as the base package. The search addon must be at a compatible version. At time of research, `@xterm/addon-search@0.15.0` is the current release. Pin it alongside `@xterm/addon-fit@^0.10.0` (already in devDependencies) to keep addon versions in sync.
-
-The overview ruler (scrollbar gutter markers) requires `overviewRulerWidth` set in `Terminal` options AND `allowProposedApi: true` — which is already set in `TerminalView.tsx`. The overview ruler color in `ISearchDecorationOptions` (`matchOverviewRuler`, `activeMatchColorOverviewRuler`) will not appear without `overviewRulerWidth > 0` in the terminal constructor options.
-
-**Warning signs:**
-- TypeScript errors on `SearchAddon` import referencing `ITerminalAddon` interface mismatch
-- `npm ls xterm-addon-search` shows the legacy package installed alongside `xterm@5`
-- Search highlights appear but overview ruler markers are invisible (missing `overviewRulerWidth`)
-
-**Phase to address:**
-Phase 1 (search addon installation) — add to `package.json` devDependencies in the same commit that wires the addon. Check `npm ls @xterm/` to confirm all addons share the same major version.
-
----
-
-### Pitfall 9: Socket.IO Event Name Collision When Adding permission:detected to /terminal Namespace
-
-**What goes wrong:**
-The `/terminal` Socket.IO namespace already uses events: `terminal:input`, `terminal:output`, `terminal:reset`, `terminal:resize`, `terminal:exit`, `terminal:error`. Adding new events like `agent:state` or `permission:detected` to the same namespace with ambiguous prefixes risks collision with future xterm.js or Socket.IO internal events, and more practically, it breaks the existing client-side event handling if any intermediate event processing (e.g., logging middleware) captures all events matching a wildcard pattern.
-
-More importantly: the current architecture emits from the shared PTY session's subscriber loop in `TerminalStreamService`. Adding state-related events to this path means state events are emitted to ALL subscribers of a session, not per-agent — which is correct behavior but requires careful implementation.
-
-**Why it happens:**
-Adding new events to an existing namespace is low-friction — it "just works" in Socket.IO. Developers add events without reviewing the existing event namespace design, leading to inconsistent prefixes and potential future conflicts.
-
-**How to avoid:**
-The recommended approach for v3.0 is to NOT add permission/state events to the `/terminal` Socket.IO namespace. Instead, use the existing HTTP polling approach:
-
-- `useAgentLiveStatus()` already polls `/api/gsd/agents/live-status` every 5 seconds and returns `state: 'permission_prompt'`
-- Pass this state down to `InstanceTabBar` via props for the badge
-- No new Socket.IO events needed for permission detection
-
-If real-time push is eventually needed, create a separate `/events` namespace with a clear event taxonomy, not extending `/terminal`.
-
-If events ARE added to `/terminal`, use a consistent `warden:` prefix distinct from `terminal:`:
-```
-warden:agent-state  ← not terminal:state (too generic)
-warden:permission   ← not permission:detected (ambiguous prefix)
-```
-
-**Warning signs:**
-- New events in the `/terminal` namespace use inconsistent prefixes (some `terminal:`, some `agent:`)
-- Client event handler catches events it didn't subscribe to (wildcard listeners)
-- State events emitted per PTY data chunk instead of batched on poll
-
-**Phase to address:**
-Phase 1 (agent state badge) — decision to use polling vs. push must be made before implementation. Polling via the existing `/api/gsd/agents/live-status` route is the correct choice for this milestone.
-
----
-
-### Pitfall 10: Context Pressure Detection Breaks When Claude Code Changes Its Status Bar Format
-
-**What goes wrong:**
-The existing `extractContextPressure()` function uses a heuristic regex: `/(?:[\u2580-\u259F]|context).*?(\d{1,3})%/i` against the last 5 lines of `tmux capture-pane` output. This regex relies on Claude Code rendering context pressure via Unicode block characters (█, ▓, ▒, ░) or the word "context" preceding a percentage. This is a best-effort heuristic — Claude Code's status bar format is not publicly documented and changes across releases.
-
-Confirmed failure mode: Claude Code v0.2.76+ changes its ANSI color scheme or status bar format (documented in GitHub issue #5428: ANSI sequences from status line contamination). A status line format change renders the existing regex blind — `contextPressure` returns `null` indefinitely while the agent's context silently fills.
-
-**Why it happens:**
-There is no official API for context pressure data. The only available signal is the visual status bar rendered in the terminal, which is subject to unannounced format changes.
-
-**How to avoid:**
-1. The regex is already annotated "fragile heuristics" in `PROJECT.md` — the planned mitigation is correct: treat context pressure as best-effort display, never as a reliable trigger
-2. When `contextPressure` is `null`, show a neutral "?%" badge, not an error state
-3. Test the regex against actual tmux pane captures from the running system periodically — a Playwright test that captures pane output and asserts regex matches would catch regressions before the operator notices
-
-For the badge display in the terminal header:
-```typescript
-// Graceful degradation
-const pressureLabel = contextPressure !== null ? `${contextPressure}%` : '—';
-```
-
-4. Do not gate any critical functionality on context pressure detection — it is display-only
-
-**Warning signs:**
-- `contextPressure` always returns null despite active agent sessions
-- Context pressure badge shows "—" across all agents simultaneously (suggests regex failed)
-- tmux capture-pane output format visibly changed from previous working state
-
-**Phase to address:**
-Phase 1 (context pressure badge in terminal header) — implement as best-effort display-only. No critical logic gated on this value.
+Auto-record phase (add size warning) and storage rotation phase (add hard cap or streaming write for v3.3 planning note).
 
 ---
 
@@ -435,13 +236,11 @@ Phase 1 (context pressure badge in terminal header) — implement as best-effort
 
 | Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
 |----------|-------------------|----------------|-----------------|
-| Using document-level keydown listener without terminal focus check | Simple implementation | Shortcuts fire AND send to PTY simultaneously | Never — double-action is always wrong |
-| Calling findNext on every keystroke (no debounce) | Immediate feedback | Main thread blocked for 100ms+ per keystroke on large buffers | Never — always debounce at 200-300ms |
-| Raising highlightLimit above 1000 in SearchAddon | More visible highlights | Blocking 500ms+ freeze per search in long sessions | Never — keep default 1000 |
-| Requesting Notification.permission on page load | Zero friction for operator | Silent failure in all modern browsers (requires user gesture) | Never |
-| Adding state events to /terminal namespace | Simple implementation | Namespace pollution, future event name conflicts | Acceptable only if prefixed with `warden:` consistently |
-| Raw PTY stream regex for permission detection | Lower latency (<100ms) | High false positive rate, CPU overhead per data chunk | Never — use tmux capture-pane instead |
-| Not restoring terminal focus after search overlay closes | Simpler overlay implementation | User must click terminal to resume typing | Never — focus restoration is 3 lines of code |
+| In-memory frame buffer for all recordings | No intermediate disk I/O, clean final files | 50-240MB heap growth per 4-hour session; OOM risk with 5+ auto-recording agents | Acceptable now for manual recordings; not for auto-record without buffer cap |
+| Auto-record config in memory only (not SQLite) | Simple to implement | Config lost on server restart; operator must re-enable after every deployment | Never acceptable for production; persist to SQLite from day one |
+| `fs.unlinkSync()` for rotation deletion | Synchronous, simple | Blocks event loop; fails silently on concurrent read; no recovery path | Never — use `fs.promises.unlink()` and two-phase deletion |
+| `IS_TOUCH_DEVICE` module-load detection | No per-render overhead | Fails for Surface/hybrid devices; cannot change at runtime | Acceptable — single-operator, consistent environment |
+| History query with no recording join | Simple initial implementation | Row click navigation cannot distinguish "has recording" from "no recording" | Never acceptable if clickable rows are a feature — join must be in initial query |
 
 ---
 
@@ -449,14 +248,11 @@ Phase 1 (context pressure badge in terminal header) — implement as best-effort
 
 | Integration | Common Mistake | Correct Approach |
 |-------------|----------------|------------------|
-| `@xterm/addon-search` installation | Installing legacy `xterm-addon-search` | Use `@xterm/addon-search` (scoped package, v5 compatible) |
-| `overviewRulerWidth` for gutter markers | Decorations set but rulers invisible | Set `overviewRulerWidth: 15` in `Terminal` options at construction |
-| `attachCustomKeyEventHandler` | Returning `false` without `preventDefault()` | Call both `event.preventDefault()` AND `return false` |
-| Global keyboard shortcuts | `document.addEventListener` capturing terminal keys | Guard with `event.stopPropagation()` in xterm custom handler |
-| `Notification.requestPermission()` | Calling outside user gesture | Call only inside click/keypress event handler |
-| `Notification.permission === 'denied'` | Showing re-prompt button | Show "unblock in browser settings" message instead |
-| Search addon + xterm.css version | Old CSS causes gray blocks on search results | Import current `xterm/css/xterm.css` — already correct in project |
-| `onDidChangeResults` result count | Expecting accurate count beyond highlight limit | `resultIndex: -1` means count exceeded limit, not "no results" |
+| xterm.js `terminal.textarea` (mobile keyboard) | Calling `terminal.focus()` to restore keyboard after button tap | Access `terminal.textarea` directly and call `.focus()` synchronously in `onTouchStart`; `terminal.focus()` dispatches to a container div — insufficient for iOS keyboard |
+| `RecordingCaptureService` auto-record trigger | Triggering from `InstanceTracker` poll or Socket.IO connection event | Only trigger from inside `TerminalStreamService.attachSocketToSession()` after `ptyProcess.onData()` is registered — no race window |
+| Storage rotation + active recordings | Running rotation scan over `data/recordings/` including actively-written files | Exclude sessions where `recordingCaptureService.isRecording(sessionName) === true` from deletion candidates |
+| Storage rotation + concurrent playback | Deleting file while client is streaming | Use `deletion_pending` flag in DB; content route returns 410 if flag is set; actual file deletion deferred |
+| `SessionHistory` + `useSessionSelection` | Passing session name of a stopped/old session to `selectSession()` | Check session existence in `activeInstances` and recording availability before deciding navigation target |
 
 ---
 
@@ -464,11 +260,10 @@ Phase 1 (context pressure badge in terminal header) — implement as best-effort
 
 | Trap | Symptoms | Prevention | When It Breaks |
 |------|----------|------------|----------------|
-| SearchAddon findNext on every keypress | 100-500ms UI freeze per character typed in search box | Debounce search input at 300ms | First search in a session with >1000 matches |
-| SearchAddon highlightLimit >1000 with decorations | 500ms+ blocking per search | Keep default 1000 or lower | Any search returning >1000 matches |
-| Regex scanning in TerminalStreamService.onData | CPU spike during high-throughput terminal output | Use tmux capture-pane polling instead | npm install or build output (hundreds of lines/sec) |
-| Polling `/api/gsd/agents/live-status` faster than 2 seconds | N concurrent `tmux capture-pane` calls × M agents | Keep 5s interval; lower to 2-3s maximum if needed | >5 active agents at 2s interval = 10+ tmux calls/tick |
-| Re-creating SearchAddon on every tab switch | Flicker + lost search state when switching sessions | Attach addon to terminal instance; dispose with terminal | Every tab switch if not handled |
+| `frameBuffer` unbounded growth | Node.js heap grows ~50-200KB/min per auto-recording session; server becomes slow or OOM after hours | Add 50MB warning log; document limit; implement streaming write in future milestone | With 5 agents auto-recording for 4+ hours simultaneously |
+| `fs.readdirSync` + `fs.statSync` in rotation loop | Event loop blocked 50-200ms when `data/recordings/` has 1000+ files | Use `fs.promises.readdir()` + `fs.promises.stat()` async throughout; add overlap-prevention flag to prevent concurrent rotation runs | Directory exceeds ~500 files (~each 30-minute session = 1 file; 500 days of daily auto-recording) |
+| `listRecordings()` with no pagination | `RecordingLibrary` renders all rows; mobile browser sluggish at 200+ recordings | Add `LIMIT/OFFSET` to `listRecordings()` + pagination to `RecordingLibrary` before hitting production volume | At ~100-200 recordings on mobile |
+| Storage size check via `SUM(file_size_bytes)` SQL | Slightly stale — value frozen at recording-stop time | This is acceptable for rotation decisions; document that active recording sizes are excluded from the sum | Never a correctness problem; just a documentation note |
 
 ---
 
@@ -476,25 +271,25 @@ Phase 1 (context pressure badge in terminal header) — implement as best-effort
 
 | Pitfall | User Impact | Better Approach |
 |---------|-------------|-----------------|
-| Permission badge clears before operator responds | Operator sees badge, switches tabs, badge gone — was it real? | Use a latching badge: clear only when state transitions away from `permission_prompt` for 2+ polls |
-| Search overlay does not show match count | Operator must press Enter repeatedly to count matches | Show "3 / 47" format via `onDidChangeResults` |
-| Notification fires repeatedly for same permission prompt | Browser fills up with duplicate notifications | Use `tag: agentId` on `Notification` constructor to deduplicate |
-| Keyboard shortcut list not discoverable | Operator doesn't know Alt+1 switches tabs | Show shortcut hints in InstanceTabBar header or tooltip |
-| Context pressure badge shows on non-active sessions | Operator confused about which terminal the badge refers to | Badge scoped to active terminal's header only, not in tab bar |
-| Search box takes focus, Escape exits search but terminal doesn't respond | Operator must click terminal to resume | Always call `terminal.focus()` after closing search overlay |
+| Enter button sends `\r` not `\r\n` | Enter does nothing in some CLIs (Python REPL, some shells) | Send `\r` — PTY normalizes it to the appropriate line ending; but test with bash, Python, and vim explicitly before shipping |
+| Auto-record indicator not visible from History/Recordings view | Operator navigates away, doesn't realize recording is running, cannot stop it | Add a global recording badge in the page header (like the budget alert dot) when any session is actively recording |
+| Storage cap prunes recordings operator wanted to keep | Operator loses a critical debug session to rotation | Add a "pin" flag per recording before implementing auto-prune; auto-prune only removes unpinned recordings |
+| All history rows appear clickable but most lead nowhere | Operator clicks frequently, gets "no terminal" result, loses trust | Style rows with `cursor: pointer` only when a terminal or recording is available; others `cursor: default` + grayed appearance |
+| Font size change mid-recording alters terminal dimensions | Replay shows layout shift at arbitrary timestamp | Warn "Changing font size may affect recording layout" while a recording is active, or disable the font size button during recording |
 
 ---
 
 ## "Looks Done But Isn't" Checklist
 
-- [ ] **Ctrl+F search:** Often missing `event.preventDefault()` — verify the browser's native find bar does NOT open when pressing Ctrl+F inside the terminal
-- [ ] **Tab switch shortcuts:** Often sends escape codes to PTY — verify pressing Alt+1 in a running vim session switches tabs AND does not inject `\x1b1` into vim
-- [ ] **Search focus restoration:** Often missing — verify that after closing search with Escape, the next keystroke appears in the terminal (not silently discarded)
-- [ ] **Overview ruler:** Often invisible — verify `overviewRulerWidth` is set in Terminal constructor and search result marks appear in scrollbar gutter
-- [ ] **Notification denied state:** Often missing — verify clicking "Enable notifications" when already denied shows explanation text, not silent failure
-- [ ] **Permission badge latching:** Often transient — verify the badge stays visible across polling intervals, not just for the single poll that detected the prompt
-- [ ] **Search result count at limit:** Often wrong — verify `onDidChangeResults` returning `resultIndex: -1` is shown as "1000+" or "many" not "-1 results"
-- [ ] **@xterm/addon-search version:** Often wrong package — verify `npm ls xterm-addon-search` shows nothing (legacy), `npm ls @xterm/addon-search` shows the scoped version
+- [ ] **Enter button:** Test `\r` works with bash readline, Python interactive, and vim insert mode. On a real iOS device: tap Enter, keyboard stays open, `\n` appears in terminal.
+- [ ] **Mobile keyboard persistence:** Test on real iPhone (not Simulator). Sequence: tap Tab, type a character without re-tapping terminal. Keyboard must remain visible throughout.
+- [ ] **Clickable history rows:** Click a session stopped 45 minutes ago (outside 30-minute retention). Verify outcome is either: recording player opens, or toast explains "no recording available" — NOT a silent redirect to a different session.
+- [ ] **Auto-record first frame:** Start a session with auto-record enabled. Stop it after 5 seconds. Replay — the very first line of PTY output must be present.
+- [ ] **Auto-record persists across restart:** Restart the Node.js server. Confirm auto-record config is restored from SQLite.
+- [ ] **Rotation vs. active recording:** Trigger rotation while an active recording is running. Confirm the active recording is NOT deleted. Verify `isRecording()` guard is in the rotation code path.
+- [ ] **Rotation vs. concurrent playback:** Open a recording in the player, then trigger rotation that would delete it. Player either completes or shows graceful "recording deleted" error — not a blank screen crash.
+- [ ] **Recording library pagination:** Seed or accumulate 50+ recordings. Confirm library renders and scrolls without browser lag on mobile.
+- [ ] **Global auto-record indicator:** Start auto-recording, navigate to History view. Confirm a visible indicator exists that recording is active somewhere in the header.
 
 ---
 
@@ -502,13 +297,12 @@ Phase 1 (context pressure badge in terminal header) — implement as best-effort
 
 | Pitfall | Recovery Cost | Recovery Steps |
 |---------|---------------|----------------|
-| Keyboard shortcut sends to PTY | LOW | Add `event.stopPropagation()` + `event.preventDefault()` in `attachCustomKeyEventHandler`; no data loss |
-| Search freeze on large buffer | LOW | Reduce `highlightLimit`; add debounce to search input; re-test |
-| Notification permission denied by operator | LOW | Document recovery path (browser settings); no code change needed |
-| SearchAddon wrong package version | MEDIUM | `npm uninstall xterm-addon-search && npm install --save-dev @xterm/addon-search`; update imports |
-| Permission false positives flooding notifications | MEDIUM | Strengthen regex anchors; add minimum-confidence threshold; clear existing notifications with `tag` dedup |
-| Context pressure regex broken by Claude Code update | LOW | Update regex; regex is isolated in `extractContextPressure()` in `gsdRoutes.ts`; no rebuild of other features |
-| Terminal focus lost on search close | LOW | Add `requestAnimationFrame(() => terminal.focus())` after overlay close; 3-line fix |
+| iOS keyboard dismissal on button tap | LOW | Add `terminal.textarea?.focus()` call synchronously in each toolbar button's `onTouchStart`; one line per button, no architecture change |
+| Auto-record race (missing first frames) | MEDIUM | Move trigger inside `TerminalStreamService.attachSocketToSession()` after `onData` is registered; requires modifying two files |
+| Rotation deletes in-use file (player crash) | LOW | Add `deletion_pending` column (one migration); update content route to check flag; defer actual deletion |
+| Orphaned recordings (no frames, never stopped) | LOW | Add cleanup job: `recordings WHERE stoppedAt IS NULL AND startedAt < NOW - 2 hours` → auto-stop with `stop_reason = 'orphaned'`; write empty asciicast |
+| History navigation to unavailable session | LOW | Client-side only; check `activeInstances` + `recordingId` in click handler before calling `selectSession()` |
+| Frame buffer OOM with long auto-recording | HIGH | Requires streaming write mode refactor for `RecordingCaptureService`; mitigate in v3.2 with buffer size warning + 50MB soft cap that stops recording |
 
 ---
 
@@ -516,54 +310,33 @@ Phase 1 (context pressure badge in terminal header) — implement as best-effort
 
 | Pitfall | Prevention Phase | Verification |
 |---------|------------------|--------------|
-| `attachCustomKeyEventHandler` missing `preventDefault` | Phase 1: Ctrl+F handler | Press Ctrl+F in terminal; verify browser find bar does not open |
-| Global keydown conflict with terminal input | Phase 1: keyboard shortcuts | Press Alt+1 in running vim; verify tab switches AND vim is unaffected |
-| Search overlay focus loss | Phase 1: search overlay UI | Close search with Escape; type a character; verify it appears in terminal |
-| SearchAddon performance with large buffer | Phase 1: search implementation | Search for "e" in a 50,000-line session; verify no freeze |
-| Permission regex false positives | Phase 1: badge logic | Run `npm install` in a terminal; verify no permission badge fires |
-| Notification denied state UX | Phase 2: notifications | Block notifications in browser; click opt-in button; verify explanation text appears |
-| Notification click cross-browser focus | Phase 2: notifications | Test on macOS Chrome; document behavior if focus doesn't work |
-| Wrong search package version | Phase 1: addon installation | Verify with `npm ls @xterm/addon-search` |
-| Socket.IO namespace collision | Phase 1: architecture decision | Decision: use polling, not Socket.IO push for state events |
-| Context pressure regex fragility | Phase 1: badge display | Test against live tmux pane output; verify null case renders gracefully |
+| iOS keyboard dismissal on button tap | Mobile toolbar phase (keyboard persistence) | Real iPhone test: tap toolbar button, keyboard stays open |
+| Auto-record race (missing first frames) | Auto-record feature phase | Replay 5-second auto-recording, confirm first line of output present |
+| Rotation deletes in-use file | Storage rotation phase | Concurrent playback + rotation manual test; no ENOENT in server logs |
+| History navigation to unavailable session | Clickable history sessions phase | Click 45-min-old stopped session; verify recording player or explanatory toast |
+| Frame buffer OOM | Auto-record phase | Monitor heap during 1-hour auto-recorded session; warning logged at 50MB |
+| Auto-record config lost on restart | Auto-record phase | Restart server, verify auto-record setting is preserved in SQLite |
+| Rotation deletes active recording | Storage rotation phase | Rotation code checked for `isRecording()` guard; automated assertion or code review |
 
 ---
 
 ## Sources
 
-**Confidence: HIGH** — Verified against xterm.js GitHub issues, MDN Web Docs, and Warden project source code (TerminalView.tsx, useTerminalSocket.ts, gsdRoutes.ts read in full).
-
-### xterm.js Keyboard Handling
-- [xterm.js Terminal API: attachCustomKeyEventHandler](https://xtermjs.org/docs/api/terminal/classes/terminal/) — official API reference
-- [CustomKeyEventHandler does not override xterm default keybindings · Issue #3880](https://github.com/xtermjs/xterm.js/issues/3880) — confirmed edge cases
-- [keyup still handled when custom key handler returns false · Issue #2293](https://github.com/xtermjs/xterm.js/issues/2293) — documented keyup gap
-
-### xterm.js Search Addon
-- [xterm.js Search is too slow · Issue #5176](https://github.com/xtermjs/xterm.js/issues/5176) — performance profiling data (470ms for 72k matches)
-- [@xterm/addon-search typings](https://github.com/xtermjs/xterm.js/blob/master/addons/addon-search/typings/addon-search.d.ts) — `onDidChangeResults`, `highlightLimit`, `ISearchDecorationOptions`
-- [Migrate to @xterm org on npm · Issue #4859](https://github.com/xtermjs/xterm.js/issues/4859) — v5 scoped package migration
-- [xterm selection conflict with search addon · Issue #3915](https://github.com/xtermjs/xterm.js/issues/3915) — CSS version dependency
-
-### xterm.js Focus Management
-- [Terminal focus class lost under certain conditions · Issue #789](https://github.com/xtermjs/xterm.js/issues/789)
-- [Rendering issue from xterm-helper-textarea off-screen · Issue #3065](https://github.com/xtermjs/xterm.js/issues/3065)
-
-### Browser Notification API
-- [MDN: Notification.requestPermission()](https://developer.mozilla.org/en-US/docs/Web/API/Notification/requestPermission_static) — permission states and user gesture requirement
-- [MDN: Notification.permission](https://developer.mozilla.org/en-US/docs/Web/API/Notification/permission_static) — denied state is permanent without user action
-- [Reset denied notification permission guide](https://pushpad.xyz/blog/reset-the-denied-permission-for-notifications) — recovery path for denied state
-- [Firefox bug #874050: window.focus() blocked in notification onclick](https://bugzilla.mozilla.org/show_bug.cgi?id=874050) — cross-browser limitation
-
-### Permission Prompt Detection
-- [cc-hook: regex pattern for Claude Code permission prompts](https://github.com/nahco314/cc-hook) — `"Do you want to proceed?"` as detection anchor
-- [Claude Code ANSI escape contamination · Issue #5428](https://github.com/anthropics/claude-code/issues/5428) — status bar format fragility
-- [ANSI escape codes regex pitfalls — ansi-regex](https://github.com/chalk/ansi-regex) — false positive risks with non-standard sequences
-
-### Node.js PTY Performance
-- [node-pty onData callback overhead discussion](https://github.com/microsoft/node-pty/issues/387) — per-chunk callback pressure
-- [How a RegEx can bring your Node.js service down — Liran Tal](https://lirantal.medium.com/node-js-pitfalls-how-a-regex-can-bring-your-system-down-cbf1dc6c4e02) — ReDoS risk in onData path
+- xterm.js issue #1101 "Support mobile platforms" — https://github.com/xtermjs/xterm.js/issues/1101 (iOS keyboard behavior, hidden textarea mechanism)
+- xterm.js issue #2403 "Accommodate predictive keyboard on mobile" — https://github.com/xtermjs/xterm.js/issues/2403
+- xterm.js discussion #5227 "Allow selection without focusing for input?" — https://github.com/xtermjs/xterm.js/discussions/5227
+- MDN: VisualViewport API — https://developer.mozilla.org/en-US/docs/Web/API/VisualViewport
+- Apple WebKit bug #195884 "Autofocus on text input does not show keyboard" — https://bugs.webkit.org/show_bug.cgi?id=195884
+- iOS Safari focus() constraints (Tommy Brunn, Medium) — https://medium.com/@brunn/autofocus-in-ios-safari-458215514a5f
+- Mobiscroll: Annoying iOS Safari input issues with workarounds — https://blog.mobiscroll.com/annoying-ios-safari-input-issues-with-workarounds/
+- Prior Warden phase research: `.planning/phases/11.1-fix-tmux-visibility-when-mobile-keyboard-opens/11.1-RESEARCH.md` (HIGH confidence, 2026-02-17)
+- Codebase: `src/server/services/RecordingCaptureService.ts` — in-memory frame buffer, `captureOutput()` tap
+- Codebase: `src/server/services/TerminalStreamService.ts` — PTY spawn sequence, `onData` registration order
+- Codebase: `src/client/components/TerminalView.tsx` — `MobileKeyToolbar`, `IS_TOUCH_DEVICE`, current `onTouchStart` pattern
+- Codebase: `src/client/components/SessionHistory.tsx` — no recording join in current history query
+- Codebase: `src/client/App.tsx` — `useSessionSelection` validation against `activeInstances`, hash-based navigation
 
 ---
-*Pitfalls research for: Warden v3.0 — Operator Awareness & Terminal Power Tools*
-*Researched: 2026-03-03*
-*Confidence: HIGH (verified against xterm.js source, MDN, and Warden project code)*
+*Pitfalls research for: v3.2 Mobile Operations & UX Polish (mobile toolbar, auto-record, storage rotation, clickable history)*
+*Researched: 2026-03-04*
+*Confidence: HIGH — full codebase read + cross-referenced with xterm.js issue tracker, MDN, prior phase research*

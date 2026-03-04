@@ -1,341 +1,304 @@
-# Feature Research: Operator Awareness & Terminal Power Tools
+# Feature Research
 
-**Domain:** Browser-based terminal multiplexer operator workstation — passive monitoring alerts + active investigation tools
-**Researched:** 2026-03-03
-**Milestone:** v3.0 Operator Awareness & Terminal Power Tools
-**Confidence:** HIGH (all core libraries verified against official docs/type definitions)
+**Domain:** Mobile terminal UX improvements, auto-record triggers, storage rotation, history navigation — v3.2 milestone additions to Warden Dashboard
+**Researched:** 2026-03-04
+**Confidence:** HIGH (all features scoped to known codebase; patterns verified against xterm.js issues, mobile web UX literature, and existing implementation code)
 
 ---
 
-## Context
+## Context: What Already Exists
 
-This research is scoped to the NEW features for v3.0 only. It does NOT re-document
-features already built in v1.x / v2.x. Existing capabilities that v3.0 builds on:
+These features are ADDITIVE to a shipping product. The following are already complete and must not be rebuilt:
 
-- `useAgentLiveStatus` — polls `/api/gsd/agents/live-status` every 5s, returns `Map<agentId, { state, contextPressure, contextPressureLevel }>`
-- `detectAgentState()` in `gsdRoutes.ts` — regex heuristics on `tmux capture-pane` output: `permission|allow|dangerous` → `permission_prompt`
-- `AgentStateHint` type: `'working' | 'idle' | 'menu' | 'permission_prompt' | 'error'`
-- `StateBadge` + `PressureIndicator` components exist in `gsdShared.tsx` (GSD Agents tab only)
-- `TerminalStreamService` — PTY tap with `onData` callback; all terminal output flows through here
-- `TerminalView.tsx` — xterm.js 5 terminal with `@xterm/addon-fit` + `@xterm/addon-web-links` loaded
-- `InstanceTabBar.tsx` — session tabs with status dot + agent name + stop button
-- xterm package in use: `xterm@5.3.0` (legacy) + `@xterm/xterm@5.5.0` (monorepo), `@xterm/addon-fit@0.10.0`
-- `@xterm/addon-search` is NOT yet installed — needs to be added
+- MobileKeyToolbar with Copy/Paste/Esc/Tab/arrows/PgUp/PgDn buttons (using `onTouchStart` + `event.preventDefault()` pattern)
+- MobilePromptSheet bottom sheet for prompt injection on mobile
+- Session recording in asciicast v2 format with in-memory frame buffer
+- Recording library with sort, delete, download, and play actions
+- Recording player with variable-speed replay (1x/2x/4x/8x)
+- SessionHistory component with agent/status/date filters and pagination
+- HistoryView with desktop tabs and mobile accordion layout
+- EventsTab with source/session filtering and expandable rows
+- `onNavigateToSession` prop stub already wired into HistoryView (currently unused)
 
 ---
 
 ## Feature Landscape
 
-### Table Stakes (Operator Expects These)
+### Table Stakes (Users Expect These)
 
-Features the operator assumes exist in a terminal monitoring workstation. Missing any of these means the product feels like a passive viewer only, not a workstation.
+Features the operator expects to exist. Missing these makes the product feel broken for daily mobile use.
 
-| Feature | Why Expected | Complexity | Dependencies on Existing |
-|---------|--------------|------------|--------------------------|
-| Permission prompt badge on tab | Operator monitors 5+ agents; needs visual interruption signal without watching every terminal | MEDIUM | `useAgentLiveStatus` already detects `permission_prompt` state; needs tab badge layer in `InstanceTabBar` |
-| Agent state chip in terminal header | At a glance: is this agent working, waiting, stuck? Current terminal header only shows session name + connection dot | LOW | `useAgentLiveStatus` provides state; wire into `TerminalView` header bar |
-| Terminal text search (Ctrl+F) | Every terminal tool supports in-buffer search; absence is jarring | MEDIUM | `@xterm/addon-search` (not yet installed); needs UI overlay in `TerminalView` |
-| Keyboard navigation between tabs | Using mouse to switch between 5+ agent sessions is slow for an operator workstation | LOW-MEDIUM | `useSessionSelection` manages selection; need global keydown listener |
-| Context pressure badge in terminal header | Operator needs to know when to intervene before a session hits context limit | LOW | `useAgentLiveStatus` provides `contextPressure` + `contextPressureLevel`; wire into `TerminalView` header |
+| Feature | Why Expected | Complexity | Notes |
+|---------|--------------|------------|-------|
+| Enter key in mobile toolbar | Every mobile terminal app (Termius, NewTerm, Blink Shell) includes an Enter button; operators cannot submit commands without it | LOW | Add `{ label: 'Enter', seq: '\r' }` to the `MOBILE_KEYS` array in TerminalView.tsx — one-line change to existing data structure |
+| Keyboard stays open after toolbar button tap | Tapping a toolbar button blurs the xterm textarea, closing the soft keyboard; without a fix every key tap requires a re-tap on the terminal to re-open the keyboard | MEDIUM | `onTouchStart` + `event.preventDefault()` already prevents the native tap-to-blur on button press; what is missing is re-focusing the terminal textarea after `sendInput` so the PTY stays keyboard-connected. Pattern: `requestAnimationFrame(() => terminal.focus())` after sendInput |
+| Clickable history session rows | Rows in SessionHistory show session data but clicking does nothing — the UI looks interactive but isn't | MEDIUM | Add `cursor-pointer` + hover affordance + chevron icon; active sessions navigate to Terminals tab selecting that session; stopped sessions with a recording open the Recording Player; stopped sessions without a recording show a brief toast |
+| Storage cap with auto-prune | Without a cap, recording files grow unbounded on a single-server deployment with no managed storage | MEDIUM | Two-axis policy: (1) max total storage bytes, (2) max recording age in days. Delete oldest `stopped_at` recordings first. Run on server start and after each `stopRecording()` call |
+| Auto-record on session start | Manual REC toggle is forgotten; sessions of operational interest go unrecorded unless the operator remembers to click REC for every session | MEDIUM | Per-agent boolean flag in `openclaw.json`. When InstanceTracker discovers a new session for an agent with auto-record enabled, TerminalStreamService calls `recordingCaptureService.startRecording()` at PTY spawn time. Deferred from v3.1 as REC-05 |
 
-### Differentiators (What Makes This a Power Tool)
+### Differentiators (Competitive Advantage)
 
-Features that go beyond a passive viewer and make Warden a genuine operator workstation.
+Features that go beyond standard terminal dashboard behaviour and are specific to Warden's operator context.
 
-| Feature | Value Proposition | Complexity | Dependencies on Existing |
-|---------|-------------------|------------|--------------------------|
-| Browser notifications for permission prompts | Operator may be in another tab or window; permission prompts block agent progress until answered — notification allows immediate response | MEDIUM | Requires `Notification.requestPermission()` opt-in UI; notification logic triggered when `useAgentLiveStatus` state transitions to `permission_prompt` |
-| Search match count display | "3 of 47 matches" — operator searching for an error pattern needs to know scope of problem | LOW | Part of `@xterm/addon-search` — `onDidChangeResults` event fires `ISearchResultChangeEvent { resultIndex, resultCount }` |
-| Scrollbar gutter markers for search results | Visual density map of where matches appear in buffer; critical for long terminal sessions | LOW | Part of `@xterm/addon-search` — `ISearchDecorationOptions.matchOverviewRuler` sets gutter color automatically; requires xterm `overviewRulerWidth` option to be set |
-| Search highlight persistence on nav | Operator switches tabs; highlights should survive and be ready when returning | MEDIUM | Requires per-session search state management; SearchAddon instance must persist with terminal lifecycle |
-| Sidebar toggle shortcut | Single key to expand/collapse agent sidebar without losing terminal focus | LOW | `setShowSidebar` callback exists in `App.tsx`; just needs a keyboard binding |
+| Feature | Value Proposition | Complexity | Notes |
+|---------|-------------------|------------|-------|
+| History row navigates to recording replay | Closes the loop between "what happened in that session" and "let me watch it" — one tap from history to playback | MEDIUM | Requires SessionHistory to receive `onPlayRecording` callback; RecordingLibrary already supports `onPlayRecording`; need to join sessions to recordings by `tmux_session_name` in history API response |
+| Auto-record per agent ("always" trigger) | Zero-friction audit trail — every session for a configured agent is recorded without operator action | MEDIUM | Config in `openclaw.json` per agent; triggers from InstanceTracker discovery path; no client UI changes needed for the auto-start itself |
+| Storage rotation UI in RecordingLibrary | Shows current usage vs cap with a visual indicator and a "Prune now" button | LOW | Adds a header strip: "X recordings, Y MB of Z GB cap". Prune button calls `POST /api/recordings/prune`. Operator sees storage health without SSHing into the server |
+| Events tab row click navigates to terminal | EventsTab rows show session names; clicking navigates to that terminal, reducing manual tab-switching during investigation | LOW | Same pattern as clickable history rows; EventsTab already has `selectedSession` state; just add a click handler and accept an `onNavigateToSession` prop |
+| Auto-record trigger on permission prompt | Record only the interesting moments — saves disk vs always-on per agent | HIGH | Requires permission-prompt detection (exists via detectAgentState()) to emit an event that RecordingCaptureService subscribes to; complex interaction with existing recording state; defer to v3.3 unless trivial to hook in |
 
-### Anti-Features (Requested, But Wrong for This Context)
+### Anti-Features (Commonly Requested, Often Problematic)
 
-| Anti-Feature | Surface Appeal | Why Problematic | Better Approach |
-|--------------|----------------|-----------------|-----------------|
-| Always-on browser notifications (no opt-in) | "Keep me informed" | Browsers block auto-permission requests not triggered by user gesture — would silently fail or get denied; also violates best practice and user trust | Settings toggle in UI that calls `Notification.requestPermission()` on click |
-| Search across all sessions simultaneously | "Find which agent has the error" | xterm.js search operates on in-memory terminal buffer; cross-session search would require keeping all PTY buffers live — contradicts the existing PTY keepalive/cleanup design | Operator switches to relevant tab first, then searches |
-| Real-time permission prompt auto-answer | "Automate the approval" | Permission prompts require operator judgment — auto-approval removes the safety check that permission prompts provide | Notification + focus-jump to relevant tab so operator can manually respond |
-| Replacing polling with WebSocket push for live-status | "Eliminate latency" | `tmux capture-pane` is already called every 5s; push would require server-side event loop managing all sessions, adding complexity for marginal gain | Keep 5s poll; add visual flash/animation when state changes to `permission_prompt` |
-| External hotkeys library (react-hotkeys-hook) | "More robust shortcut management" | xterm.js captures keyboard events in its canvas element — a global hotkey library cannot intercept those without complex focus tracking; custom `useEffect` on `document` with focus-awareness is simpler and more predictable | Custom `useKeyboardNav` hook with `document.addEventListener('keydown', ...)` + enabled check |
+| Feature | Why Requested | Why Problematic | Alternative |
+|---------|---------------|-----------------|-------------|
+| Floating keyboard toolbar (InputAccessoryView-style) | Native iOS terminal apps use it; feels more polished | Web browsers do not support inputAccessoryView outside React Native; position:fixed above the keyboard leads to iOS Safari layout bugs (visualViewport resize events unreliable during keyboard transitions, safe-area insets shift mid-animation) | Keep the existing `sticky bottom-0` toolbar — it is already working and tested; just fix the focus-loss bug |
+| Auto-record with video output (pixel-perfect) | Operators want to share recordings externally | Video encoding (ffmpeg) is a heavy server-side dependency, complex to manage, and produces large files; asciicast v2 captures all terminal output faithfully | asciicast v2 is the right format for terminal sessions; use asciinema player for external sharing if needed |
+| Per-session storage quota | Prevents any one long session from consuming all space | Individual session recordings are naturally bounded by session duration; the total-size cap already solves runaway growth without per-session complexity | Max total size + max age policy is sufficient; prune oldest-first |
+| Real-time auto-delete during an active recording | Prevent disk overflow immediately | Risk of deleting a file the operator is currently watching in the Recording Player; also creates a race condition if pruning runs while `stopRecording()` is writing a file | Run pruning only at safe synchronisation points: server start, after `stopRecording()` completes, and on explicit "Prune now" operator action |
+| Haptic feedback on mobile toolbar button tap | Mobile terminal apps on Android provide haptic feedback | Web Vibration API is blocked on iOS Safari; Android support is inconsistent and opt-in per browser; adds complexity for zero benefit on the primary iOS target | Skip entirely — focus on functional behaviour |
 
 ---
 
 ## Feature Dependencies
 
 ```
-Permission prompt tab badge
-    └──requires──> useAgentLiveStatus (exists, polls /api/gsd/agents/live-status)
-    └──requires──> InstanceTabBar badge slot (new: red dot overlay on tab button)
+[Enter button in toolbar]
+    (standalone — no external dependencies)
+    └──enhances──> [Keyboard persistence fix] (Enter button benefits from same re-focus fix)
 
-Agent state chip in terminal header
-    └──requires──> useAgentLiveStatus (exists)
-    └──requires──> TerminalView header accepts agentId prop (new prop)
-    └──requires──> StateBadge component (exists in gsdShared.tsx)
+[Keyboard persistence after toolbar tap]
+    └──requires──> [refocusTerminal callback prop from TerminalViewInner to MobileKeyToolbar]
+    └──applies to──> [Enter, Esc, Tab, arrow, PgUp, PgDn, Copy, Paste buttons — all need same fix]
 
-Context pressure badge in terminal header
-    └──requires──> useAgentLiveStatus (exists)
-    └──requires──> TerminalView header accepts agentId prop (same new prop as state chip)
-    └──requires──> PressureIndicator component (exists in gsdShared.tsx)
+[Clickable history session rows]
+    └──requires──> [App.tsx onNavigateToSession implementation — prop stub already exists in HistoryView]
+    └──requires──> [API: /api/history/sessions response must include recording_id or has_recording field]
+    └──enhances──> [History row navigates to recording replay]
 
-Browser notification for permission prompts
-    └──requires──> useAgentLiveStatus (exists)
-    └──requires──> Notification.requestPermission() opt-in (new settings UI)
-    └──requires──> State transition detection: previous state !== 'permission_prompt', new === 'permission_prompt'
+[History row navigates to recording replay]
+    └──requires──> [Clickable history session rows]
+    └──requires──> [App.tsx receives and threads onPlayRecording callback into HistoryView/SessionHistory]
 
-Terminal text search (Ctrl+F)
-    └──requires──> @xterm/addon-search package (NOT YET INSTALLED — npm install needed)
-    └──requires──> SearchAddon loaded in TerminalView useEffect alongside FitAddon
-    └──requires──> Search overlay UI (input, prev/next buttons, match count display, close)
-    └──requires──> Ctrl+F keydown intercepted BEFORE xterm (via terminal.attachCustomKeyEventHandler)
+[Auto-record on session start]
+    └──requires──> [openclaw.json per-agent autoRecord flag parsed by OpenClawConfigReader]
+    └──requires──> [TerminalStreamService PTY spawn path checks agent config and calls startRecording()]
+    └──conflicts──> [Manual REC toggle — guard with isRecording() check to prevent double-start]
+    └──requires──> [Storage rotation] (auto-record without rotation leads to unbounded disk growth)
 
-Search match count display
-    └──requires──> Terminal text search (above)
-    └──enhances──> Search overlay UI
+[Storage rotation / auto-prune backend]
+    └──requires──> [listRecordings() with fileSizeBytes — already exists in DatabaseConnection]
+    └──requires──> [deleteRecording() — exists in DatabaseConnection; file deletion is in recordingRoutes.ts and must be extracted to a shared helper]
+    └──requires──> [New: RecordingPruneService or method on RecordingCaptureService]
 
-Scrollbar gutter markers for search results
-    └──requires──> Terminal text search (above)
-    └──requires──> xterm Terminal options: overviewRulerWidth: 15 (new config)
-    └──enhances──> Terminal text search (automatic via ISearchDecorationOptions.matchOverviewRuler)
+[Storage rotation UI in RecordingLibrary]
+    └──requires──> [Storage rotation backend + POST /api/recordings/prune endpoint]
+    └──requires──> [GET /api/recordings/storage-stats returning { totalBytes, capBytes, recordingCount }]
 
-Keyboard tab navigation shortcuts
-    └──requires──> useSessionSelection.selectSession() callback (exists)
-    └──requires──> activeInstances list (exists via useActiveInstances)
-    └──no external library needed
-
-Sidebar toggle shortcut
-    └──requires──> setShowSidebar callback (exists in App.tsx)
-    └──enhances──> Keyboard tab navigation shortcuts (same hook/listener)
+[Events tab row click navigates to terminal]
+    └──requires──> [App.tsx onNavigateToSession callback threaded into GsdView/EventsTab]
+    └──enhances──> [Clickable history session rows] (same navigation pattern, shared App.tsx logic)
 ```
 
 ### Dependency Notes
 
-- **State chip + pressure badge both require agentId in TerminalView:** `TerminalView` currently only receives `tmuxSessionName`. The parent `App.tsx` has `selectedInstance` which contains `agentId`. Adding `agentId?: string` prop to `TerminalView` unlocks both features without architecture changes.
-- **Search requires `terminal.attachCustomKeyEventHandler`:** xterm.js 5 provides `terminal.attachCustomKeyEventHandler(handler)` which returns `true` to allow the event to propagate to the terminal, or `false` to swallow it. Ctrl+F must return `false` so the browser's find dialog doesn't open alongside the custom overlay.
-- **Browser notifications require prior state knowledge:** The notification must only fire when state *transitions* to `permission_prompt`, not every 5s while already in that state. This requires storing previous state in a ref inside `useAgentLiveStatus` or a wrapper hook.
-- **Scrollbar gutter markers are automatic:** Setting `matchOverviewRuler` (required field in `ISearchDecorationOptions`) + `overviewRulerWidth` on the Terminal instance is all that is needed. No separate implementation beyond the color value.
+- **Auto-record requires storage rotation:** Enabling auto-record without a cap creates unbounded disk growth on a single-server deployment. These two features must ship in the same phase.
+- **Clickable rows require API join:** The current `/api/history/sessions` response does not include a `recordingId` field. Either extend the SQL query with a LEFT JOIN on `recordings` (preferred — clean, single round-trip), or do a client-side lookup against the `/api/recordings` response (acceptable but wasteful for large recording libraries).
+- **Keyboard persistence fix applies to all toolbar buttons:** The re-focus fix must be applied uniformly. Adding Enter without fixing focus loss makes it behave inconsistently with the other buttons.
+- **File deletion needs extraction:** `recordingRoutes.ts` currently handles `fs.unlinkSync` on DELETE. This logic must move into a shared helper (or into `RecordingCaptureService`) so the pruning path can also delete files cleanly.
 
 ---
 
 ## MVP Definition
 
-### Launch With (v3.0)
+### Launch With (v3.2)
 
-Minimum viable operator workstation additions — what makes the milestone meaningful.
+Minimum scope to address the milestone goal: close daily mobile friction and finish the recording story.
 
-- [ ] **Agent state chip + context pressure badge in terminal header** — Wires `useAgentLiveStatus` data (already polling) into the terminal header bar. Minimal UI change, high daily value. Requires new `agentId` prop on TerminalView.
-- [ ] **Permission prompt tab badge** — Red dot overlay on the tab button when `state === 'permission_prompt'`. Operator sees it immediately without watching every terminal.
-- [ ] **Terminal text search (Ctrl+F)** — Install `@xterm/addon-search`, add SearchAddon to TerminalView, build search overlay with input + prev/next + match count.
-- [ ] **Keyboard tab navigation** — `Alt+]` / `Alt+[` (or `Ctrl+Tab` / `Ctrl+Shift+Tab`) to cycle tabs; `Alt+S` to toggle sidebar. Custom hook, no library.
+- [ ] Enter button in mobile toolbar — closes the most glaring gap; operators currently cannot submit commands from the mobile toolbar
+- [ ] Keyboard persistence after toolbar button tap — without this, every toolbar key tap dismisses the soft keyboard requiring a follow-up tap on the terminal
+- [ ] Clickable history session rows — navigate to live terminal if active; open recording player if stopped+recorded; show "no recording" toast if stopped+unrecorded
+- [ ] Auto-record on session start (per-agent config) — completes REC-05 deferred from v3.1; config flag per agent in `openclaw.json`
+- [ ] Storage rotation with configurable cap — must ship alongside auto-record to prevent unbounded growth; default 2 GB cap, 30-day max age
 
-### Add After Core Is Working (v3.0.x)
+### Add After Core Is Working (v3.2.x)
 
-- [ ] **Browser notifications for permission prompts** — Depends on opt-in UI being placed somewhere logical (settings toggle); add after tab badge is confirmed working (same data source, lower urgency).
-- [ ] **Scrollbar gutter markers** — Trivial addition once search is working; just set `overviewRulerWidth: 15` in Terminal options and add `matchOverviewRuler` color to search decorations.
+- [ ] Storage rotation UI in RecordingLibrary — visual usage bar + "Prune now" button; pruning already runs automatically so this is a polish layer
+- [ ] Events tab row click navigates to terminal — low complexity; same pattern as history rows once navigation callback is threaded through App.tsx
 
-### Future Consideration (v3.1+)
+### Future Consideration (v3.3+)
 
-- [ ] **Search highlight persistence across tab switches** — Requires storing search term per session in React state or localStorage; SearchAddon must be re-initialized with stored term on tab return. Adds complexity to terminal lifecycle.
-- [ ] **Keyboard shortcut help overlay** — `?` key shows all shortcuts. Nice UX polish, not critical for single operator who configured the system.
+- [ ] Auto-record on permission prompt detection — useful but depends on `detectAgentState()` reliability which is flagged as fragile tech debt in PROJECT.md
+- [ ] Recording external sharing — asciinema.org upload or S3 presigned URL — out of scope for single-operator tool
+- [ ] Session duration column in SessionHistory — requires reliable session end time tracking beyond current `last_active_at` heuristic
 
 ---
 
 ## Feature Prioritization Matrix
 
-| Feature | Operator Value | Implementation Cost | Priority |
-|---------|---------------|---------------------|----------|
-| Agent state chip in terminal header | HIGH — immediate situational awareness | LOW — existing data + existing component | P1 |
-| Context pressure badge in terminal header | HIGH — prevents context overflow surprises | LOW — same data, same component | P1 |
-| Permission prompt tab badge | HIGH — unblocks stuck agents immediately | MEDIUM — badge slot in InstanceTabBar | P1 |
-| Terminal text search (Ctrl+F) | HIGH — investigating agent output is core workflow | MEDIUM — new package + overlay UI | P1 |
-| Keyboard tab navigation | MEDIUM — convenience, not critical path | LOW — simple keydown handler | P1 |
-| Browser notifications | MEDIUM — useful when away from tab | MEDIUM — opt-in flow + transition detection | P2 |
-| Scrollbar gutter markers | MEDIUM — visual density for long sessions | LOW — config flag once search exists | P2 |
-| Search match count | MEDIUM — scope awareness during investigation | LOW — onDidChangeResults event | P2 |
-| Search highlight persistence | LOW — current flow is tab → search | MEDIUM — per-session state management | P3 |
-| Keyboard shortcut help overlay | LOW — single operator knows shortcuts | LOW — static overlay | P3 |
+| Feature | User Value | Implementation Cost | Priority |
+|---------|------------|---------------------|----------|
+| Enter button in toolbar | HIGH | LOW | P1 |
+| Keyboard persistence fix | HIGH | LOW | P1 |
+| Clickable history rows | HIGH | MEDIUM | P1 |
+| Auto-record on session start | HIGH | MEDIUM | P1 |
+| Storage rotation / auto-prune | HIGH | MEDIUM | P1 |
+| Storage rotation UI | MEDIUM | LOW | P2 |
+| Events tab row navigates to terminal | MEDIUM | LOW | P2 |
+| Auto-record on permission prompt | MEDIUM | HIGH | P3 |
 
 **Priority key:**
-- P1: Must have for v3.0 milestone to feel complete
-- P2: Should have — add in same milestone if time allows
-- P3: Nice to have — defer to v3.1
+- P1: Must have for v3.2 launch
+- P2: Should have — add when P1s are done
+- P3: Future milestone
 
 ---
 
 ## Implementation Notes by Feature
 
-### @xterm/addon-search Integration
+### Enter Button
 
-**Package:** `@xterm/addon-search` (monorepo package — matches the `@xterm/addon-fit` pattern already in use)
-**Install:** `npm install --save-dev @xterm/addon-search`
-**Version:** 0.15.0 (latest stable as of research date)
-**Peer dep:** xterm.js v4+ (project uses v5.3.0 / @xterm/xterm@5.5.0 — compatible)
+The `MOBILE_KEYS` array in `TerminalView.tsx` (lines 78-88) drives all toolbar buttons. Insert `{ label: 'Enter', seq: '\r' }` at the beginning of the array before Tab. The `\r` sequence is correct for terminal Enter (carriage return); tmux handles the newline translation. The button renders identically to existing keys via the existing `onTouchStart` handler.
 
-**Key API (HIGH confidence — verified from type definitions):**
-```typescript
-import { SearchAddon } from '@xterm/addon-search';
+**Confidence: HIGH** — verified directly from existing MOBILE_KEYS data structure.
 
-const searchAddon = new SearchAddon({ highlightLimit: 1000 });
-terminal.loadAddon(searchAddon);
+### Keyboard Persistence
 
-// Search
-searchAddon.findNext(term, {
-  regex: false,
-  caseSensitive: false,
-  wholeWord: false,
-  decorations: {
-    matchBackground: '#ffff0033',
-    matchBorder: '#ffff00',
-    matchOverviewRuler: '#ffff00',         // Required — enables gutter markers
-    activeMatchBackground: '#ff6a0099',
-    activeMatchBorder: '#ff6a00',
-    activeMatchColorOverviewRuler: '#ff6a00', // Required
-  },
-});
-searchAddon.findPrevious(term, { ... });
-searchAddon.clearDecorations();
-
-// Match count (fires after each search)
-searchAddon.onDidChangeResults((event) => {
-  // event.resultIndex: 0-based index of active match (-1 if > threshold)
-  // event.resultCount: total matches
-});
+The current `onTouchStart` pattern for each toolbar button:
+```tsx
+onTouchStart={(event) => {
+  event.preventDefault();   // prevents tap → blur on the button element
+  sendInput(key.seq);        // sends escape sequence to PTY via Socket.IO
+}}
 ```
 
-**Gutter markers:** Requires `Terminal` options to include `overviewRulerWidth: 15`. This renders the colored ruler on the right edge of the terminal canvas. The `matchOverviewRuler` color in `ISearchDecorationOptions` is a required field — it must be set.
+What is missing: after `sendInput`, the xterm.js internal textarea loses focus because `preventDefault` stops the native tap event chain but does not restore PTY focus. Fix:
 
-**Ctrl+F interception:** Use `terminal.attachCustomKeyEventHandler` BEFORE `terminal.open()`:
-```typescript
-terminal.attachCustomKeyEventHandler((ev) => {
-  if (ev.ctrlKey && ev.key === 'f' && ev.type === 'keydown') {
-    setSearchVisible(true);
-    return false; // Swallow — prevents browser find dialog
-  }
-  return true; // Pass through all other keys
-});
+```tsx
+onTouchStart={(event) => {
+  event.preventDefault();
+  sendInput(key.seq);
+  requestAnimationFrame(() => terminalRef.current?.focus());
+}}
 ```
 
-**Escape to close:** Also intercept `Escape` when search overlay is open:
+`MobileKeyToolbar` is currently a sibling function component that receives only `sendInput`, `selectMode`, and `onToggleCopyMode` — it does not have access to the xterm Terminal instance. Cleanest fix: add a `refocusTerminal: () => void` callback prop that `TerminalViewInner` provides via `useCallback(() => terminalInstanceRef.current?.focus(), [])`.
+
+This same `refocusTerminal` callback must be called in the existing Copy and Esc button handlers. The Paste button's async clipboard path should call it after the clipboard read resolves.
+
+**Confidence: HIGH** — the `requestAnimationFrame(() => terminal.focus())` pattern is already used in `handleToggleCopyMode` (lines 344-346 of TerminalView.tsx), confirming it works in this codebase. xterm.js issue #5377 confirms focus-loss is the documented root cause for mobile toolbar interactions.
+
+### Clickable History Rows
+
+`HistoryView` already declares `onNavigateToSession?: (sessionName: string) => void` as a prop (line 28) and accepts it but passes it through as `_onNavigateToSession` (unused). Changes needed:
+
+1. Pass `onNavigateToSession` from `HistoryView` down to `SessionHistory`
+2. `SessionHistory` calls it with `session.tmuxSessionName` on row click — but only if the session is clickable (i.e., active or has a recording)
+3. Extend `/api/history/sessions` SQL to LEFT JOIN `recordings ON tmux_session_name = session_name` and include `recordingId: number | null` in each row result
+4. In `App.tsx`, implement `onNavigateToSession(sessionName)`: look up `sessionName` in `activeInstances`; if found and active, switch to Terminals view and select that tab; if not found, call the recording lookup path
+5. Add visual affordances to rows: `cursor-pointer` class, hover background change (already present as `hover:bg-warden-border/30`), and a right-pointing chevron icon on the right edge of each row
+
+**Confidence: HIGH** — prop stub already exists; the pattern mirrors how `onRestart` is threaded in the existing codebase.
+
+### Auto-Record Configuration
+
+Recommended approach: add `autoRecord?: boolean` to the `AgentDetails` type in `openclawTypes.ts`. `OpenClawConfigReader` parses `AgentDetails` objects per-agent already; the field falls through as `undefined` (falsy) for agents that do not set it.
+
+When `TerminalStreamService` spawns a new PTY (in `handleConnection` or equivalent), it has access to the session name and agent ID. Look up the agent config from `OpenClawConfigReader`, check `autoRecord`, and if true call `recordingCaptureService.startRecording()` before beginning the PTY data tap.
+
+Guard: `recordingCaptureService.isRecording(sessionName)` check before auto-starting prevents double-recording if the operator already started a manual recording.
+
+Client side: no changes needed for the auto-start path. The client's `useRecordingState` hook polls `/api/recordings/status/:sessionName` to discover if a recording is in progress (already implemented), so the REC indicator in the terminal header will light up automatically when the server starts an auto-recording.
+
+**Confidence: MEDIUM** — `openclaw.json` schema extension is straightforward; the TerminalStreamService hook point needs verification against the actual PTY spawn code path in `TerminalStreamService.ts`.
+
+### Storage Rotation
+
+Policy implementation:
+- **Max total size:** configurable via `WARDEN_RECORDING_MAX_GB` env var, default 2 GB
+- **Max age:** configurable via `WARDEN_RECORDING_MAX_DAYS` env var, default 30 days
+- **Deletion order:** oldest `stopped_at` first (most recordings with least recent value)
+- **Safe execution points:** (1) server startup, (2) after each `stopRecording()` completes, (3) explicit `POST /api/recordings/prune`
+
+New method in `RecordingCaptureService` (or a dedicated `RecordingPruneService`):
 ```typescript
-if (ev.key === 'Escape' && searchVisible) {
-  setSearchVisible(false);
-  searchAddon.clearDecorations();
-  return false;
-}
-```
+pruneRecordings(): { deletedCount: number; freedBytes: number } {
+  const all = database.listRecordings(); // returns RecordingEntry[] ordered by started_at desc
+  const completed = all.filter(r => r.stoppedAt !== null);
 
-### Permission Prompt Tab Badge
+  // Phase 1: delete by age
+  const cutoff = new Date(Date.now() - MAX_AGE_MS);
+  const aged = completed.filter(r => new Date(r.stoppedAt!) < cutoff);
+  for (const r of aged) deleteRecordingWithFile(r);
 
-**Signal source:** `useAgentLiveStatus` already exposes `state: AgentStateHint | null` per agent. The `InstanceTabBar` needs to receive this data.
-
-**Data flow options:**
-1. Call `useAgentLiveStatus()` inside `App.tsx` (already available via `useAgentLiveStatus` hook) and pass relevant state down to `InstanceTabBar` as a prop: `permissionAlertSessions: Set<string>`
-2. Call `useAgentLiveStatus()` directly in `InstanceTabBar` — simpler, self-contained
-
-Option 2 is recommended to keep `InstanceTabBar` self-contained. The hook already deduplicates via JSON comparison so double-calling has no polling cost.
-
-**Badge UI:** Small red dot overlay positioned top-right of tab button. Pulse animation (`animate-ping`) to draw attention. Accessible: `title="Permission prompt waiting"` on the badge element.
-
-**Tab indicator pattern (standard UX):**
-- Dot badge: colored circle overlay in tab corner — low footprint, high visibility
-- Color: `warden-warning` (amber/yellow) — permission prompts are attention-needed, not errors
-- Animation: `animate-ping` pulse while state is active; stops when resolved
-
-### Browser Notifications
-
-**Permission flow (MEDIUM confidence — verified against MDN):**
-1. Notification.permission states: `'default'`, `'granted'`, `'denied'`
-2. Must call `Notification.requestPermission()` inside a user gesture handler
-3. Pattern: settings toggle → user clicks → `requestPermission()` → OS prompt appears
-4. Never auto-prompt on page load — browsers will block and users will deny
-
-**State transition detection (needed to avoid repeated notifications):**
-```typescript
-const previousStatesRef = useRef<Map<string, AgentStateHint | null>>(new Map());
-
-// Inside useEffect watching liveStatusMap:
-for (const [agentId, status] of liveStatusMap) {
-  const prev = previousStatesRef.current.get(agentId);
-  if (prev !== 'permission_prompt' && status.state === 'permission_prompt') {
-    // Only fires on transition, not on each 5s poll while state persists
-    new Notification(`Agent ${agentId} needs permission`, { body: '...' });
+  // Phase 2: delete by total size cap (oldest first)
+  const remaining = database.listRecordings().filter(r => r.stoppedAt);
+  const totalBytes = remaining.reduce((sum, r) => sum + (r.fileSizeBytes ?? 0), 0);
+  if (totalBytes > MAX_BYTES) {
+    const byAge = [...remaining].sort((a, b) =>
+      new Date(a.stoppedAt!).getTime() - new Date(b.stoppedAt!).getTime()
+    );
+    let excess = totalBytes - MAX_BYTES;
+    for (const r of byAge) {
+      if (excess <= 0) break;
+      deleteRecordingWithFile(r);
+      excess -= r.fileSizeBytes ?? 0;
+    }
   }
 }
-previousStatesRef.current = new Map(liveStatusMap.entries().map(...));
 ```
 
-### Keyboard Navigation
+File deletion extraction: `recordingRoutes.ts` currently does `fs.unlinkSync(recording.filePath)` inline in the DELETE handler. Extract this into a `deleteRecordingWithFile(recording: RecordingEntry)` helper that both the route and the pruning path use.
 
-**Approach:** Custom `useKeyboardNav` hook with `document.addEventListener('keydown', ...)`.
-
-**Why not react-hotkeys-hook:** The xterm.js canvas captures keyboard events. When terminal is focused, `document` events still fire (xterm uses `document.addEventListener` internally), but a global hotkey library may conflict with xterm's own key handler registration. A custom `useEffect` on `document` is more predictable and requires zero additional dependencies.
-
-**Key bindings (chosen to avoid common conflicts):**
-- `Alt+]` → next tab (no browser conflict, no tmux conflict)
-- `Alt+[` → previous tab (symmetric)
-- `Alt+S` → toggle sidebar
-- `Ctrl+F` → open terminal search (intercepted at xterm level via `attachCustomKeyEventHandler`, not document)
-
-**Focus-aware enabling:** The keydown handler should check if the active element is a text input (`INPUT`, `TEXTAREA`, `[contenteditable]`) and skip navigation in that case — operator may be typing in the prompt panel.
-
-```typescript
-document.addEventListener('keydown', (ev) => {
-  const target = document.activeElement;
-  const isTyping = target instanceof HTMLInputElement ||
-    target instanceof HTMLTextAreaElement ||
-    (target as HTMLElement)?.contentEditable === 'true';
-  if (isTyping) return; // Don't navigate while typing a prompt
-
-  if (ev.altKey && ev.key === ']') {
-    // next tab
-  }
-});
-```
-
-### Agent State Chip + Context Pressure in Terminal Header
-
-**Current header structure in `TerminalView.tsx`:**
-```
-[connection dot] [session name]           [font size button] [hint text]
-```
-
-**New header structure:**
-```
-[connection dot] [session name]   [state chip] [pressure %]   [font size button]
-```
-
-**Prop change needed:** `TerminalView` receives `tmuxSessionName`. Parent `App.tsx` has `selectedInstance` which has `agentId`. Add `agentId?: string` prop.
-
-**Inside `TerminalView`:** Call `useAgentLiveStatus()` directly (same self-contained pattern as InstanceTabBar badge recommendation), look up by `agentId`. Render `StateBadge` + `PressureIndicator` from `gsdShared.tsx`.
-
-**Warning:** Both components already exist — this is a wiring task, not a build task. LOW implementation risk.
+**Confidence: HIGH** — all required DB methods exist; pattern follows established Node.js log-rotation conventions (age + size cap, oldest-first deletion); verified against better-sqlite3 documentation.
 
 ---
 
-## Ecosystem Comparison: Terminal Search Approaches
+## Ecosystem Patterns Observed
 
-| Approach | Match Count | Gutter Markers | Search Highlight | Implementation |
-|----------|-------------|----------------|------------------|----------------|
-| `@xterm/addon-search` | YES (`onDidChangeResults`) | YES (`matchOverviewRuler`) | YES (decorations) | Install package, load addon |
-| Manual buffer scan + mark | NO (DIY) | NO | Fragile (ANSI codes) | Major custom work |
-| Browser Find (Ctrl+F) | YES (browser UI) | NO | YES | Zero work, but only finds rendered text |
+### Mobile Terminal Keyboard Toolbar (Industry Pattern)
 
-**Recommendation:** `@xterm/addon-search` is the only viable option. Browser Find does not work reliably on xterm.js canvas rendering. Manual scan is prohibitive. The addon is maintained by the xterm.js core team and ships as `@xterm/addon-search` matching the monorepo package pattern already used (`@xterm/addon-fit`, `@xterm/addon-web-links`).
+Reference apps (Termius, NewTerm 2, Blink Shell) all implement keyboard accessory toolbars. Common pattern:
+- Always-visible sticky bar at bottom of screen
+- Keys: Esc, Tab, Ctrl, arrow keys, Enter, function keys
+- Each button uses `touchstart` + `preventDefault` to avoid soft keyboard dismissal
+- After each button tap, focus is returned to the terminal input element
+
+Web terminal implementations face the same challenge. iOS Safari does not allow programmatic `focus()` calls to open the keyboard (only user-initiated gestures open the keyboard), but calling `element.focus()` within a `touchstart` handler (where a user gesture is in-progress) does keep the keyboard open. This is the mechanism that the existing `onTouchStart` pattern exploits — the `refocus` call must happen within the same event tick or in a `requestAnimationFrame` to remain within the gesture context.
+
+**Confidence: MEDIUM** — sourced from Termius blog, NewTerm GitHub, and xterm.js issue discussions; iOS Safari gesture-context behaviour is known but not officially documented.
+
+### Storage Rotation (Industry Pattern)
+
+Standard rotation policies for bounded-disk deployments use two axes: time (delete older than N days) and size (delete oldest until under cap). Running on: server start, after write, and manual trigger. This matches PM2 log rotation, winston-daily-rotate-file, and Linux `logrotate` conventions. Size-cap with oldest-first deletion is the dominant pattern because it preserves recent high-value recordings while making room for new ones.
+
+**Confidence: HIGH** — verified against multiple Node.js log rotation implementations; pattern is language-agnostic and well-established.
+
+### Clickable List Row Navigation (Industry Pattern)
+
+Standard UX for data list rows with drilldown:
+- Row has `cursor-pointer`, hover background change, right chevron icon
+- Clicking navigates to: live view if resource is active, detail/replay view if completed
+- Touch target minimum: 44px height (Apple HIG, already met by existing session row `min-h-[44px]`)
+- Disambiguation: if multiple targets are possible (live terminal vs recording replay), pick the most recent/relevant one automatically, or show a contextual action sheet
+
+**Confidence: HIGH** — established UX pattern, consistent with Apple HIG and Material Design guidelines.
 
 ---
 
 ## Sources
 
-- [@xterm/addon-search type definitions](https://github.com/xtermjs/xterm.js/blob/master/addons/addon-search/typings/addon-search.d.ts) — HIGH confidence (official source, complete API)
-- [@xterm/addon-search npm page](https://www.npmjs.com/package/@xterm/addon-search) — HIGH confidence
-- [MDN Notifications API](https://developer.mozilla.org/en-US/docs/Web/API/Notifications_API) — HIGH confidence (official MDN)
-- [MDN Notification.requestPermission()](https://developer.mozilla.org/en-US/docs/Web/API/Notification/requestPermission_static) — HIGH confidence
-- [web.dev Push Notifications Permission UX](https://web.dev/articles/push-notifications-permissions-ux) — MEDIUM confidence (Google official but prescriptive)
-- [react-hotkeys-hook useHotkeys API](https://react-hotkeys-hook.vercel.app/docs/api/use-hotkeys) — MEDIUM confidence (referenced to inform the anti-feature recommendation)
-- Existing codebase: `src/server/routes/gsdRoutes.ts`, `src/client/hooks/useAgentLiveStatus.ts`, `src/client/components/TerminalView.tsx`, `src/client/components/InstanceTabBar.tsx`, `src/client/components/gsdShared.tsx` — HIGH confidence (direct code inspection)
+- xterm.js issue #5377 — Limited touch support on mobile devices: https://github.com/xtermjs/xterm.js/issues/5377
+- xterm.js issue #2403 — Accommodate predictive keyboard on mobile: https://github.com/xtermjs/xterm.js/issues/2403
+- Termius blog — Touch Terminal on iOS: https://termius.com/blog/new-touch-terminal-on-ios
+- NewTerm GitHub — iOS terminal keyboard toolbar implementation reference: https://github.com/hbang/NewTerm
+- MDN HTMLElement.focus() — focus within touchstart gesture context: https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/focus
+- MDN VirtualKeyboard API — programmatic keyboard control: https://developer.mozilla.org/en-US/docs/Web/API/VirtualKeyboard_API
+- mobilespoon.net — 10 usability rules for mobile keyboard UX: https://www.mobilespoon.net/2018/12/10-usability-rules-keyboard-mobile-app.html
+- Pencil & Paper — Data Table UX Patterns: https://www.pencilandpaper.io/articles/ux-pattern-analysis-enterprise-data-tables
+- Warden codebase — TerminalView.tsx, SessionHistory.tsx, HistoryView.tsx, RecordingLibrary.tsx, RecordingCaptureService.ts, DatabaseConnection.ts (direct inspection)
 
 ---
 
-*Feature research for: Warden Dashboard v3.0 Operator Awareness & Terminal Power Tools*
-*Researched: 2026-03-03*
+*Feature research for: Warden Dashboard v3.2 Mobile Operations & UX Polish*
+*Researched: 2026-03-04*
