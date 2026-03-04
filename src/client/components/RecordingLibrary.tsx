@@ -40,6 +40,11 @@ export function RecordingLibrary({ onPlayRecording, refreshKey }: RecordingLibra
   const [autoRecordAgentIds, setAutoRecordAgentIds] = useState<Set<string>>(new Set());
   const [agents, setAgents] = useState<Array<{ id: string; name: string }>>([]);
   const [showAutoRecordSettings, setShowAutoRecordSettings] = useState(false);
+  const [storageStats, setStorageStats] = useState<{ totalBytes: number; recordingCount: number; capBytes: number } | null>(null);
+  const [showStorageSettings, setShowStorageSettings] = useState(false);
+  const [capInputMb, setCapInputMb] = useState<string>('');
+  const [isPruning, setIsPruning] = useState(false);
+  const [pruneResult, setPruneResult] = useState<{ deletedCount: number; freedBytes: number } | null>(null);
 
   const fetchRecordings = useCallback(async () => {
     setIsLoading(true);
@@ -56,11 +61,50 @@ export function RecordingLibrary({ onPlayRecording, refreshKey }: RecordingLibra
     }
   }, []);
 
+  const fetchStorageStats = useCallback(() => {
+    void fetch('/api/recordings/storage-stats')
+      .then(r => r.json())
+      .then((data: { totalBytes: number; recordingCount: number; capBytes: number }) => {
+        setStorageStats(data);
+        // Initialize cap input from server value (convert bytes to MB)
+        setCapInputMb(data.capBytes > 0 ? String(Math.round(data.capBytes / (1024 * 1024))) : '');
+      })
+      .catch(() => { /* non-fatal */ });
+  }, []);
+
+  const handleSetCap = useCallback(() => {
+    const mb = parseInt(capInputMb, 10);
+    const capBytes = isNaN(mb) || mb <= 0 ? 0 : mb * 1024 * 1024;
+    void fetch('/api/recordings/rotation-config', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ capBytes }),
+    }).then(() => fetchStorageStats());
+  }, [capInputMb, fetchStorageStats]);
+
+  const handlePrune = useCallback(() => {
+    setIsPruning(true);
+    setPruneResult(null);
+    void fetch('/api/recordings/rotation/prune', { method: 'POST' })
+      .then(r => r.json())
+      .then((result: { deletedCount: number; freedBytes: number }) => {
+        setPruneResult(result);
+        fetchStorageStats();
+        // Refresh recordings list since some may have been pruned
+        void fetchRecordings();
+        // Clear prune result after 5 seconds
+        setTimeout(() => setPruneResult(null), 5000);
+      })
+      .catch(() => { /* non-fatal */ })
+      .finally(() => setIsPruning(false));
+  }, [fetchStorageStats, fetchRecordings]);
+
   useEffect(() => {
     void fetchRecordings();
   }, [fetchRecordings, refreshKey]);
 
   useEffect(() => {
+    fetchStorageStats();
     void Promise.all([
       fetch('/api/agents').then(r => r.json()),
       fetch('/api/recordings/auto-record-config').then(r => r.json()),
@@ -72,7 +116,7 @@ export function RecordingLibrary({ onPlayRecording, refreshKey }: RecordingLibra
       );
       setAutoRecordAgentIds(enabled);
     }).catch(err => console.error('Failed to load auto-record config:', err));
-  }, []);
+  }, [fetchStorageStats]);
 
   const handleToggleAutoRecord = useCallback(async (agentId: string) => {
     const enabled = !autoRecordAgentIds.has(agentId);
