@@ -13,7 +13,7 @@ See: .planning/PROJECT.md (updated 2026-03-03)
 Phase: 20 — Terminal Search & Browser Notifications
 Plan: 02 complete (ALL PLANS COMPLETE)
 Status: Phase 20 complete — v3.0 Operator Awareness & Terminal Power Tools milestone achieved
-Last activity: 2026-03-03 — Phase 20 Plan 02 executed
+Last activity: 2026-03-04 — Completed quick task 2036: Fix v3.0 review findings
 
 Progress: [############################] 100% (Phase 20 of 20 — Plan 02/02 complete)
 
@@ -248,6 +248,7 @@ Key decisions for v3.0 (from research — apply from Phase 19 onwards):
 | 2033 | Add targeted code comments for RISK-1 (ref-in-render), RISK-2 (PTY-exit overlay), RISK-3 (stale-closure), EDGE-2 (double-timer guard) | 2026-03-03 | `e03797e` |
 | 2034 | Final readiness check: all 2030 review P1/P2 items confirmed resolved, 40 tests pass, build clean — 2030 review cycle closed | 2026-03-03 | `92dbc07` |
 | 2035 | Draft v3.0 milestone scope: combined Operator Awareness & Terminal Power Tools (permission alerts, context pressure, terminal search, keyboard nav) | 2026-03-03 | `6d0c2e5` |
+| 2036 | Fix v3.0 review findings: aria-label, ROADMAP checkboxes, deps cleanup | 2026-03-04 | `b48660f` |
 
 ### Roadmap Evolution
 
