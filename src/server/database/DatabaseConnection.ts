@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import type { AgentInstance, AgentInstanceCreateParams, AgentInstanceStatus, TokenUsageRow, BurnRateEntry, BudgetConfig, BudgetAlertStatus, BurnWindow, TokenUsageByModelRow, ModelComparisonRow, TokenUsageExportRow, RecordingEntry, AutoRecordConfig } from '../../shared/types.js';
+import type { AgentInstance, AgentInstanceCreateParams, AgentInstanceStatus, TokenUsageRow, BurnRateEntry, BudgetConfig, BudgetAlertStatus, BurnWindow, TokenUsageByModelRow, ModelComparisonRow, TokenUsageExportRow, RecordingEntry, AutoRecordConfig, RotationConfig, StorageStats } from '../../shared/types.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -380,6 +380,55 @@ class DatabaseConnection {
     return row?.auto_record === 1;
   }
 
+  getRotationConfig(): RotationConfig {
+    const row = this.db.prepare(
+      'SELECT cap_bytes AS capBytes FROM rotation_config WHERE id = 1'
+    ).get() as { capBytes: number } | undefined;
+    return { capBytes: row?.capBytes ?? 0 };
+  }
+
+  setRotationConfig(capBytes: number): void {
+    this.db.prepare(`
+      INSERT INTO rotation_config (id, cap_bytes, updated_at)
+      VALUES (1, ?, CURRENT_TIMESTAMP)
+      ON CONFLICT(id) DO UPDATE SET cap_bytes = excluded.cap_bytes, updated_at = CURRENT_TIMESTAMP
+    `).run(capBytes);
+  }
+
+  getStorageStats(): StorageStats {
+    const row = this.db.prepare(`
+      SELECT COALESCE(SUM(file_size_bytes), 0) AS totalBytes,
+             COUNT(*) AS recordingCount
+      FROM recordings
+      WHERE stopped_at IS NOT NULL AND deletion_pending = 0
+    `).get() as { totalBytes: number; recordingCount: number };
+    return { totalBytes: row.totalBytes, recordingCount: row.recordingCount };
+  }
+
+  getRotationCandidates(): RecordingEntry[] {
+    return this.db.prepare(`
+      SELECT id, session_name AS sessionName, agent_id AS agentId, agent_name AS agentName,
+             project_path AS projectPath, file_path AS filePath,
+             started_at AS startedAt, stopped_at AS stoppedAt,
+             duration_secs AS durationSecs, file_size_bytes AS fileSizeBytes,
+             stop_reason AS stopReason
+      FROM recordings
+      WHERE stopped_at IS NOT NULL AND deletion_pending = 0 AND file_size_bytes IS NOT NULL
+      ORDER BY started_at ASC
+    `).all() as RecordingEntry[];
+  }
+
+  markDeletionPending(id: number): void {
+    this.db.prepare('UPDATE recordings SET deletion_pending = 1 WHERE id = ?').run(id);
+  }
+
+  isRecordingPendingDeletion(id: number): boolean {
+    const row = this.db.prepare(
+      'SELECT deletion_pending FROM recordings WHERE id = ?'
+    ).get(id) as { deletion_pending: number } | undefined;
+    return row?.deletion_pending === 1;
+  }
+
   close(): void {
     console.log('[Database] Checkpointing WAL before close');
     this.db.pragma('wal_checkpoint(TRUNCATE)');
@@ -512,6 +561,22 @@ class DatabaseConnection {
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )
     `);
+
+    // Migration: rotation_config table (ROT-01) — single-row storage cap config
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS rotation_config (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        cap_bytes INTEGER NOT NULL DEFAULT 0,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Migration: deletion_pending column on recordings (ROT-02) — two-phase deletion safety
+    try {
+      this.db.exec('ALTER TABLE recordings ADD COLUMN deletion_pending INTEGER NOT NULL DEFAULT 0');
+    } catch {
+      // Column already exists — safe to ignore
+    }
   }
 
   upsertTokenUsageByModel(row: TokenUsageByModelRow): void {

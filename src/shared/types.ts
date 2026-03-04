@@ -110,3 +110,12 @@ export interface AutoRecordConfig {
   agentId: string;
   autoRecord: boolean;
 }
+
+export interface RotationConfig {
+  capBytes: number;  // 0 = disabled
+}
+
+export interface StorageStats {
+  totalBytes: number;
+  recordingCount: number;
+}
