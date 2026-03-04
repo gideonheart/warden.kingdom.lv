@@ -27,6 +27,25 @@ recordingRoutes.get('/api/recordings/active', (_req, res) => {
   res.json(active);
 });
 
+// GET /api/recordings/auto-record-config — list agents with auto-record enabled
+// NOTE: must be placed before any /:id routes to prevent Express `:id` matching "auto-record-config"
+recordingRoutes.get('/api/recordings/auto-record-config', (_req, res) => {
+  const configs = database.getAllAutoRecordConfigs();
+  res.json({ configs });
+});
+
+// PUT /api/recordings/auto-record-config/:agentId — toggle auto-record for an agent
+recordingRoutes.put('/api/recordings/auto-record-config/:agentId', (req, res) => {
+  const { agentId } = req.params;
+  const { enabled } = req.body as { enabled?: boolean };
+  if (typeof enabled !== 'boolean') {
+    res.status(400).json({ error: 'enabled (boolean) is required' });
+    return;
+  }
+  database.setAutoRecord(agentId, enabled);
+  res.json({ agentId, autoRecord: enabled });
+});
+
 // POST /api/recordings/session/:sessionName/start — start recording
 recordingRoutes.post('/api/recordings/session/:sessionName/start', (req, res) => {
   const { sessionName } = req.params;
