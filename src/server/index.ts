@@ -14,6 +14,7 @@ import { terminalStreamService } from './services/TerminalStreamService.js';
 import { instanceTracker } from './services/InstanceTracker.js';
 import { sessionUsageReader } from './services/SessionUsageReader.js';
 import { recordingRotationService } from './services/RecordingRotationService.js';
+import { telegramBotService } from './services/TelegramBotService.js';
 import { database } from './database/DatabaseConnection.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -94,13 +95,14 @@ terminalStreamService.setupSocketNamespace(socketServer);
 instanceTracker.startPeriodicSync();
 sessionUsageReader.startPeriodicScan();
 recordingRotationService.startPeriodicRotation();
+telegramBotService.start();   // NEW — Telegram bot (no-op if token missing)
 
 httpServer.listen(PORT, HOST, () => {
   console.log(`[Warden] Server running at http://${HOST}:${PORT}`);
   console.log(`[Warden] Environment: ${IS_PRODUCTION ? 'production' : 'development'}`);
 });
 
-function handleShutdown(signal: string): void {
+async function handleShutdown(signal: string): Promise<void> {
   console.log(`\n[Warden] Received ${signal}, shutting down...`);
 
   const forceExitTimeout = setTimeout(() => {
@@ -112,6 +114,8 @@ function handleShutdown(signal: string): void {
   recordingRotationService.stopPeriodicRotation();
   sessionUsageReader.stopPeriodicScan();
   instanceTracker.stopPeriodicSync();
+  await telegramBotService.stop();   // NEW — stop bot before closing HTTP server
+
   httpServer.close(() => {
     console.log('[Warden] HTTP server closed');
     terminalStreamService.killAllPtyProcesses();
@@ -123,5 +127,5 @@ function handleShutdown(signal: string): void {
   });
 }
 
-process.on('SIGTERM', () => handleShutdown('SIGTERM'));
-process.on('SIGINT', () => handleShutdown('SIGINT'));
+process.on('SIGTERM', () => { void handleShutdown('SIGTERM'); });
+process.on('SIGINT', () => { void handleShutdown('SIGINT'); });
