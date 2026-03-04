@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import type { AgentDetails, TopicMapping } from '../../shared/openclawTypes.js';
 
 const REFRESH_INTERVAL_MS = 30_000;
@@ -9,6 +9,13 @@ export function useAgentConfig() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Track previous serialized data to skip setState when poll data is unchanged.
+  // Without this, setAgents/setTopicMappings create new array references every 30s,
+  // triggering unnecessary App re-renders that cascade into TerminalView re-renders
+  // and cause a visible blink on the xterm.js canvas.
+  const previousAgentsRef = useRef<string>('');
+  const previousTopicsRef = useRef<string>('');
+
   const fetchConfig = useCallback(async () => {
     try {
       const [agentsResponse, topicsResponse] = await Promise.all([
@@ -18,12 +25,20 @@ export function useAgentConfig() {
 
       if (agentsResponse.ok) {
         const agentsData = await agentsResponse.json();
-        setAgents(agentsData.agents);
+        const serialized = JSON.stringify(agentsData.agents);
+        if (serialized !== previousAgentsRef.current) {
+          previousAgentsRef.current = serialized;
+          setAgents(agentsData.agents);
+        }
       }
 
       if (topicsResponse.ok) {
         const topicsData = await topicsResponse.json();
-        setTopicMappings(topicsData.mappings);
+        const serialized = JSON.stringify(topicsData.mappings);
+        if (serialized !== previousTopicsRef.current) {
+          previousTopicsRef.current = serialized;
+          setTopicMappings(topicsData.mappings);
+        }
       }
 
       setError(null);
