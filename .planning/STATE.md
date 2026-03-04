@@ -11,9 +11,9 @@ See: .planning/PROJECT.md (updated 2026-03-04)
 ## Current Position
 
 Phase: 21 of 25 (Agent Lifecycle Controls)
-Plan: 1 of 2 complete
-Status: In progress
-Last activity: 2026-03-04 — Phase 21 Plan 01 completed (server-side lifecycle API)
+Plan: 2 of 2 complete
+Status: Phase complete — awaiting human verification (Task 2 checkpoint)
+Last activity: 2026-03-04 — Phase 21 Plan 02 completed (client-side lifecycle UI controls)
 
 Progress: [████████████████░░░░░░░░░░░░░░] 53% (20/25 phases complete)
 
@@ -40,6 +40,9 @@ Key decisions relevant to v3.1:
 - [21-01]: promise chain fire-and-forget for start (not spawn detach) — tmux commands fast (<1s), no event loop blocking risk
 - [21-01]: buildSessionName made public — instanceRoutes pre-registers session name before tmux creation
 - [21-01]: markMissingSessionsStopped guards only 'active'/'idle' — 'starting'/'stopping' have own lifecycle handlers
+- [21-02]: activeInstances filter includes all 6 statuses — API controls scope, UI shows everything returned
+- [21-02]: Confirmation dialogs inline (not modal) — local state string|null pattern for compact UX
+- [21-02]: Dismiss button uses client-side Set — no server call, tab reappears on next poll if still in DB
 
 ### Pending Todos
 
@@ -58,5 +61,5 @@ No active blockers for Phase 21.
 ## Session Continuity
 
 Last session: 2026-03-04
-Stopped at: Completed 21-01-PLAN.md (server-side lifecycle API: start/stop/restart/force-kill endpoints)
-Next step: Execute 21-02-PLAN.md (client-side lifecycle UI controls)
+Stopped at: 21-02-PLAN.md Task 2 checkpoint (human-verify: lifecycle controls end-to-end)
+Next step: Verify lifecycle controls in browser (8 verification steps in 21-02-PLAN.md Task 2)

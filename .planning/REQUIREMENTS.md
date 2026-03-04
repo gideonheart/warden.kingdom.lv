@@ -12,7 +12,7 @@ Requirements for v3.1 Agent Control & Deep Insights. Each maps to roadmap phases
 - [x] **ORCH-01**: Operator can start a new agent session by selecting an agent from the config and clicking Start — tmux session appears in tab bar within 15 seconds with Claude Code running inside
 - [x] **ORCH-02**: Operator can stop a running agent session with two-phase graceful shutdown (Ctrl+C to Claude Code, 5s grace period, then kill tmux session)
 - [x] **ORCH-03**: Operator can restart a stopped or errored agent session — equivalent to stop + start with the same agent identity and project path
-- [ ] **ORCH-04**: Session status badges in InstanceTabBar reflect full lifecycle (starting/active/stopping/stopped) in real time with appropriate visual indicators
+- [x] **ORCH-04**: Session status badges in InstanceTabBar reflect full lifecycle (starting/active/stopping/stopped) in real time with appropriate visual indicators
 - [x] **ORCH-05**: Safety guards — stop/restart require confirmation dialog, start button disabled for agents with active sessions, server returns 409 on duplicate start attempts
 
 ### Token Insights
@@ -119,7 +119,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | ORCH-01 | Phase 21 | Complete |
 | ORCH-02 | Phase 21 | Complete |
 | ORCH-03 | Phase 21 | Complete |
-| ORCH-04 | Phase 21 | Pending |
+| ORCH-04 | Phase 21 | Complete |
 | ORCH-05 | Phase 21 | Complete |
 | TOKN-10 | Phase 22 | Pending |
 | TOKN-11 | Phase 22 | Pending |
