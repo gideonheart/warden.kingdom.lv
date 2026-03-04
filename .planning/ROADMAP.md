@@ -179,11 +179,11 @@ Plans:
   4. Session tab badges display all four lifecycle states — starting, active, stopping, stopped — with visually distinct indicators that update in real time without page reload
   5. Start button is disabled when the agent already has an active session; duplicate start attempts via the API return HTTP 409; stop and restart require a confirmation dialog before executing
 
-**Plans**: TBD
+**Plans:** 2 plans
 
 Plans:
-- [ ] 21-01: Server-side lifecycle API — POST /api/instances/start, POST /api/instances/:id/stop, POST /api/instances/:id/restart; extend AgentInstanceStatus with 'starting' and 'stopping'; InstanceTracker polling update
-- [ ] 21-02: Client-side lifecycle UI — Start agent dialog, confirmation dialogs for stop/restart, tab badge updates for transitional states, 409 duplicate-start handling
+- [ ] 21-01-PLAN.md — Server-side lifecycle API: extend AgentInstanceStatus with starting/stopping, TmuxSessionManager sendCtrlC + createSessionWithClaude, lifecycle API endpoints (start/stop/restart/force-kill), InstanceTracker transitional state reconciliation
+- [ ] 21-02-PLAN.md — Client-side lifecycle UI: Start button in AgentSidebar, confirmation dialogs for stop, lifecycle badges (green/yellow-pulse/orange-pulse/gray/red), terminal overlays for transitional states, Force Kill escape hatch, Restart for stopped sessions
 
 ---
 
