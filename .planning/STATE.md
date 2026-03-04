@@ -13,7 +13,7 @@ See: .planning/PROJECT.md (updated 2026-03-04)
 Phase: 22 of 25 (Token Burn Rate & Budget Alerts)
 Plan: 2 of 2 complete (Phase 22 DONE)
 Status: Phase 22 complete — both plans executed (server layer + client UI)
-Last activity: 2026-03-04 - Completed 22-02: burn rate UI, budget editor, History nav badge
+Last activity: 2026-03-04 - Completed quick task 2040: Fix Phase 22 verification gaps inline
 
 Progress: [████████████████░░░░░░░░░░░░░░] 53% (20/25 phases complete)
 
