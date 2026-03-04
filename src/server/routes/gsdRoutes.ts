@@ -9,6 +9,7 @@ import { gsdRegistryService } from '../services/GsdRegistryService.js';
 import { gsdEventLogService } from '../services/GsdEventLogService.js';
 import { database } from '../database/DatabaseConnection.js';
 import type { AgentStateHint, PressureLevel } from '../../shared/gsdTypes.js';
+import { detectAgentState } from '../utils/agentStateDetection.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -25,19 +26,6 @@ const router = Router();
 // ─────────────────────────────────────────────────────────────────────────────
 // Live-status helpers
 // ─────────────────────────────────────────────────────────────────────────────
-
-function detectAgentState(pane: string): AgentStateHint {
-  if (/enter to select|numbered.*option/i.test(pane)) return 'menu';
-  if (/Do you want to proceed\?|❯\s*1\.\s*Yes/i.test(pane)) return 'permission_prompt';
-  if (/what can i help|waiting for/i.test(pane)) return 'idle';
-  const lines = pane.split('\n');
-  for (const line of lines) {
-    if (/error|failed|exception/i.test(line) && !/error handling/i.test(line)) {
-      return 'error';
-    }
-  }
-  return 'working';
-}
 
 function extractContextPressure(pane: string): { contextPressure: number | null; contextPressureLevel: PressureLevel | null } {
   const nonEmptyLines = pane.split('\n').filter((line) => line.trim().length > 0);
