@@ -25,7 +25,7 @@ Requirements for v3.1 Agent Control & Deep Insights. Each maps to roadmap phases
 
 ### Session Recording
 
-- [ ] **REC-01**: PTY output captured as timestamped asciicast v2 recording files when recording is active, with metadata stored in SQLite recordings table
+- [x] **REC-01**: PTY output captured as timestamped asciicast v2 recording files when recording is active, with metadata stored in SQLite recordings table
 - [ ] **REC-02**: Record button in terminal view header starts/stops recording per session with visual indicator (red pulse when recording)
 - [ ] **REC-03**: Completed recordings replay in read-only xterm.js terminal at variable speed (1x/2x/4x/8x) with pause/resume controls
 - [ ] **REC-04**: Recording library shows browsable list of past recordings with agent name, project, date, duration, file size — click to open in replay player
@@ -129,7 +129,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | TOKN-12 | Phase 23 | Complete |
 | TOKN-13 | Phase 22 | Complete |
 | TOKN-14 | Phase 23 | Complete |
-| REC-01 | Phase 24 | Pending |
+| REC-01 | Phase 24 | Complete |
 | REC-02 | Phase 24 | Pending |
 | REC-03 | Phase 24 | Pending |
 | REC-04 | Phase 24 | Pending |
