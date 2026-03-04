@@ -14,7 +14,7 @@ const mockBotInstance = {
   isRunning: vi.fn(() => false),
 };
 
-const MockBot = vi.fn(() => mockBotInstance);
+const MockBot = vi.fn(function () { return mockBotInstance; });
 
 vi.mock('grammy', () => ({
   Bot: MockBot,
