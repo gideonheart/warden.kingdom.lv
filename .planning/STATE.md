@@ -11,9 +11,9 @@ See: .planning/PROJECT.md (updated 2026-03-04)
 ## Current Position
 
 Phase: 21 of 25 (Agent Lifecycle Controls)
-Plan: 2 of 2 complete
-Status: Phase complete — awaiting human verification (Task 2 checkpoint)
-Last activity: 2026-03-04 — Phase 21 Plan 02 completed (client-side lifecycle UI controls)
+Plan: 3 of 3 complete
+Status: Phase 21 complete — all 3 plans executed
+Last activity: 2026-03-04 — Phase 21 Plan 03 completed (stopped session 30-minute visibility gap closure)
 
 Progress: [████████████████░░░░░░░░░░░░░░] 53% (20/25 phases complete)
 
@@ -43,6 +43,8 @@ Key decisions relevant to v3.1:
 - [21-02]: activeInstances filter includes all 6 statuses — API controls scope, UI shows everything returned
 - [21-02]: Confirmation dialogs inline (not modal) — local state string|null pattern for compact UX
 - [21-02]: Dismiss button uses client-side Set — no server call, tab reappears on next poll if still in DB
+- [21-03]: 30-minute retention window for stopped/error sessions in listActiveInstances() — balances restart access vs tab bar clutter
+- [21-03]: OR clause (not UNION) for stopped/error retention — simpler, readable, same single-pass performance
 
 ### Pending Todos
 
@@ -61,5 +63,5 @@ No active blockers for Phase 21.
 ## Session Continuity
 
 Last session: 2026-03-04
-Stopped at: 21-02-PLAN.md Task 2 checkpoint (human-verify: lifecycle controls end-to-end)
-Next step: Verify lifecycle controls in browser (8 verification steps in 21-02-PLAN.md Task 2)
+Stopped at: Completed 21-03-PLAN.md (stopped session visibility gap closure)
+Next step: Phase 21 complete — proceed to Phase 22
