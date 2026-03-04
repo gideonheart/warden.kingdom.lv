@@ -85,7 +85,7 @@
 
 **Milestone Goal:** Fix daily mobile friction and complete the recording story — auto-record and storage rotation ship together.
 
-- [ ] **Phase 28: Mobile Toolbar Fixes** — Enter button + keyboard persistence on toolbar taps
+- [x] **Phase 28: Mobile Toolbar Fixes** — Enter button + keyboard persistence on toolbar taps (completed 2026-03-04)
 - [ ] **Phase 29: Session Navigation** — History rows navigate to live terminal, recording replay, or explanatory feedback
 - [ ] **Phase 30: Auto-Record Per Agent** — Per-agent toggle to start recording automatically on session creation
 - [ ] **Phase 31: Storage Rotation** — Configurable storage cap with safe oldest-first pruning and rotation UI
@@ -230,7 +230,7 @@ Plans:
 | 26. Token Analytics Polish & Tech Debt | v3.1 | 1/1 | Complete | 2026-03-04 |
 | 24. Session Recording & Replay | v3.1 | 2/2 | Complete | 2026-03-04 |
 | 27. Recording State Cleanup & Tech Debt | v3.1 | 1/1 | Complete | 2026-03-04 |
-| 28. Mobile Toolbar Fixes | v3.2 | 0/1 | Not started | - |
+| 28. Mobile Toolbar Fixes | 1/1 | Complete   | 2026-03-04 | - |
 | 29. Session Navigation | v3.2 | 0/1 | Not started | - |
 | 30. Auto-Record Per Agent | v3.2 | 0/2 | Not started | - |
 | 31. Storage Rotation | v3.2 | 0/2 | Not started | - |

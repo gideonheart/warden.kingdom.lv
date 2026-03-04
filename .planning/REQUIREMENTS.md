@@ -9,8 +9,8 @@ Requirements for v3.2 Mobile Operations & UX Polish. Each maps to roadmap phases
 
 ### Mobile Toolbar
 
-- [ ] **MOB-01**: User can tap Enter button in mobile terminal toolbar to submit commands
-- [ ] **MOB-02**: Soft keyboard stays open when user taps any toolbar button (Enter, Tab, Esc, Ctrl+C, arrows, PgUp/PgDn, Copy, Paste)
+- [x] **MOB-01**: User can tap Enter button in mobile terminal toolbar to submit commands
+- [x] **MOB-02**: Soft keyboard stays open when user taps any toolbar button (Enter, Tab, Esc, Ctrl+C, arrows, PgUp/PgDn, Copy, Paste)
 
 ### Session Navigation
 
@@ -60,8 +60,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| MOB-01 | Phase 28 | Pending |
-| MOB-02 | Phase 28 | Pending |
+| MOB-01 | Phase 28 | Complete |
+| MOB-02 | Phase 28 | Complete |
 | NAV-01 | Phase 29 | Pending |
 | NAV-02 | Phase 29 | Pending |
 | NAV-03 | Phase 29 | Pending |

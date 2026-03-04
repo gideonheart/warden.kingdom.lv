@@ -10,15 +10,19 @@ See: .planning/PROJECT.md (updated 2026-03-04)
 ## Current Position
 
 Phase: 28 of 31 (Mobile Toolbar Fixes)
-Plan: 0 of 1 in current phase
-Status: Ready to plan
-Last activity: 2026-03-04 — v3.2 roadmap created, Phases 28-31 defined
+Plan: 1 of 1 in current phase
+Status: Phase complete — ready for Phase 29
+Last activity: 2026-03-04 — Phase 28 complete: Enter key + iOS keyboard persistence fix shipped
 
-Progress: [██████████████████░░] 27/31 phases complete (87%)
+Progress: [████████████████████] 28/31 phases complete (90%)
 
 ## Performance Metrics
 
-**Completed milestones:** v1.0 (6 phases), v1.1 (2), v2.0 (3), v2.1 (3), v2.3 (4), v3.0 (2), v3.1 (6) = 26 phases shipped
+**Completed milestones:** v1.0 (6 phases), v1.1 (2), v2.0 (3), v2.1 (3), v2.3 (4), v3.0 (2), v3.1 (6), v3.2 in progress (1 phase) = 27 phases shipped
+
+| Phase | Plan | Duration | Tasks | Files |
+|-------|------|----------|-------|-------|
+| 28-mobile-toolbar-fixes | 01 | 2min | 2 | 1 |
 
 ## Accumulated Context
 
@@ -32,6 +36,9 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - Phase 31: Must co-ship with Phase 30 — auto-record without storage cap causes unbounded disk growth
 - Phase 31: Two-phase deletion required — `deletion_pending` DB flag prevents deleting files mid-playback
 - iOS fix: Use `terminal.textarea?.focus()` synchronously in `onTouchStart`, never `terminal.focus()` or deferred calls
+- [Phase 28-mobile-toolbar-fixes]: Use terminal.textarea?.focus() (DOM) not terminal.focus() (xterm API) for iOS keyboard retention
+- [Phase 28-mobile-toolbar-fixes]: Call refocusTerminal() synchronously in onTouchStart — deferred calls ignored by iOS Safari
+- [Phase 28-mobile-toolbar-fixes]: Enter key placed at MOBILE_KEYS[0] for always-visible position on narrow phone screens
 
 ### Pending Todos
 
@@ -53,5 +60,5 @@ None — v3.1 shipped cleanly. v3.2 scope is well-researched with HIGH confidenc
 ## Session Continuity
 
 Last session: 2026-03-04
-Stopped at: v3.2 roadmap created — 4 phases defined (28-31), all 10 requirements mapped
-Next step: `/gsd:plan-phase 28`
+Stopped at: Completed 28-01-PLAN.md — Phase 28 done (Enter key + iOS keyboard-persistence fix in TerminalView.tsx)
+Next step: `/gsd:plan-phase 29` (or `/gsd:execute-phase 29` if plan already exists)
