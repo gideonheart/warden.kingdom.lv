@@ -1,8 +1,8 @@
 # Feature Research
 
-**Domain:** Mobile terminal UX improvements, auto-record triggers, storage rotation, history navigation — v3.2 milestone additions to Warden Dashboard
+**Domain:** Telegram bot notification bridge — monitoring dashboard to Telegram operator awareness (v3.3 milestone)
 **Researched:** 2026-03-04
-**Confidence:** HIGH (all features scoped to known codebase; patterns verified against xterm.js issues, mobile web UX literature, and existing implementation code)
+**Confidence:** HIGH (grammY official docs verified, Telegram Bot API verified, codebase dependencies directly inspected)
 
 ---
 
@@ -10,15 +10,13 @@
 
 These features are ADDITIVE to a shipping product. The following are already complete and must not be rebuilt:
 
-- MobileKeyToolbar with Copy/Paste/Esc/Tab/arrows/PgUp/PgDn buttons (using `onTouchStart` + `event.preventDefault()` pattern)
-- MobilePromptSheet bottom sheet for prompt injection on mobile
-- Session recording in asciicast v2 format with in-memory frame buffer
-- Recording library with sort, delete, download, and play actions
-- Recording player with variable-speed replay (1x/2x/4x/8x)
-- SessionHistory component with agent/status/date filters and pagination
-- HistoryView with desktop tabs and mobile accordion layout
-- EventsTab with source/session filtering and expandable rows
-- `onNavigateToSession` prop stub already wired into HistoryView (currently unused)
+- `detectAgentState()` regex heuristics in `TerminalStreamService` — detects 'waiting_for_permission', 'idle', 'active', 'error' states from PTY output stream
+- `useBudgetAlerts` hook — polls `/api/history/budget-config/status` every 30s, returns 'ok' | 'warning' | 'exceeded' per-system (not per-agent yet)
+- `OpenClawConfigReader.getTopicMappings()` — reads `~/.openclaw/openclaw.json`, returns `TopicMapping[]` with `{ agentId, agentName, groupId, topicId, systemPrompt }` per agent
+- `AgentInstance.telegramTopicId` field — already in SQLite schema and type definitions
+- Browser notification system (`useBrowserNotifications`) — push notifications to browser on permission prompt; opt-in
+- `GatewayApiClient.sendPrompt()` — sends prompts to agents via OpenClaw Gateway API (can be reused for "approve" delivery)
+- `TerminalStreamService` — PTY per session; `onData` callback tapped for recording; same tap point usable for Telegram notification trigger
 
 ---
 
@@ -26,111 +24,123 @@ These features are ADDITIVE to a shipping product. The following are already com
 
 ### Table Stakes (Users Expect These)
 
-Features the operator expects to exist. Missing these makes the product feel broken for daily mobile use.
+Features the operator expects when a "Telegram notifications" milestone ships. Missing these makes the feature feel half-built.
 
 | Feature | Why Expected | Complexity | Notes |
 |---------|--------------|------------|-------|
-| Enter key in mobile toolbar | Every mobile terminal app (Termius, NewTerm, Blink Shell) includes an Enter button; operators cannot submit commands without it | LOW | Add `{ label: 'Enter', seq: '\r' }` to the `MOBILE_KEYS` array in TerminalView.tsx — one-line change to existing data structure |
-| Keyboard stays open after toolbar button tap | Tapping a toolbar button blurs the xterm textarea, closing the soft keyboard; without a fix every key tap requires a re-tap on the terminal to re-open the keyboard | MEDIUM | `onTouchStart` + `event.preventDefault()` already prevents the native tap-to-blur on button press; what is missing is re-focusing the terminal textarea after `sendInput` so the PTY stays keyboard-connected. Pattern: `requestAnimationFrame(() => terminal.focus())` after sendInput |
-| Clickable history session rows | Rows in SessionHistory show session data but clicking does nothing — the UI looks interactive but isn't | MEDIUM | Add `cursor-pointer` + hover affordance + chevron icon; active sessions navigate to Terminals tab selecting that session; stopped sessions with a recording open the Recording Player; stopped sessions without a recording show a brief toast |
-| Storage cap with auto-prune | Without a cap, recording files grow unbounded on a single-server deployment with no managed storage | MEDIUM | Two-axis policy: (1) max total storage bytes, (2) max recording age in days. Delete oldest `stopped_at` recordings first. Run on server start and after each `stopRecording()` call |
-| Auto-record on session start | Manual REC toggle is forgotten; sessions of operational interest go unrecorded unless the operator remembers to click REC for every session | MEDIUM | Per-agent boolean flag in `openclaw.json`. When InstanceTracker discovers a new session for an agent with auto-record enabled, TerminalStreamService calls `recordingCaptureService.startRecording()` at PTY spawn time. Deferred from v3.1 as REC-05 |
+| Permission prompt → Telegram message | Core reason for the milestone — operator wants to know when an agent is blocked, from anywhere | MEDIUM | `TerminalStreamService.onData` already detects agent state via `detectAgentState()`; new `TelegramNotificationService` subscribes to state transitions and sends via grammY `bot.api.sendMessage(groupId, text, { message_thread_id: topicId })` |
+| Inline approve button on permission prompt message | One-tap approve is the primary UX goal from PROJECT.md; typing `/approve` or navigating to browser defeats the purpose | MEDIUM | grammY `InlineKeyboard().text('Approve', 'approve:agentId:sessionName')` attached to the notification message; `bot.callbackQuery('approve:*', handler)` receives tap; handler calls `tmuxSessionManager.sendInput(sessionName, '1\n')` or `gatewayApiClient.sendPrompt()` |
+| Budget alert → Telegram message (amber/red) | Budget alerts already exist in the dashboard; Telegram extension is the same signal via a different channel | LOW | Reuse existing per-agent budget status polling; when threshold crosses (ok→warning, warning→exceeded), call `bot.api.sendMessage()` to agent's topic. Budget check runs server-side on existing 30s interval |
+| Duplicate suppression / cooldown | Without dedup, a stalled agent re-triggers permission prompt detection on every PTY output line, flooding Telegram | MEDIUM | In-memory `Map<string, number>` keyed by `agentId + alertType`, value = last-sent timestamp. Only send if `Date.now() - lastSent > COOLDOWN_MS`. Configurable per type (permission prompt default: 2 min; budget alert default: 10 min) |
+| Bot token configuration | Operator must provide a bot token from BotFather; must not be hardcoded | LOW | Read from `WARDEN_TELEGRAM_BOT_TOKEN` env var. Warden already uses `process.env` for other config. No new config file format needed |
+| Notification settings UI | Operator needs to toggle notification types on/off and adjust cooldown; settings stored in SQLite (same pattern as budget_config, rotation_config) | MEDIUM | New collapsible panel in Settings area (or dedicated Telegram tab in HistoryView). Toggles: enable permission alerts, enable budget alerts. Cooldown inputs per type. Single-row SQLite table: `notification_config` |
 
 ### Differentiators (Competitive Advantage)
 
-Features that go beyond standard terminal dashboard behaviour and are specific to Warden's operator context.
+Features that go beyond basic "bot sends a message" and make the Warden → Telegram bridge genuinely useful for a solo operator.
 
 | Feature | Value Proposition | Complexity | Notes |
 |---------|-------------------|------------|-------|
-| History row navigates to recording replay | Closes the loop between "what happened in that session" and "let me watch it" — one tap from history to playback | MEDIUM | Requires SessionHistory to receive `onPlayRecording` callback; RecordingLibrary already supports `onPlayRecording`; need to join sessions to recordings by `tmux_session_name` in history API response |
-| Auto-record per agent ("always" trigger) | Zero-friction audit trail — every session for a configured agent is recorded without operator action | MEDIUM | Config in `openclaw.json` per agent; triggers from InstanceTracker discovery path; no client UI changes needed for the auto-start itself |
-| Storage rotation UI in RecordingLibrary | Shows current usage vs cap with a visual indicator and a "Prune now" button | LOW | Adds a header strip: "X recordings, Y MB of Z GB cap". Prune button calls `POST /api/recordings/prune`. Operator sees storage health without SSHing into the server |
-| Events tab row click navigates to terminal | EventsTab rows show session names; clicking navigates to that terminal, reducing manual tab-switching during investigation | LOW | Same pattern as clickable history rows; EventsTab already has `selectedSession` state; just add a click handler and accept an `onNavigateToSession` prop |
-| Auto-record trigger on permission prompt | Record only the interesting moments — saves disk vs always-on per agent | HIGH | Requires permission-prompt detection (exists via detectAgentState()) to emit an event that RecordingCaptureService subscribes to; complex interaction with existing recording state; defer to v3.3 unless trivial to hook in |
+| Edit notification message after approve | After the operator taps Approve, the message updates to "Approved by operator at HH:MM" and the inline button disappears — prevents re-tapping stale prompts | LOW | `bot.api.editMessageReplyMarkup(chatId, messageId, { reply_markup: new InlineKeyboard() })` + `bot.api.editMessageText(...)` called inside the `callbackQuery` handler after approve action succeeds |
+| Per-agent Telegram topic routing | Each agent's notifications go to its own configured Telegram topic (already mapped in `openclaw.json`) rather than a single group chat | LOW | `getTopicMappings()` already returns `{ groupId, topicId }` per agent; pass `message_thread_id: parseInt(topicId)` in `sendMessage` call. No new config plumbing needed |
+| Approve via tmux direct input vs Gateway API | Direct `tmux send-keys` is more reliable for permission prompts (sends '1\n' to the waiting process); Gateway API is for prompt injection, not interactive selection | MEDIUM | `TmuxSessionManager.sendKeys(sessionName, '1')` is the right approval mechanism for Claude Code permission prompts (which expect a numbered menu selection); expose as `POST /api/instances/:sessionName/approve` to keep the approve action in a clean API layer |
+| Connection status logging | Bot start/stop logged to console with timestamp; Telegram polling errors logged with retry behaviour | LOW | grammY long-polling catches errors and auto-retries; add `console.log('[TelegramBot] Started polling')` on init and error handler with backoff logging |
+| Graceful shutdown on server stop | Bot polling stops cleanly when the Express server shuts down (no orphan polling processes) | LOW | `bot.stop()` called in existing server shutdown handler (`process.on('SIGTERM')` or equivalent in `src/server/index.ts`) |
 
 ### Anti-Features (Commonly Requested, Often Problematic)
 
 | Feature | Why Requested | Why Problematic | Alternative |
 |---------|---------------|-----------------|-------------|
-| Floating keyboard toolbar (InputAccessoryView-style) | Native iOS terminal apps use it; feels more polished | Web browsers do not support inputAccessoryView outside React Native; position:fixed above the keyboard leads to iOS Safari layout bugs (visualViewport resize events unreliable during keyboard transitions, safe-area insets shift mid-animation) | Keep the existing `sticky bottom-0` toolbar — it is already working and tested; just fix the focus-loss bug |
-| Auto-record with video output (pixel-perfect) | Operators want to share recordings externally | Video encoding (ffmpeg) is a heavy server-side dependency, complex to manage, and produces large files; asciicast v2 captures all terminal output faithfully | asciicast v2 is the right format for terminal sessions; use asciinema player for external sharing if needed |
-| Per-session storage quota | Prevents any one long session from consuming all space | Individual session recordings are naturally bounded by session duration; the total-size cap already solves runaway growth without per-session complexity | Max total size + max age policy is sufficient; prune oldest-first |
-| Real-time auto-delete during an active recording | Prevent disk overflow immediately | Risk of deleting a file the operator is currently watching in the Recording Player; also creates a race condition if pruning runs while `stopRecording()` is writing a file | Run pruning only at safe synchronisation points: server start, after `stopRecording()` completes, and on explicit "Prune now" operator action |
-| Haptic feedback on mobile toolbar button tap | Mobile terminal apps on Android provide haptic feedback | Web Vibration API is blocked on iOS Safari; Android support is inconsistent and opt-in per browser; adds complexity for zero benefit on the primary iOS target | Skip entirely — focus on functional behaviour |
+| Webhook mode instead of long polling | Webhooks are "more production-grade" | Warden already has Nginx + SSL but the server is also behind an IP whitelist; configuring Telegram's servers to bypass IP whitelist adds complexity. Long polling is simpler, lower latency for a single-server operator tool, and grammY docs explicitly recommend it for single-server deployments | Use grammY `bot.start()` (long polling) — simpler, no webhook registration, no IP whitelist changes |
+| Telegram as two-way command interface | Would allow `/status`, `/list`, `/stop agentId` commands via Telegram | Adds significant attack surface (commands from Telegram bypass IP whitelist); Warden is a trusted-operator tool behind IP whitelist for a reason; command parsing complexity for little gain | Keep Telegram interaction strictly to: outbound notifications + one tap approve. Full control remains in the dashboard |
+| Persistent per-agent notification state in Telegram (pinned messages, edit history) | Provides a Telegram-native status board | Managing pinned message IDs across restarts, editing on state change, handling deleted messages creates fragile state synchronisation | Use stateless notification messages with inline buttons; message edits on approve only |
+| SMS/email fallback when Telegram unreachable | Redundancy for critical alerts | Scope creep; Telegram delivery is reliable for a single-operator tool; adds external service dependencies (Twilio, SendGrid) | If Telegram bot errors, log to server console — the operator can SSH in. Browser notifications are already the primary fallback |
+| Per-message cooldown tracking across restarts (SQLite persistence) | Prevents re-flooding after server restart | Adds DB writes on every notification; restarts happen rarely; in-memory cooldown Map is lost on restart but the operator is unlikely to be flooded in the first 2 minutes after a restart | Use in-memory Map; cooldowns reset on restart — acceptable for this use case |
+| Rich message formatting with markdown tables, session details | More context in the Telegram message | Telegram MarkdownV2 escaping is error-prone (many characters must be escaped); plain text + emoji is easier to maintain and less likely to cause `Bad Request: can't parse entities` errors | Use plain text + HTML parse_mode for simple bold/code spans only; avoid MarkdownV2 |
 
 ---
 
 ## Feature Dependencies
 
 ```
-[Enter button in toolbar]
-    (standalone — no external dependencies)
-    └──enhances──> [Keyboard persistence fix] (Enter button benefits from same re-focus fix)
+[TelegramNotificationService — core singleton]
+    └──requires──> [WARDEN_TELEGRAM_BOT_TOKEN env var]
+    └──requires──> [grammY bot instance — one Bot per process]
+    └──requires──> [OpenClawConfigReader.getTopicMappings() — already exists]
+    └──requires──> [TmuxSessionManager.sendKeys() — already exists via execFile]
 
-[Keyboard persistence after toolbar tap]
-    └──requires──> [refocusTerminal callback prop from TerminalViewInner to MobileKeyToolbar]
-    └──applies to──> [Enter, Esc, Tab, arrow, PgUp, PgDn, Copy, Paste buttons — all need same fix]
+[Permission prompt → Telegram message]
+    └──requires──> [TelegramNotificationService]
+    └──requires──> [detectAgentState() output tap — in TerminalStreamService.onData]
+    └──requires──> [State transition tracking (ok → waiting_for_permission only, not every line)]
+    └──enhances──> [Inline approve button]
+    └──requires──> [Duplicate suppression]
 
-[Clickable history session rows]
-    └──requires──> [App.tsx onNavigateToSession implementation — prop stub already exists in HistoryView]
-    └──requires──> [API: /api/history/sessions response must include recording_id or has_recording field]
-    └──enhances──> [History row navigates to recording replay]
+[Inline approve button]
+    └──requires──> [Permission prompt → Telegram message] (message must exist to attach button)
+    └──requires──> [TelegramNotificationService callbackQuery handler]
+    └──requires──> [POST /api/instances/:sessionName/approve endpoint or direct TmuxSessionManager call]
+    └──enhances──> [Edit message after approve] (mark message as acted on)
 
-[History row navigates to recording replay]
-    └──requires──> [Clickable history session rows]
-    └──requires──> [App.tsx receives and threads onPlayRecording callback into HistoryView/SessionHistory]
+[Edit message after approve]
+    └──requires──> [Inline approve button]
+    └──requires──> [In-memory Map<agentId, messageId> to know which message to edit]
 
-[Auto-record on session start]
-    └──requires──> [openclaw.json per-agent autoRecord flag parsed by OpenClawConfigReader]
-    └──requires──> [TerminalStreamService PTY spawn path checks agent config and calls startRecording()]
-    └──conflicts──> [Manual REC toggle — guard with isRecording() check to prevent double-start]
-    └──requires──> [Storage rotation] (auto-record without rotation leads to unbounded disk growth)
+[Budget alert → Telegram]
+    └──requires──> [TelegramNotificationService]
+    └──requires──> [Server-side budget threshold check — extend existing /api/history/budget-config/status logic]
+    └──requires──> [Duplicate suppression] (budget alerts fire every 30s if not suppressed)
+    └──conflicts──> [Per-agent budget alerts] (current budget_config is system-wide; per-agent is an extension)
 
-[Storage rotation / auto-prune backend]
-    └──requires──> [listRecordings() with fileSizeBytes — already exists in DatabaseConnection]
-    └──requires──> [deleteRecording() — exists in DatabaseConnection; file deletion is in recordingRoutes.ts and must be extracted to a shared helper]
-    └──requires──> [New: RecordingPruneService or method on RecordingCaptureService]
+[Duplicate suppression]
+    └──requires──> [TelegramNotificationService] (cooldown state lives on the service)
+    └──applies to──> [All alert types: permission prompt, budget warning, budget exceeded]
 
-[Storage rotation UI in RecordingLibrary]
-    └──requires──> [Storage rotation backend + POST /api/recordings/prune endpoint]
-    └──requires──> [GET /api/recordings/storage-stats returning { totalBytes, capBytes, recordingCount }]
+[Notification settings UI]
+    └──requires──> [New SQLite table: notification_config]
+    └──requires──> [New API routes: GET/POST /api/notifications/config]
+    └──requires──> [TelegramNotificationService reads config on each send (or cached with 30s TTL)]
+    └──enhances──> [Duplicate suppression] (cooldown values come from notification_config)
 
-[Events tab row click navigates to terminal]
-    └──requires──> [App.tsx onNavigateToSession callback threaded into GsdView/EventsTab]
-    └──enhances──> [Clickable history session rows] (same navigation pattern, shared App.tsx logic)
+[Bot token configuration]
+    └──requires──> [WARDEN_TELEGRAM_BOT_TOKEN in process.env]
+    └──blocks──> [all other Telegram features] (nothing works without valid token)
 ```
 
 ### Dependency Notes
 
-- **Auto-record requires storage rotation:** Enabling auto-record without a cap creates unbounded disk growth on a single-server deployment. These two features must ship in the same phase.
-- **Clickable rows require API join:** The current `/api/history/sessions` response does not include a `recordingId` field. Either extend the SQL query with a LEFT JOIN on `recordings` (preferred — clean, single round-trip), or do a client-side lookup against the `/api/recordings` response (acceptable but wasteful for large recording libraries).
-- **Keyboard persistence fix applies to all toolbar buttons:** The re-focus fix must be applied uniformly. Adding Enter without fixing focus loss makes it behave inconsistently with the other buttons.
-- **File deletion needs extraction:** `recordingRoutes.ts` currently handles `fs.unlinkSync` on DELETE. This logic must move into a shared helper (or into `RecordingCaptureService`) so the pruning path can also delete files cleanly.
+- **Token is the absolute first dependency:** Without a valid `WARDEN_TELEGRAM_BOT_TOKEN`, grammY throws on `new Bot(token)`. Service must degrade gracefully (log warning, disable Telegram features) if env var is absent — this prevents breaking the existing dashboard on deployments that do not yet have the bot configured.
+- **State transition tracking is required, not raw output tapping:** `detectAgentState()` returns a state hint per output chunk. To avoid re-sending a notification for every output line while the agent is still waiting, the notification service must track per-session `previousState` and only notify on transitions to `waiting_for_permission` (not on repeated chunks while already in that state).
+- **Approve must go directly to tmux, not Gateway:** Claude Code permission prompts are menu selections (press 1, 2, etc.). The Gateway API is for injecting user messages into conversations, not for interactive menu navigation. The approve action needs `tmux send-keys -t sessionName '1' Enter`.
+- **Budget alerts are currently system-wide:** `useBudgetAlerts` polls a single system-level status. For per-agent Telegram routing, the backend needs to compute per-agent alert levels. The budget threshold data is in SQLite (`token_usage` + `budget_config`); the query extension is straightforward but is a dependency of per-agent budget routing.
+- **callbackQuery handler needs the session name in callback data:** The approve button's `callback_data` string (`approve:agentId:sessionName`) must embed enough identity to find the right tmux session. callback_data is limited to 64 bytes — `approve:gideon:gideon-myproject-a1b2c3d4` fits within that limit.
 
 ---
 
 ## MVP Definition
 
-### Launch With (v3.2)
+### Launch With (v3.3)
 
-Minimum scope to address the milestone goal: close daily mobile friction and finish the recording story.
+Minimum scope to deliver the milestone goal: operator receives Telegram notification when agent blocks, taps to approve, unblocks without opening browser.
 
-- [ ] Enter button in mobile toolbar — closes the most glaring gap; operators currently cannot submit commands from the mobile toolbar
-- [ ] Keyboard persistence after toolbar button tap — without this, every toolbar key tap dismisses the soft keyboard requiring a follow-up tap on the terminal
-- [ ] Clickable history session rows — navigate to live terminal if active; open recording player if stopped+recorded; show "no recording" toast if stopped+unrecorded
-- [ ] Auto-record on session start (per-agent config) — completes REC-05 deferred from v3.1; config flag per agent in `openclaw.json`
-- [ ] Storage rotation with configurable cap — must ship alongside auto-record to prevent unbounded growth; default 2 GB cap, 30-day max age
+- [ ] `TelegramNotificationService` singleton — bot init from env var, graceful degradation if token absent, long polling start/stop lifecycle
+- [ ] Permission prompt detection → Telegram message with inline Approve button, routed to agent's configured topic via `getTopicMappings()`
+- [ ] `callbackQuery` handler for approve — calls `tmux send-keys`, edits message to show "Approved", removes inline button
+- [ ] Duplicate suppression — in-memory cooldown Map, configurable per alert type, default 2 min for permission prompts
+- [ ] Budget alert forwarding — amber and red thresholds sent to operator's primary topic; dedup with 10 min cooldown
+- [ ] Notification settings UI — enable/disable per alert type + cooldown duration; stored in SQLite `notification_config` table; settings panel in HistoryView or as new Settings tab
 
-### Add After Core Is Working (v3.2.x)
+### Add After Core Is Working (v3.3.x)
 
-- [ ] Storage rotation UI in RecordingLibrary — visual usage bar + "Prune now" button; pruning already runs automatically so this is a polish layer
-- [ ] Events tab row click navigates to terminal — low complexity; same pattern as history rows once navigation callback is threaded through App.tsx
+- [ ] Per-agent budget threshold routing — route budget alerts to the specific agent's topic rather than a catch-all topic (requires extending per-agent budget query)
+- [ ] Test notification button in settings UI — lets operator verify bot token and topic routing without waiting for a real event
+- [ ] Notification history log — last N sent notifications in the settings panel (useful for debugging; SQLite append-only, 100-row cap)
 
-### Future Consideration (v3.3+)
+### Future Consideration (v3.4+)
 
-- [ ] Auto-record on permission prompt detection — useful but depends on `detectAgentState()` reliability which is flagged as fragile tech debt in PROJECT.md
-- [ ] Recording external sharing — asciinema.org upload or S3 presigned URL — out of scope for single-operator tool
-- [ ] Session duration column in SessionHistory — requires reliable session end time tracking beyond current `last_active_at` heuristic
+- [ ] "Deny" button alongside Approve — sends 'n' or '2' to the permission menu for a different choice (uncommon but possible use case)
+- [ ] Context pressure alert — notify when agent context window exceeds 90% (already tracked in `useAgentLiveStatus`; same notification path as permission prompts)
+- [ ] Scheduled quiet hours — suppress notifications between configurable times (e.g., 23:00–07:00); stored in `notification_config`
 
 ---
 
@@ -138,167 +148,143 @@ Minimum scope to address the milestone goal: close daily mobile friction and fin
 
 | Feature | User Value | Implementation Cost | Priority |
 |---------|------------|---------------------|----------|
-| Enter button in toolbar | HIGH | LOW | P1 |
-| Keyboard persistence fix | HIGH | LOW | P1 |
-| Clickable history rows | HIGH | MEDIUM | P1 |
-| Auto-record on session start | HIGH | MEDIUM | P1 |
-| Storage rotation / auto-prune | HIGH | MEDIUM | P1 |
-| Storage rotation UI | MEDIUM | LOW | P2 |
-| Events tab row navigates to terminal | MEDIUM | LOW | P2 |
-| Auto-record on permission prompt | MEDIUM | HIGH | P3 |
+| Bot token + TelegramNotificationService init | HIGH | LOW | P1 |
+| Permission prompt → Telegram message | HIGH | MEDIUM | P1 |
+| Inline approve button + callbackQuery handler | HIGH | MEDIUM | P1 |
+| Edit message after approve | HIGH | LOW | P1 |
+| Duplicate suppression | HIGH | LOW | P1 |
+| Budget alert forwarding | MEDIUM | LOW | P1 |
+| Notification settings UI | MEDIUM | MEDIUM | P1 |
+| Per-agent budget routing | MEDIUM | MEDIUM | P2 |
+| Test notification button | MEDIUM | LOW | P2 |
+| Notification history log | LOW | LOW | P2 |
+| Deny button | LOW | LOW | P3 |
+| Context pressure alert | MEDIUM | LOW | P3 |
+| Scheduled quiet hours | LOW | MEDIUM | P3 |
 
 **Priority key:**
-- P1: Must have for v3.2 launch
-- P2: Should have — add when P1s are done
+- P1: Must have for v3.3 launch
+- P2: Should have — add after P1s are working
 - P3: Future milestone
 
 ---
 
-## Implementation Notes by Feature
+## UX Flows
 
-### Enter Button
+### Flow 1: Permission Prompt → Approve
 
-The `MOBILE_KEYS` array in `TerminalView.tsx` (lines 78-88) drives all toolbar buttons. Insert `{ label: 'Enter', seq: '\r' }` at the beginning of the array before Tab. The `\r` sequence is correct for terminal Enter (carriage return); tmux handles the newline translation. The button renders identically to existing keys via the existing `onTouchStart` handler.
+```
+Agent stalls (Claude Code shows permission menu)
+    → TerminalStreamService.onData() detects state change to 'waiting_for_permission'
+    → TelegramNotificationService checks cooldown (skip if < 2 min since last send for this agent)
+    → getTopicMappings() returns groupId + topicId for this agent
+    → bot.api.sendMessage(groupId, "[Agent] Gideon is waiting for permission\n/home/forge/project\nRequesting: bash command\n\nTime: 14:32:01", {
+        message_thread_id: topicId,
+        reply_markup: new InlineKeyboard().text("Approve", "approve:gideon:gideon-project-a1b2")
+      })
+    → Stores { agentId → messageId } in memory
 
-**Confidence: HIGH** — verified directly from existing MOBILE_KEYS data structure.
-
-### Keyboard Persistence
-
-The current `onTouchStart` pattern for each toolbar button:
-```tsx
-onTouchStart={(event) => {
-  event.preventDefault();   // prevents tap → blur on the button element
-  sendInput(key.seq);        // sends escape sequence to PTY via Socket.IO
-}}
+Operator sees Telegram notification on phone
+    → Taps "Approve" button
+    → Telegram sends callback_query with data "approve:gideon:gideon-project-a1b2"
+    → bot.callbackQuery handler receives it
+    → Calls answerCallbackQuery (required by Telegram, clears loading spinner)
+    → Calls tmuxSessionManager.sendKeys('gideon-project-a1b2', '1\r')
+    → Edits message: replaces text with "Approved at 14:32:45 by operator"
+    → Calls editMessageReplyMarkup with empty InlineKeyboard (removes Approve button)
+    → Agent unblocks and continues
 ```
 
-What is missing: after `sendInput`, the xterm.js internal textarea loses focus because `preventDefault` stops the native tap event chain but does not restore PTY focus. Fix:
+### Flow 2: Budget Alert
 
-```tsx
-onTouchStart={(event) => {
-  event.preventDefault();
-  sendInput(key.seq);
-  requestAnimationFrame(() => terminalRef.current?.focus());
-}}
+```
+Server-side budget check runs (every 30s, same interval as existing budget polling)
+    → Detects system-level (or per-agent) cost has crossed amber threshold
+    → TelegramNotificationService checks cooldown (skip if < 10 min since last budget alert)
+    → Sends to operator's primary topic: "Budget Alert — Amber\nDaily spend: $8.42 / $10.00 limit\nBurn rate: $1.2/hr"
+    → No inline button (budget alerts are informational; no approve action)
+    → Updates cooldown timestamp
 ```
 
-`MobileKeyToolbar` is currently a sibling function component that receives only `sendInput`, `selectMode`, and `onToggleCopyMode` — it does not have access to the xterm Terminal instance. Cleanest fix: add a `refocusTerminal: () => void` callback prop that `TerminalViewInner` provides via `useCallback(() => terminalInstanceRef.current?.focus(), [])`.
+### Flow 3: Settings Panel
 
-This same `refocusTerminal` callback must be called in the existing Copy and Esc button handlers. The Paste button's async clipboard path should call it after the clipboard read resolves.
-
-**Confidence: HIGH** — the `requestAnimationFrame(() => terminal.focus())` pattern is already used in `handleToggleCopyMode` (lines 344-346 of TerminalView.tsx), confirming it works in this codebase. xterm.js issue #5377 confirms focus-loss is the documented root cause for mobile toolbar interactions.
-
-### Clickable History Rows
-
-`HistoryView` already declares `onNavigateToSession?: (sessionName: string) => void` as a prop (line 28) and accepts it but passes it through as `_onNavigateToSession` (unused). Changes needed:
-
-1. Pass `onNavigateToSession` from `HistoryView` down to `SessionHistory`
-2. `SessionHistory` calls it with `session.tmuxSessionName` on row click — but only if the session is clickable (i.e., active or has a recording)
-3. Extend `/api/history/sessions` SQL to LEFT JOIN `recordings ON tmux_session_name = session_name` and include `recordingId: number | null` in each row result
-4. In `App.tsx`, implement `onNavigateToSession(sessionName)`: look up `sessionName` in `activeInstances`; if found and active, switch to Terminals view and select that tab; if not found, call the recording lookup path
-5. Add visual affordances to rows: `cursor-pointer` class, hover background change (already present as `hover:bg-warden-border/30`), and a right-pointing chevron icon on the right edge of each row
-
-**Confidence: HIGH** — prop stub already exists; the pattern mirrors how `onRestart` is threaded in the existing codebase.
-
-### Auto-Record Configuration
-
-Recommended approach: add `autoRecord?: boolean` to the `AgentDetails` type in `openclawTypes.ts`. `OpenClawConfigReader` parses `AgentDetails` objects per-agent already; the field falls through as `undefined` (falsy) for agents that do not set it.
-
-When `TerminalStreamService` spawns a new PTY (in `handleConnection` or equivalent), it has access to the session name and agent ID. Look up the agent config from `OpenClawConfigReader`, check `autoRecord`, and if true call `recordingCaptureService.startRecording()` before beginning the PTY data tap.
-
-Guard: `recordingCaptureService.isRecording(sessionName)` check before auto-starting prevents double-recording if the operator already started a manual recording.
-
-Client side: no changes needed for the auto-start path. The client's `useRecordingState` hook polls `/api/recordings/status/:sessionName` to discover if a recording is in progress (already implemented), so the REC indicator in the terminal header will light up automatically when the server starts an auto-recording.
-
-**Confidence: MEDIUM** — `openclaw.json` schema extension is straightforward; the TerminalStreamService hook point needs verification against the actual PTY spawn code path in `TerminalStreamService.ts`.
-
-### Storage Rotation
-
-Policy implementation:
-- **Max total size:** configurable via `WARDEN_RECORDING_MAX_GB` env var, default 2 GB
-- **Max age:** configurable via `WARDEN_RECORDING_MAX_DAYS` env var, default 30 days
-- **Deletion order:** oldest `stopped_at` first (most recordings with least recent value)
-- **Safe execution points:** (1) server startup, (2) after each `stopRecording()` completes, (3) explicit `POST /api/recordings/prune`
-
-New method in `RecordingCaptureService` (or a dedicated `RecordingPruneService`):
-```typescript
-pruneRecordings(): { deletedCount: number; freedBytes: number } {
-  const all = database.listRecordings(); // returns RecordingEntry[] ordered by started_at desc
-  const completed = all.filter(r => r.stoppedAt !== null);
-
-  // Phase 1: delete by age
-  const cutoff = new Date(Date.now() - MAX_AGE_MS);
-  const aged = completed.filter(r => new Date(r.stoppedAt!) < cutoff);
-  for (const r of aged) deleteRecordingWithFile(r);
-
-  // Phase 2: delete by total size cap (oldest first)
-  const remaining = database.listRecordings().filter(r => r.stoppedAt);
-  const totalBytes = remaining.reduce((sum, r) => sum + (r.fileSizeBytes ?? 0), 0);
-  if (totalBytes > MAX_BYTES) {
-    const byAge = [...remaining].sort((a, b) =>
-      new Date(a.stoppedAt!).getTime() - new Date(b.stoppedAt!).getTime()
-    );
-    let excess = totalBytes - MAX_BYTES;
-    for (const r of byAge) {
-      if (excess <= 0) break;
-      deleteRecordingWithFile(r);
-      excess -= r.fileSizeBytes ?? 0;
-    }
-  }
-}
 ```
-
-File deletion extraction: `recordingRoutes.ts` currently does `fs.unlinkSync(recording.filePath)` inline in the DELETE handler. Extract this into a `deleteRecordingWithFile(recording: RecordingEntry)` helper that both the route and the pruning path use.
-
-**Confidence: HIGH** — all required DB methods exist; pattern follows established Node.js log-rotation conventions (age + size cap, oldest-first deletion); verified against better-sqlite3 documentation.
+Operator opens Warden dashboard → navigates to History/Settings tab
+    → Notification settings panel shows:
+        - "Telegram Notifications" toggle (master enable)
+        - "Permission prompt alerts" toggle + cooldown input (minutes)
+        - "Budget alerts" toggle + cooldown input (minutes)
+        - Bot status indicator (green dot if bot polling, red if token missing)
+    → Operator toggles off "Budget alerts" during testing phase
+    → UI calls POST /api/notifications/config with updated settings
+    → TelegramNotificationService reads updated config from DB on next send attempt
+```
 
 ---
 
-## Ecosystem Patterns Observed
+## Technical Notes
 
-### Mobile Terminal Keyboard Toolbar (Industry Pattern)
+### grammY vs alternatives
 
-Reference apps (Termius, NewTerm 2, Blink Shell) all implement keyboard accessory toolbars. Common pattern:
-- Always-visible sticky bar at bottom of screen
-- Keys: Esc, Tab, Ctrl, arrow keys, Enter, function keys
-- Each button uses `touchstart` + `preventDefault` to avoid soft keyboard dismissal
-- After each button tap, focus is returned to the terminal input element
+**grammY** is the correct choice for this project. Reasons:
+- TypeScript-first design; outstanding type inference for context, inline keyboards, callback handlers
+- Long polling as default mode — no infrastructure changes needed (no webhook registration, no Nginx changes, no IP whitelist modifications for Telegram's servers)
+- `bot.callbackQuery('approve:*', handler)` with wildcard matching simplifies routing
+- Active maintenance, 28k+ GitHub stars, well-documented
+- `bot.stop()` cleanly terminates polling for graceful shutdown integration
 
-Web terminal implementations face the same challenge. iOS Safari does not allow programmatic `focus()` calls to open the keyboard (only user-initiated gestures open the keyboard), but calling `element.focus()` within a `touchstart` handler (where a user gesture is in-progress) does keep the keyboard open. This is the mechanism that the existing `onTouchStart` pattern exploits — the `refocus` call must happen within the same event tick or in a `requestAnimationFrame` to remain within the gesture context.
+**node-telegram-bot-api** is not suitable: no TypeScript support, plain event emitter (not middleware), poor scalability patterns per official Telegram bot samples page.
 
-**Confidence: MEDIUM** — sourced from Termius blog, NewTerm GitHub, and xterm.js issue discussions; iOS Safari gesture-context behaviour is known but not officially documented.
+**Telegraf** is a viable alternative but grammY is newer and has better TypeScript ergonomics. No reason to prefer Telegraf here.
 
-### Storage Rotation (Industry Pattern)
+**Confidence: HIGH** — grammY docs and GitHub directly verified.
 
-Standard rotation policies for bounded-disk deployments use two axes: time (delete older than N days) and size (delete oldest until under cap). Running on: server start, after write, and manual trigger. This matches PM2 log rotation, winston-daily-rotate-file, and Linux `logrotate` conventions. Size-cap with oldest-first deletion is the dominant pattern because it preserves recent high-value recordings while making room for new ones.
+### Telegram API: Topic Routing
 
-**Confidence: HIGH** — verified against multiple Node.js log rotation implementations; pattern is language-agnostic and well-established.
+OpenClawConfigReader already exposes `groupId` and `topicId` strings per agent via `getTopicMappings()`. The `message_thread_id` parameter on `sendMessage` is an integer. Parse with `parseInt(topicId, 10)`. Works for Telegram supergroup forum topics. General topic (ID 1) behaves differently — if the agent's topic is the General topic, omit `message_thread_id` (or test against the configured group first).
 
-### Clickable List Row Navigation (Industry Pattern)
+**Confidence: HIGH** — Telegram Bot API official docs verified; `message_thread_id` is a documented parameter on `sendMessage`.
 
-Standard UX for data list rows with drilldown:
-- Row has `cursor-pointer`, hover background change, right chevron icon
-- Clicking navigates to: live view if resource is active, detail/replay view if completed
-- Touch target minimum: 44px height (Apple HIG, already met by existing session row `min-h-[44px]`)
-- Disambiguation: if multiple targets are possible (live terminal vs recording replay), pick the most recent/relevant one automatically, or show a contextual action sheet
+### Approve Mechanism
 
-**Confidence: HIGH** — established UX pattern, consistent with Apple HIG and Material Design guidelines.
+The permission prompt is a numbered menu in Claude Code's terminal output (typically: "1. Allow this once", "2. Allow in this project", "3. Deny"). Sending `1\n` via tmux selects option 1. This must be delivered via `tmux send-keys` (not Gateway API). The Gateway API sends chat messages to the Claude Code session, not interactive menu selections to the process stdin.
+
+Existing path: `TmuxSessionManager` wraps `execFile('tmux', ...)` — add a `sendKeys(sessionName: string, keys: string): Promise<void>` method calling `tmux send-keys -t sessionName keys`.
+
+**Confidence: HIGH** — inspected TmuxSessionManager.ts and instanceRoutes.ts; tmux send-keys is used in existing `sendCtrlC` implementation already present in the codebase.
+
+### Cooldown / Deduplication
+
+In-memory `Map<string, number>` is appropriate because:
+- Cooldown resets on restart are acceptable (described in Anti-Features reasoning above)
+- No DB write overhead on each notification (notifications can be frequent)
+- Simple implementation: `if (Date.now() - lastSent.get(key) < cooldownMs) return`
+
+Default values calibrated to this use case:
+- Permission prompt: 2 min (agent may re-output the prompt multiple times per second while waiting; 2 min gives operator time to respond without repeat floods)
+- Budget alert: 10 min (cost crosses threshold once and stays there; 10 min avoids flooding but provides reminders)
+
+### Telegram Rate Limits
+
+Telegram allows 1 message/second per chat. In a single-operator tool with 5 agents, the maximum notification rate is far below this limit. No rate limiting middleware needed for this use case. If ever needed, grammY's `@grammyjs/auto-retry` plugin handles 429 errors with exponential backoff automatically.
+
+**Confidence: HIGH** — grammY flood control docs verified; rate limits are 1 msg/sec per chat, well within single-operator use.
 
 ---
 
 ## Sources
 
-- xterm.js issue #5377 — Limited touch support on mobile devices: https://github.com/xtermjs/xterm.js/issues/5377
-- xterm.js issue #2403 — Accommodate predictive keyboard on mobile: https://github.com/xtermjs/xterm.js/issues/2403
-- Termius blog — Touch Terminal on iOS: https://termius.com/blog/new-touch-terminal-on-ios
-- NewTerm GitHub — iOS terminal keyboard toolbar implementation reference: https://github.com/hbang/NewTerm
-- MDN HTMLElement.focus() — focus within touchstart gesture context: https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/focus
-- MDN VirtualKeyboard API — programmatic keyboard control: https://developer.mozilla.org/en-US/docs/Web/API/VirtualKeyboard_API
-- mobilespoon.net — 10 usability rules for mobile keyboard UX: https://www.mobilespoon.net/2018/12/10-usability-rules-keyboard-mobile-app.html
-- Pencil & Paper — Data Table UX Patterns: https://www.pencilandpaper.io/articles/ux-pattern-analysis-enterprise-data-tables
-- Warden codebase — TerminalView.tsx, SessionHistory.tsx, HistoryView.tsx, RecordingLibrary.tsx, RecordingCaptureService.ts, DatabaseConnection.ts (direct inspection)
+- grammY official docs — Long Polling vs Webhooks: https://grammy.dev/guide/deployment-types
+- grammY official docs — Inline Keyboards plugin: https://grammy.dev/plugins/keyboard
+- grammY official docs — Flood control / rate limits: https://grammy.dev/advanced/flood
+- grammY GitHub — 28k stars, active 2025 maintenance: https://github.com/grammyjs/grammY
+- Telegram Bot API — sendMessage with message_thread_id: https://core.telegram.org/bots/api
+- Telegram Bot API — Inline keyboards and callback queries: https://core.telegram.org/bots/2-0-intro
+- Telegram Bot API — Buttons reference: https://core.telegram.org/api/bots/buttons
+- grammY comparison page — grammY vs Telegraf vs NTBA: https://grammy.dev/resources/comparison
+- Warden codebase — OpenClawConfigReader.ts, TerminalStreamService.ts, TmuxSessionManager.ts, GatewayApiClient.ts, DatabaseConnection.ts, types.ts, openclawTypes.ts (direct inspection)
 
 ---
 
-*Feature research for: Warden Dashboard v3.2 Mobile Operations & UX Polish*
+*Feature research for: Warden Dashboard v3.3 Telegram Operator Awareness*
 *Researched: 2026-03-04*

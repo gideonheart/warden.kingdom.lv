@@ -1,189 +1,252 @@
 # Project Research Summary
 
-**Project:** Warden Dashboard v3.2 — Mobile Operations & UX Polish
-**Domain:** Additive milestone on a shipping browser-based terminal multiplexer dashboard
+**Project:** Warden Dashboard v3.3 — Telegram Operator Awareness
+**Domain:** Telegram bot notification bridge integrated into an existing Node.js monitoring dashboard
 **Researched:** 2026-03-04
 **Confidence:** HIGH
 
 ## Executive Summary
 
-Warden v3.2 is a tightly scoped additive milestone on a stable, production-shipping application. The research confirms that all five feature areas — mobile Enter button, keyboard persistence, clickable history rows, auto-record per agent, and storage rotation — can be completed without adding any new npm dependencies. Every capability builds on existing primitives: the `onTouchStart` + `preventDefault()` pattern already used in `MobileKeyToolbar`, the `RecordingCaptureService` and `DatabaseConnection` services already in production, and callback prop chains already stubbed in `HistoryView`. This is execution work, not exploration work.
+Warden v3.3 adds a Telegram notification and one-tap approval layer on top of a fully-shipping v3.2 codebase. The milestone is narrowly scoped: an operator away from a browser should receive a Telegram message when an agent stalls on a permission prompt and should be able to approve it with a single button tap. The recommended approach is a single new `grammy`-powered `TelegramBotService` running inside the existing Express process as a long-polling bot — no webhook infrastructure changes, no new processes, one package added (`grammy ^1.41.1`). Everything else required (topic mappings, budget status, tmux session manager, signal handlers, SQLite migration pattern) already exists in the codebase and needs only wiring, not rebuilding.
 
-The recommended implementation approach is additive and sequential: fix mobile toolbar friction first (zero-risk, client-only changes), then wire up the history navigation (also client-only against existing API), then implement auto-record server-side, then add storage rotation as a safety layer for auto-record. Each phase is independently shippable. The dependency that matters most is that auto-record and storage rotation must ship together — enabling auto-record without a storage cap creates unbounded disk growth. No phase requires a major refactor or new infrastructure.
+The principal architectural decision is that notification trigger detection must happen via independent `tmux capture-pane` polling rather than tapping the PTY `onData` stream. The PTY only exists while a browser tab is connected; if no browser is open the PTY is gone and no notification fires — which defeats the entire purpose of the feature. A new `NotificationPoller` service runs on a 10-second interval using the same `detectAgentState()` / tmux capture pattern already proven in `gsdRoutes.ts`, and emits typed EventEmitter events that `TelegramBotService` subscribes to. This keeps the components decoupled and SRP-clean.
 
-The primary risks are all well-defined and avoidable with explicit acceptance criteria. The two most consequential pitfalls are (1) the iOS keyboard dismissal problem — `terminal.focus()` does not work; `terminal.textarea?.focus()` called synchronously in `onTouchStart` is the only correct path — and (2) the auto-record race condition where recording starts before the PTY `onData` tap is registered, causing missing first frames. Both are point-in-code fixes, not architectural problems. The frame buffer memory growth risk under long auto-recorded sessions is a known limitation to document and monitor, not a blocker.
+The top risks are: (1) duplicate notification spam if transition-only emission and cooldown deduplication are not built into the first implementation, (2) unauthorized one-tap approvals if sender identity is not verified against a configured operator Telegram user ID, and (3) 409 Conflict bot crashes on restart if graceful `bot.stop()` shutdown is not wired into the existing SIGTERM/SIGINT handlers. All three must be addressed in Phase 1 or Phase 2 — not as post-launch followups.
+
+---
 
 ## Key Findings
 
 ### Recommended Stack
 
-All v3.2 capabilities use the existing stack with zero new npm dependencies. The production base — Express 5, Socket.IO 4, React 19, xterm.js 5.3.0, better-sqlite3 with WAL mode, node-pty, Tailwind CSS 4, TypeScript 5 — is unchanged. The only new server-side I/O primitives used are `fs.statSync()` and `fs/promises.statfs()`, both verified available on Node.js 22.22.0 running on this server.
+The v3.3 stack addition is exactly one package: `grammy ^1.41.1`. grammy is TypeScript-first (ships its own declarations, no `@types` needed), actively maintained (published 2 days before research date), and directly supports the required features: `bot.api.sendMessage()` with `message_thread_id` for Telegram forum topics, `InlineKeyboard` for one-tap approve buttons, `bot.callbackQuery()` handler for button press routing, and graceful `bot.stop()` for SIGTERM integration. Long polling is used instead of webhooks — grammy's official docs recommend this for always-on single-server deployments, and it requires zero Nginx or IP-whitelist changes. Competing libraries (node-telegram-bot-api, telegraf) are either unmaintained or have inferior TypeScript support; there is no reason to choose them for new code.
+
+Two new SQLite tables are added following the existing singleton-row pattern (`budget_config`, `rotation_config`): `notification_config` (enable/disable per alert type, cooldown duration) and optionally `notification_cooldown` (persisted dedup timestamps if restart resilience is needed). The bot token is loaded from a `WARDEN_TELEGRAM_BOT_TOKEN` environment variable — not from `openclaw.json` and not from any file tracked by git.
 
 See: `.planning/research/STACK.md`
 
 **Core technologies:**
-- `onTouchStart` + `terminal.textarea?.focus()`: mobile keyboard control — pattern already used on all toolbar buttons; the only gap is the missing Enter entry and the explicit `textarea` re-focus call
-- `better-sqlite3` singleton-row pattern: configuration persistence — all new config (auto-record trigger, rotation policy) follows the established `budget_config` table precedent
-- `fs.statSync()` + `fs/promises.statfs()`: storage accounting — Node.js 22 built-ins verified on this server; no external disk-usage package needed
-- `setImmediate()` + `try/catch`: fire-and-forget side effects — defers storage rotation off the PTY callback chain without blocking
-- React `useCallback` with ref: stable callback props at `TerminalView` boundary — mandatory to preserve `React.memo` effectiveness
+- `grammy ^1.41.1`: Telegram Bot API client — long polling, inline keyboards, callback query handling, graceful shutdown. No `@types/grammy` needed; types bundled.
+- `@grammyjs/auto-retry` (optional): Automatic 429 rate-limit retry with exponential backoff for high-activity multi-agent runs.
+- `strip-ansi`: Strip ANSI escape codes from tmux pane captures before embedding excerpts in Telegram messages.
+- `better-sqlite3` (existing): Two new tables (`notification_config`, optional `notification_cooldown`) following the singleton-row pattern already in the codebase.
+- Environment variables: `WARDEN_TELEGRAM_BOT_TOKEN` — token source; `WARDEN_TELEGRAM_OPERATOR_ID` — sender verification in callback handlers.
 
 ### Expected Features
 
 See: `.planning/research/FEATURES.md`
 
-**Must have (P1 — v3.2 launch blockers):**
-- Enter button in mobile toolbar — operators cannot submit commands without it; one-line addition to `MOBILE_KEYS` array
-- Keyboard persistence after toolbar button tap — current behavior dismisses keyboard on every tap; fix via `terminal.textarea?.focus()` synchronously in `onTouchStart`
-- Clickable history session rows — active sessions navigate to terminal tab; stopped sessions with recording open player; stopped sessions without recording show explanatory toast
-- Auto-record on session start (per-agent config) — deferred REC-05 from v3.1; stored in SQLite `auto_record_config` table; triggered from `TerminalStreamService` after PTY `onData` is registered
-- Storage rotation with configurable cap — must co-ship with auto-record; two-axis policy: max total bytes + max age days; oldest-first deletion; runs on stop and server start
+**Must have (table stakes for v3.3 launch):**
+- `TelegramBotService` singleton — bot init from env var, graceful degradation if token absent, long polling lifecycle
+- Permission prompt detection → Telegram message with inline Approve button, routed to agent's configured topic via existing `getTopicMappings()`
+- `callbackQuery` handler for approve — sends `'1'` via `tmuxSessionManager.sendPromptToSession()`, edits message to remove button, calls `answerCallbackQuery()` first
+- Duplicate suppression — in-memory cooldown Map, transition-only emission (state must change TO `permission_prompt`, not just sustain it), configurable cooldown (default: 2 min permission, 10 min budget)
+- Budget alert forwarding — amber and red thresholds sent to operator's topic with distinct formatting; no inline button (informational only)
+- Notification settings UI — enable/disable per alert type + cooldown duration, stored in SQLite `notification_config`
 
-**Should have (P2 — add when P1s are done):**
-- Storage rotation UI in `RecordingLibrary` — visual usage bar, current stats, "Run Now" button
-- Events tab row click navigates to terminal — same navigation pattern as history rows once App.tsx callback is threaded
+**Should have (competitive differentiators):**
+- Edit message after approve — remove inline keyboard so button cannot be re-tapped; update text to "Approved at HH:MM"
+- Per-agent Telegram topic routing — already supported by `getTopicMappings()`; each agent's alerts go to its specific topic
+- Bot connection status indicator in settings UI — green/red dot showing polling state
+- Sender identity verification — reject callback queries from non-operator Telegram user IDs
+- ANSI-stripped pane excerpt in notification body — operator sees the actual prompt text before tapping Approve
+- Timestamp expiry token in `callback_data` — approve requests older than 15 minutes return a friendly "expired" error
 
-**Defer (v3.3+):**
-- Auto-record on permission-prompt detection — depends on `detectAgentState()` reliability flagged as fragile tech debt
-- Recording external sharing (S3, asciinema.org) — out of scope for single-operator tool
-- Streaming write mode for frame buffer — significant refactor; mitigate in v3.2 with buffer-size warning log only
+**Defer to v3.3.x / v3.4+:**
+- Per-agent budget threshold routing (requires per-agent budget query extension; current `budget_config` is system-wide)
+- Test notification button in settings UI
+- Notification history log (SQLite, last 100 rows)
+- Deny button (sends '2' or 'n' to permission menu)
+- Context pressure alert (90% context window)
+- Scheduled quiet hours
 
 ### Architecture Approach
 
-V3.2 makes surgical additions to the existing two-tier architecture (React 19 SPA + Express 5 server). Three new server-side files are needed: `AutoRecordConfigService.ts` (singleton config + `shouldRecord()` method), `RecordingRotationService.ts` (pruning algorithm), and `autoRecordRoutes.ts` (REST endpoints). No new shared types are required — all new data shapes are simple enough to type inline. The correct build order within each server feature is: database migration first, then service, then route, then integration hook point, then client UI.
+The new code is a small service layer that wires into the existing Express process without modifying any existing services. `NotificationPoller` (extends `EventEmitter`) runs on a 10-second interval, captures tmux panes with `execFileAsync`, calls the extracted `detectAgentState()` utility, compares against previous states, and emits typed events. `TelegramBotService` subscribes to those events, checks `NotificationDeduplicator`, reads `notification_config` from SQLite, resolves topic mappings via `OpenClawConfigReader`, and sends Telegram messages via grammy. The approve callback from Telegram routes back through `TmuxSessionManager.sendPromptToSession()`. The `detectAgentState()` function is extracted from `gsdRoutes.ts` into `src/server/utils/agentStateDetection.ts` so both the route and the poller can share it without circular imports.
 
 See: `.planning/research/ARCHITECTURE.md`
 
-**Major components (modified or new):**
-1. `MobileKeyToolbar` in `TerminalView.tsx` — add Enter key to `MOBILE_KEYS`; add `onAfterInput` prop; call `terminal.textarea?.focus()` synchronously in every `onTouchStart` handler
-2. `SessionHistory.tsx` + `HistoryView.tsx` + `App.tsx` — wire the already-stubbed `onNavigateToSession` callback; add recording lookup in `App.tsx` to decide navigation target per session state
-3. `AutoRecordConfigService.ts` (new) — singleton SQLite config; `shouldRecord(sessionName, agentId)` method; hooked into `TerminalStreamService.attachSocketToSession()` after `ptyProcess.onData()` registration
-4. `RecordingRotationService.ts` (new) — age + size + count policy; called via `setImmediate()` after `stopRecording()`; two-phase deletion with `deletion_pending` DB flag protects concurrent playback
-5. `DatabaseConnection.ts` — two new inline migrations (`auto_record_config`, `recording_rotation_config`); four new query methods for rotation
+**Major components (new):**
+1. `NotificationPoller` — EventEmitter; 10s interval; `tmux capture-pane` → state detection → event emission; tracks previous state per session; emits only on transitions
+2. `TelegramBotService` — grammy Bot instance; event subscriptions; message sending with inline keyboards; callback query handling; lifecycle (`start`/`stop`)
+3. `NotificationDeduplicator` — in-memory `Map<key, timestamp>`; cooldown gate; configurable window read from DB
+4. `notificationRoutes` — `GET/PUT /api/notifications/config`; singleton-row SQLite table following `budget_config` precedent
+5. `NotificationSettingsPanel` — React component; toggles + cooldown inputs; bot status indicator
+6. `src/server/utils/agentStateDetection.ts` — extracted `detectAgentState()` + `extractContextPressure()`; no behavior change to existing routes
+
+**Modified files (minimal surface):**
+- `src/server/index.ts` — instantiate + start/stop new services; mount `notificationRoutes` (~12 lines)
+- `src/server/database/DatabaseConnection.ts` — add `notification_config` migration + getter/upsert methods (~40 lines)
+- `src/shared/types.ts` — add `NotificationConfig` interface (~8 lines)
 
 ### Critical Pitfalls
 
 See: `.planning/research/PITFALLS.md`
 
-1. **iOS keyboard dismissal via `terminal.focus()`** — xterm.js `terminal.focus()` calls `textarea.focus({preventScroll:true})` on the container div, not the `<textarea>` element iOS requires. Fix: use `terminal.textarea?.focus()` synchronously inside `onTouchStart`, never in `requestAnimationFrame` or `setTimeout`. Must test on a real iPhone — Simulator behaves differently.
+1. **Duplicate notification spam** — `detectAgentState()` returns a snapshot state every poll cycle; without transition-only emission AND cooldown deduplication, the operator receives 20-40 identical messages per permission prompt. Both guards must be in the Phase 2 initial implementation. Never ship notification without dedup.
 
-2. **Auto-record race (missing first PTY frames)** — triggering auto-record from `InstanceTracker` or Socket.IO connection before the PTY `onData` tap is registered means the capture tap does not yet exist. Only trigger from inside `TerminalStreamService.attachSocketToSession()` immediately after `ptyProcess.onData()` is registered. Acceptance criteria: replay of a 5-second auto-recorded session must show first-line output.
+2. **409 Conflict crash on restart** — If `bot.stop()` is not called before process exit and the server is restarted quickly, Telegram returns `409 Conflict` and the bot polling loop crashes. Wire `bot.stop()` into the SIGTERM/SIGINT handler in Phase 1 before any notification code exists.
 
-3. **Storage rotation deletes files being streamed for playback** — `fs.unlinkSync()` while `res.sendFile()` has an open fd causes inconsistency. Prevention: add `deletion_pending` column to `recordings` table; content route returns `410 Gone` if flag is set; actual file deletion deferred to next cycle. Never rotate sessions where `isRecording()` is true.
+3. **Unauthorized one-tap approve** — grammy callback query handlers fire for any Telegram user who taps the button. Any group member could inject `1\n` into a live tmux session running as `forge`. Verify `ctx.from.id === OPERATOR_TELEGRAM_USER_ID` as the first check in every callback handler (Phase 3, non-negotiable).
 
-4. **Clickable history rows navigating to unavailable sessions** — `useSessionSelection` silently substitutes the first valid session when an unknown session name is passed. Prevention: check `activeInstances` membership and `recordingId` presence before any navigation call; show a toast ("Session ended, no recording available") for the dead-end case.
+4. **PTY `onData` tap for detection (wrong approach)** — The PTY only exists while a browser is connected; 30-second keep-alive means no browser = no PTY = no detection. Use `NotificationPoller` with `tmux capture-pane` instead — it works regardless of browser state.
 
-5. **Frame buffer OOM with long auto-recorded sessions** — `frameBuffer` grows unbounded; a 4-hour high-activity session can accumulate ~48MB per agent; 5 agents simultaneously = ~240MB heap pressure. Mitigation for v3.2: add `console.warn` at 50MB threshold; default auto-record to `false` (opt-in). Streaming write mode deferred to v3.3.
+5. **`answerCallbackQuery` called after async work** — Telegram requires this acknowledgement before any async operations or the button shows an infinite spinner. Call `await ctx.answerCallbackQuery()` as the absolute first line of any callback handler.
+
+6. **False-positive permission notifications from regex** — `detectAgentState()` matches "Do you want to proceed?" which fires on npm install, git hooks, etc. For Telegram (where a false positive causes `1\n` to be sent to an unintended prompt), narrow to Claude Code's numbered menu format (`❯ 1. Yes`). Include pane excerpt in notification body so operator can verify before approving.
+
+7. **ANSI escape codes in Telegram messages** — Raw tmux pane content includes ANSI color codes that render as garbage in Telegram. Use `strip-ansi` on all pane excerpts before composing any message text.
+
+---
 
 ## Implications for Roadmap
 
-Based on combined research, the following phase structure is recommended. All four phases are independently shippable; phases 1 and 2 can be developed in parallel.
+Based on combined research, the milestone maps naturally to four sequential phases with hard inter-phase dependencies.
 
-### Phase 1: Mobile Toolbar Fixes
+### Phase 1: Bot Foundation and Lifecycle
 
-**Rationale:** Client-only changes with zero server dependencies. Zero risk of breaking existing behavior. Highest daily operator friction in current state. Can be tested on a real iPhone immediately after deploy.
-**Delivers:** Enter button in toolbar; keyboard stays open after every toolbar tap (Enter, Tab, Ctrl+C, arrows, PgUp/PgDn, Copy, Paste).
-**Addresses:** "Enter button" and "Keyboard persistence" P1 features.
-**Avoids:** Pitfall 1 (iOS keyboard dismissal) — use `terminal.textarea?.focus()` synchronously in `onTouchStart`; do NOT use `requestAnimationFrame`, `setTimeout`, or `terminal.focus()`.
-**Scope estimate:** ~12 lines in `TerminalView.tsx`; no server changes; no new files.
+**Rationale:** All other phases depend on a functioning, properly initialized grammy Bot instance. Security and operational concerns (token handling, graceful shutdown, 409 prevention, rate-limit retry) must be established before any notification logic exists — retrofitting them is error-prone and creates production risk.
 
-### Phase 2: Clickable History Session Rows
+**Delivers:** A `TelegramBotService` that can be started and stopped cleanly, logs its status, degrades gracefully if no token is configured, and handles errors without crashing the Express process. The `notification_config` SQLite table and its getter/upsert methods are also in place. `@grammyjs/auto-retry` installed at bot init.
 
-**Rationale:** Client-only against existing API endpoints. The `onNavigateToSession` prop stub already exists in `HistoryView` with an `_` prefix (declared but unused). This phase activates it. The recording lookup in `App.tsx` must handle the stopped-session case explicitly to avoid Pitfall 4's silent navigation to the wrong session.
-**Delivers:** Session rows in `SessionHistory` navigate to live terminal, recording player, or explanatory toast depending on session state. `_onNavigateToSession` dead-code resolved.
-**Addresses:** "Clickable history session rows" P1 feature; UX cleanup of history view.
-**Avoids:** Pitfall 4 (silent redirect to wrong session) — check `activeInstances` membership and `recordingId` before any navigation call.
-**Scope estimate:** ~15 lines `SessionHistory.tsx`, ~8 lines `HistoryView.tsx`, ~35 lines `App.tsx`; no server changes.
+**Features addressed:** Bot token configuration, graceful degradation if token absent, graceful shutdown on SIGTERM/SIGINT, error isolation via `bot.catch()`, rate-limit retry.
 
-### Phase 3: Auto-Record Per Agent
+**Pitfalls avoided:**
+- Bot token leaking to source code (env var pattern established first)
+- 409 Conflict on restart (SIGTERM handler wired at bot init, `deleteWebhook()` called before `bot.start()`)
+- Rate limit silent drop (`@grammyjs/auto-retry` installed at bot initialization)
+- Blocking `bot.start()` on main thread (fire-and-forget `void this.bot.start()` pattern)
 
-**Rationale:** Server-side feature with new SQLite table, new service, new route, and a hook into `TerminalStreamService`. Default trigger mode is `manual` so existing behavior is unchanged until the operator explicitly opts in. Must be built in dependency order: migration → service → route → hook point → client UI.
-**Delivers:** Per-agent auto-record config via UI toggle in `RecordingLibrary`; sessions for configured agents start recording automatically on PTY spawn; `isRecording()` indicator in terminal header lights up automatically via existing polling.
-**Addresses:** "Auto-record on session start" P1 feature (completes deferred REC-05 from v3.1).
-**Avoids:** Pitfall 2 (auto-record race) — trigger exclusively from inside `TerminalStreamService.attachSocketToSession()` after `ptyProcess.onData()` is registered; Pitfall 5 (frame buffer OOM) — add 50MB warning log, default to `false`.
-**Scope estimate:** 1 new service file, 1 new route file, 1 migration, ~15 lines `TerminalStreamService.ts`, ~60 lines `RecordingLibrary.tsx` for config UI.
+**Research flag:** Standard patterns — grammy official docs cover all of this; SIGTERM handler already exists in the codebase as the template. No additional research needed.
 
-### Phase 4: Storage Rotation
+---
 
-**Rationale:** Safety layer for auto-record. Build after Phase 3 so there are real auto-generated recordings to test rotation behavior against. All rotation policies default to zero (all axes disabled), so shipping the service before the config UI is safe — no recordings are deleted until the operator sets a cap. Two-phase deletion must be spec'd before any file deletion code is written.
-**Delivers:** Configurable storage cap (bytes, age, count); oldest-first pruning on server start and after each recording stop; manual "Run Now" API endpoint; storage stats UI in `RecordingLibrary`.
-**Addresses:** "Storage rotation" P1 feature; "Storage rotation UI" P2 feature.
-**Avoids:** Pitfall 3 (rotation deletes in-use files) — `deletion_pending` flag in DB; content route checks flag; async `fs.promises.unlink()` only; active recordings excluded from rotation candidates via `isRecording()` check.
-**Scope estimate:** 1 new service file, 4 new DB methods + 2 migrations, ~5 lines `RecordingCaptureService.ts`, ~40 lines `recordingRoutes.ts`, ~40 lines `RecordingLibrary.tsx` for settings UI.
+### Phase 2: Permission Prompt Detection and Forwarding
+
+**Rationale:** This is the core milestone deliverable. It requires Phase 1 (bot must exist), and it introduces the event architecture (`NotificationPoller`, `NotificationDeduplicator`, `agentStateDetection` utility extraction) that the budget alert phase will reuse. Building it first lets Phase 3 layer on top of existing infrastructure.
+
+**Delivers:** When an agent stalls on a Claude Code permission prompt, the operator receives a Telegram message in the correct agent topic containing the prompt excerpt. Duplicate suppression ensures exactly one message per permission event (not one per poll cycle).
+
+**Features addressed:** Permission prompt → Telegram message routing; per-agent topic routing via `getTopicMappings()`; `NotificationPoller` with 10s interval; `NotificationDeduplicator` with configurable cooldown; `agentStateDetection.ts` utility extraction; ANSI stripping of pane excerpts.
+
+**Pitfalls avoided:**
+- Duplicate notification spam (transition-only emission + cooldown Map, both required from the start)
+- PTY `onData` tap approach (use `tmux capture-pane` in `NotificationPoller` instead)
+- False-positive regex matches (narrow `detectAgentState()` regex; include pane excerpt in message body)
+- ANSI codes in Telegram messages (`strip-ansi` applied before any message text is composed)
+
+**Research flag:** The `detectAgentState()` regex narrowing deserves brief verification against actual Claude Code terminal output at Phase 2 start. Capture a real permission prompt pane output and confirm the narrowed pattern matches. Otherwise standard patterns.
+
+---
+
+### Phase 3: One-Tap Approve
+
+**Rationale:** The approve mechanism is a separate concern from detection/forwarding. It requires Phase 2 (a message must exist with a button to tap). This phase adds the inline keyboard to Phase 2's notification message and wires the callback query handler back to `TmuxSessionManager`. Security verification must be part of this phase, not a followup.
+
+**Delivers:** The Telegram notification message has an "Approve" inline button. Tapping it sends `1\n` to the correct tmux session, edits the message to remove the button, and shows the operator a confirmation. Unauthorized tappers receive an explicit rejection. Expired approvals return a friendly error rather than a silent no-op.
+
+**Features addressed:** `InlineKeyboard` on permission prompt messages; `callbackQuery` handler; `tmuxSessionManager.sendPromptToSession('1')`; `answerCallbackQuery` first (before async work); message edit after approve; sender verification against `WARDEN_TELEGRAM_OPERATOR_ID`; timestamp expiry token in `callback_data`.
+
+**Pitfalls avoided:**
+- Callback query answer timing (answer-first pattern, non-negotiable)
+- Unauthorized approval (sender ID check against env-configured operator ID)
+- Stale approve button re-tap (message edited to remove keyboard after first approval)
+- `callback_data` > 64 bytes (session name format validated; `approve:` + max session name is well within 64 bytes)
+
+**Research flag:** Standard patterns — grammy callback query docs cover all mechanics with official examples. No additional research needed.
+
+---
+
+### Phase 4: Budget Alerts and Notification Settings UI
+
+**Rationale:** Budget alerts reuse the `NotificationPoller` and `TelegramBotService` infrastructure built in Phases 2-3. They are informational (no inline keyboard), simpler to implement, and have no security complications. The settings UI completes the milestone by giving the operator control over notification behavior without code changes. Both belong in the same phase because the UI needs the config API, and the config API controls both budget alerts and permission alerts.
+
+**Delivers:** Budget warning (amber) and exceeded (red) alerts forwarded to the operator's Telegram topic with distinct message formatting. A settings panel in the Warden dashboard exposes enable/disable toggles per alert type and cooldown duration inputs. Changes take effect on the next notification send without server restart.
+
+**Features addressed:** Budget alert forwarding from `NotificationPoller`'s `getBudgetAlertStatus()` calls; worsening-only emission (ok → warning, warning → exceeded, not reverse); `notificationRoutes` (`GET/PUT /api/notifications/config`); `NotificationSettingsPanel` React component; bot status indicator.
+
+**Pitfalls avoided:**
+- Budget alert spam (10-minute cooldown default; same `NotificationDeduplicator` as Phase 2)
+- Identical amber/red message formatting (distinct emoji, wording, urgency per threshold level)
+
+**Research flag:** Standard patterns. Per-agent budget routing (requiring per-agent budget query extension) is deferred to v3.3.x — system-wide alert routing is sufficient for v3.3.
+
+---
 
 ### Phase Ordering Rationale
 
-- Phases 1 and 2 are fully client-only and have no mutual dependencies — they can be built and tested independently or in parallel.
-- Phase 3 (auto-record) before Phase 4 (rotation) because: (a) rotation test coverage needs real auto-generated recordings to verify prune behavior against; (b) the hard dependency is explicit — auto-record without rotation causes unbounded disk growth — but rotation defaults to disabled so Phase 3 ships safely before Phase 4 is complete.
-- The `deletion_pending` two-phase flag in Phase 4 requires a DB migration; this schema decision should be made before writing any file-deletion code so the migration is not altered later.
+- Phase 1 must come first: token security and shutdown wiring cannot be safely retrofitted after notification code is written.
+- Phase 2 must come before Phase 3: the inline keyboard requires a message to attach to; the `NotificationPoller` and deduplication infrastructure are shared across both phases.
+- Phase 3 must come before Phase 4's settings UI: the settings panel needs a working notification system to test against.
+- Phase 4 bundles budget alerts with settings because both depend on `notification_config` and neither warrants a standalone phase.
 
 ### Research Flags
 
-All four phases have well-documented patterns with implementation-level detail already in the research files. No phase requires a `/gsd:research-phase` invocation.
+Phases likely needing brief investigation during implementation:
+- **Phase 2:** The `detectAgentState()` regex should be tested against actual Claude Code terminal output for the current Claude version before narrowing the match. A 30-minute manual pane capture would confirm the `❯ 1. Yes` pattern reliably.
 
-**Standard patterns — skip research-phase for all phases:**
-- **Phase 1:** Pattern fully documented in codebase; `onTouchStart` + `terminal.textarea?.focus()` is the complete implementation. `MOBILE_KEYS` array structure and button handler shape confirmed by direct source read.
-- **Phase 2:** Callback threading against existing prop stubs; no new API endpoints needed for basic flow; recording lookup uses existing `GET /api/recordings`.
-- **Phase 3:** Singleton-row SQLite config pattern established (`budget_config` table precedent); `TerminalStreamService` hook point identified with file + approximate line number in ARCHITECTURE.md; `agentId` extraction via `sessionName.split('-')[0]` is the existing convention.
-- **Phase 4:** Two-phase deletion pattern fully specified in PITFALLS.md; all DB query method signatures specified in ARCHITECTURE.md; `setImmediate()` fire-and-forget pattern established in codebase.
+Phases with standard, well-documented patterns (no additional research needed):
+- **Phase 1:** grammy lifecycle is fully documented in official docs; Warden's existing SIGTERM pattern is the implementation template.
+- **Phase 3:** grammy callback query handling and `answerCallbackQuery` are core grammy features with official worked examples.
+- **Phase 4:** Budget alert DB query already exists; `notificationRoutes` follows the same pattern as three existing route modules.
 
-**Needs verification during Phase 3 implementation:**
-- `TerminalStreamService.attachSocketToSession()` exact PTY spawn sequence — confirm `ptyProcess.onData()` registration position and that `agentId` extraction from `sessionName.split('-')[0]` is correct before writing the hook.
+---
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH | All capabilities use verified existing stack; `fs.statfsSync()` and `fs/promises.statfs()` verified on Node.js 22.22.0 on this server; no new dependencies required |
-| Features | HIGH | Scope derived from direct codebase inspection; prop stubs confirmed; existing patterns confirmed; REC-05 deferred ticket confirmed in project docs |
-| Architecture | HIGH | Direct source code analysis of all modified files; hook points, prop names, integration boundaries, and scope estimates all identified from source |
-| Pitfalls | HIGH | Three pitfalls sourced from direct xterm.js source reading + iOS behavior verification (multiple consistent sources); two from codebase control-flow analysis; all have specific, testable acceptance criteria |
+| Stack | HIGH | grammy official docs verified; direct codebase inspection confirmed all existing services and their APIs; version compatibility confirmed; one-package addition validated |
+| Features | HIGH | All features grounded in existing codebase hooks (`detectAgentState`, `getTopicMappings`, `sendPromptToSession`, `getBudgetAlertStatus`); grammY API verified for inline keyboards and callback queries against official docs |
+| Architecture | HIGH | Component boundaries drawn from direct source inspection of v3.2 codebase; EventEmitter pattern matches existing codebase style; all integration points confirmed with file names and approximate line numbers |
+| Pitfalls | HIGH | Telegram Bot API official docs + grammY official docs for all API-level pitfalls; codebase inspection confirmed PTY keep-alive behavior and `detectAgentState()` regex fragility; `PROJECT.md` tech debt notes corroborate |
 
-**Overall confidence: HIGH**
+**Overall confidence:** HIGH
 
 ### Gaps to Address
 
-- **`terminal.textarea?.focus()` on Android Chrome:** The fix is confirmed correct for iOS Safari. Android behavior has MEDIUM confidence (community sources, not device-verified). Low priority — Android is not the primary target, but include in the test matrix for Phase 1 acceptance.
+- **`detectAgentState()` regex specificity for Telegram:** The current regex is documented as "fragile but functional" in `PROJECT.md`. Before finalizing Phase 2 implementation, capture a real Claude Code permission prompt pane output and confirm the narrowed regex (`❯ 1. Yes`) matches reliably. Low-effort validation; do it at Phase 2 start.
 
-- **`RecordingLibrary.tsx` settings UI scope:** ARCHITECTURE.md estimates ~60 lines for auto-record config and ~40 lines for rotation config added to `RecordingLibrary`. Actual scope may be larger depending on UX layout decisions. Treat as rough estimate during task breakdown.
+- **Operator Telegram user ID sourcing:** The sender verification in Phase 3 requires `WARDEN_TELEGRAM_OPERATOR_ID` to be set. The operator needs to look this up via `@userinfobot`. Include this in the Phase 3 setup checklist — it is not a code concern but an operational prerequisite that can block testing.
 
-- **`TerminalStreamService` agentId extraction path:** `agentId = sessionName.split('-')[0]` is the documented convention used in `TmuxSessionManager.listAgentSessions()`, but has not been verified against the actual `TerminalStreamService.ts` service code path. Verify before writing the Phase 3 hook point.
+- **Forge environment variable injection:** `WARDEN_TELEGRAM_BOT_TOKEN` needs to be set in the production environment before deployment. Confirm this is part of the Phase 1 deployment checklist and not an afterthought.
 
-- **Frame buffer memory monitoring:** Pitfall 5 documents the risk but v3.2 mitigation is a warning log only. If any agent runs long auto-recorded sessions before the warning is tested in production, OOM is possible. Document the limitation explicitly in the Phase 3 implementation notes.
+- **Per-agent budget routing (accepted limitation for v3.3):** The current `getBudgetAlertStatus()` returns system-wide status, not per-agent. Budget alerts in v3.3 route to a single operator topic rather than each agent's specific topic. This is a known accepted limitation; log it for v3.3.x work.
 
-- **Recording library pagination:** PITFALLS.md flags potential sluggishness at 100-200 recordings on mobile. Not in v3.2 scope but worth noting: if any new `listRecordings()` calls are added without `LIMIT`, add a comment to track this as v3.3 work.
+---
 
 ## Sources
 
 ### Primary (HIGH confidence — direct source inspection)
 
-- `src/client/components/TerminalView.tsx` — MOBILE_KEYS array, MobileKeyToolbar onTouchStart pattern, terminalInstanceRef, focus chain
-- `src/client/components/HistoryView.tsx` — `_onNavigateToSession` unused prop confirmed; MobileAccordionSection max-h CSS
-- `src/client/components/SessionHistory.tsx` — row structure, absence of click handlers, AgentInstance data shape
-- `src/client/components/EventsTab.tsx` — accessible row pattern (role="button", tabIndex, onKeyDown) as precedent for SessionHistory
-- `src/client/App.tsx` — view routing, setActiveRecording, stable callback patterns, useSessionSelection behavior
-- `src/server/services/TerminalStreamService.ts` — PTY spawn branch, onData tap sequence, attachSocketToSession control flow
-- `src/server/services/RecordingCaptureService.ts` — stopRecording flow, writeAsciicastFile, database.finaliseRecording
-- `src/server/database/DatabaseConnection.ts` — budget_config singleton-row migration pattern, deleteRecording method, recordings schema
-- `src/server/routes/recordingRoutes.ts` — existing DELETE handler pattern for file + DB row deletion
-- `node_modules/xterm/lib/xterm.js:25971` — confirmed `focus(){this.textarea&&this.textarea.focus({preventScroll:!0})}` (programmatic focus does not trigger iOS keyboard)
-- Node.js 22.22.0 on server — `fs.statfsSync('/')` and `fs/promises.statfs('/')` both verified returning `{blocks, bfree, bsize, ...}`
+- `src/server/routes/gsdRoutes.ts` — `detectAgentState()` regex, `tmux capture-pane` pattern, `SESSION_NAME_RE`
+- `src/server/services/TerminalStreamService.ts` — PTY lifecycle, 30s keep-alive behavior, `onData` tap pattern
+- `src/server/services/InstanceTracker.ts` — 10s polling interval pattern adopted by `NotificationPoller`
+- `src/server/services/OpenClawConfigReader.ts` — `getTopicMappings()` returning `{ agentId, groupId, topicId }`
+- `src/server/services/TmuxSessionManager.ts` — `sendPromptToSession(sessionName, prompt)` existing implementation
+- `src/server/database/DatabaseConnection.ts` — `getBudgetAlertStatus()`, singleton-row config table pattern
+- `src/shared/types.ts` — `BudgetAlertStatus`, `AgentInstance` interfaces
+- `src/shared/openclawTypes.ts` — `TopicMapping` interface
+- `src/client/hooks/useBrowserNotifications.ts` — state-transition detection pattern (template for server-side `NotificationPoller`)
+- `src/client/hooks/useBudgetAlerts.ts` — budget alert polling pattern; server-side equivalent in `NotificationPoller`
+- `.planning/PROJECT.md` — v3.3 milestone scope; "separate notification-only bot" note; out-of-scope items; tech debt on `detectAgentState()`
+- [grammy.dev/guide/](https://grammy.dev/guide/) — Bot lifecycle, long polling vs webhooks, graceful shutdown
+- [grammy.dev/plugins/keyboard](https://grammy.dev/plugins/keyboard) — `InlineKeyboard` API, `answerCallbackQuery` requirement
+- [grammy.dev/advanced/flood](https://grammy.dev/advanced/flood) — Rate limits, auto-retry plugin
+- [grammy.dev/resources/comparison](https://grammy.dev/resources/comparison) — NTBA unmaintained, telegraf outdated
+- [core.telegram.org/bots/api](https://core.telegram.org/bots/api) — `sendMessage` with `message_thread_id`, `answerCallbackQuery`, `callback_data` 64-byte limit
 
-### Secondary (MEDIUM confidence — official docs and issue tracker)
+### Secondary (MEDIUM confidence)
 
-- xterm.js issue #5377 — Limited touch support on mobile; focus-loss root cause for mobile toolbar interactions
-- xterm.js issue #2403 — Accommodate predictive keyboard on mobile
-- xterm.js issue #1101 — Support mobile platforms; iOS hidden textarea mechanism
-- MDN HTMLElement.focus() — focus within touchstart gesture context requirements
-- Apple WebKit bug #195884 — Autofocus on text input does not show keyboard
-- iOS Safari keyboard behavior — `onTouchStart` + `preventDefault()` established technique; multiple WebSearch sources consistent
-- Prior Warden phase research: `.planning/phases/11.1-fix-tmux-visibility-when-mobile-keyboard-opens/11.1-RESEARCH.md`
+- WebSearch: grammy v1.41.1 publication date (2 days before research), 339+ dependents, npm weekly downloads
+- WebSearch: node-telegram-bot-api callback_query issues (#306, #621) confirming library is in maintenance mode
+- python-telegram-bot wiki — Avoiding flood limits (different library, same Telegram API constraints)
+- node-telegram-bot-api issue #488 — 409 Conflict (same API behavior, different library)
 
-### Tertiary (MEDIUM confidence — community/blog sources)
+### Tertiary (informational)
 
-- Termius, NewTerm, Blink Shell toolbar implementation patterns — consistent with codebase approach
-- MDN VirtualKeyboard API — Chrome 94+ only; confirmed not applicable to iOS Safari target
-- Node.js log rotation conventions — age + size two-axis policy is the established pattern (PM2, winston-daily-rotate-file, logrotate)
+- codex.so — Telegram Bots in Group Topics — verified against Bot API docs; confirms `message_thread_id` usage
+- GitGuardian — Telegram Bot Token detector pattern for pre-commit hook reference
 
 ---
 *Research completed: 2026-03-04*
