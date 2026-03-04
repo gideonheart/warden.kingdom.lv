@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-03-04)
 ## Current Position
 
 Phase: 32 — Bot Foundation
-Plan: TBD
-Status: Roadmap created, ready for Phase 32 planning
-Last activity: 2026-03-04 — v3.3 roadmap created (Phases 32-35)
+Plan: 01 complete (1/2 plans done)
+Status: Plan 01 complete — TelegramBotService implemented, all 11 tests green
+Last activity: 2026-03-04 — 32-01-PLAN.md executed, TelegramBotService created
 
 ```
 Progress: [░░░░] 0/4 phases complete
@@ -22,7 +22,7 @@ Milestone: v3.3 Telegram Operator Awareness
 ## Performance Metrics
 
 **Completed milestones:** v1.0 (6 phases), v1.1 (2), v2.0 (3), v2.1 (3), v2.3 (4), v3.0 (2), v3.1 (6), v3.2 (4) = 31 phases shipped
-**Current milestone:** v3.3 — 0/4 phases complete
+**Current milestone:** v3.3 — 0/4 phases complete (Phase 32 in progress: 1/2 plans done)
 
 ## Accumulated Context
 
@@ -42,6 +42,9 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - `NotificationDeduplicator` with in-memory cooldown Map — configurable window, defaults: 2 min permission, 10 min budget
 - `notification_config` SQLite table following singleton-row pattern (same as `budget_config`, `rotation_config`)
 - Phase 33 depends on Phase 32; Phase 34 depends on Phase 33; Phase 35 depends on Phase 33
+- [Phase 32-bot-foundation]: MockBot vi.fn must use function() not arrow fn for constructability via new Bot(token)
+- [Phase 32-bot-foundation]: TelegramBotService.start() is void — bot.start() fire-and-forget, no await
+- [Phase 32-bot-foundation]: autoRetry() default config (unlimited retries) selected for Phase 32
 
 ### Research Flags
 
@@ -68,6 +71,6 @@ None
 
 ## Session Continuity
 
-Last session: 2026-03-04 (v3.3 roadmap creation)
-Stopped at: Roadmap written — Phases 32-35 defined, all 19 requirements mapped
-Next step: `/gsd:plan-phase 32` — Bot Foundation
+Last session: 2026-03-04 (Plan 32-01 execution)
+Stopped at: Completed 32-01-PLAN.md — TelegramBotService implemented, 11 tests green, BOT-01/BOT-02/BOT-04 complete
+Next step: Execute 32-02-PLAN.md — wire TelegramBotService into server index.ts (BOT-03)

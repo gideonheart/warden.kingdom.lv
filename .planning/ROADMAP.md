@@ -166,7 +166,7 @@ See `.planning/milestones/v3.2-ROADMAP.md`
   2. Server starts without `WARDEN_TELEGRAM_BOT_TOKEN` and logs a single warning — no crash, all other features unaffected
   3. `SIGTERM` or `SIGINT` stops the bot cleanly before process exit — no 409 Conflict error on rapid restart
   4. Telegram sends a high-volume message burst and the server does not crash or log unhandled errors — auto-retry absorbs 429 responses
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 Plans:
 - [ ] 32-01-PLAN.md — TDD: TelegramBotService singleton with unit tests (BOT-01, BOT-02, BOT-04)
 - [ ] 32-02-PLAN.md — Wire service into Express lifecycle start/stop (BOT-03)
@@ -241,7 +241,7 @@ Plans:
 | 29. Session Navigation | v3.2 | 1/1 | Complete | 2026-03-04 |
 | 30. Auto-Record Per Agent | v3.2 | 2/2 | Complete | 2026-03-04 |
 | 31. Storage Rotation | v3.2 | 2/2 | Complete | 2026-03-04 |
-| 32. Bot Foundation | v3.3 | 0/2 | Planning complete | - |
+| 32. Bot Foundation | 1/2 | In Progress|  | - |
 | 33. Permission Prompt Detection and Forwarding | v3.3 | 0/? | Not started | - |
 | 34. One-Tap Approve | v3.3 | 0/? | Not started | - |
 | 35. Budget Alerts and Notification Settings | v3.3 | 0/? | Not started | - |
