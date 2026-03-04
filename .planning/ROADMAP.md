@@ -73,7 +73,7 @@
 **Milestone Goal:** Advance Warden from a monitoring tool to an active operations platform — agent lifecycle control, cost velocity insights, and session recording.
 
 - [x] **Phase 21: Agent Lifecycle Controls** — Start, stop, restart agent sessions with safety guards and real-time transitional state badges (completed 2026-03-04)
-- [ ] **Phase 22: Token Burn Rate & Budget Alerts** — Real-time cost velocity with sliding windows, budget thresholds, and cost projection
+- [x] **Phase 22: Token Burn Rate & Budget Alerts** — Real-time cost velocity with sliding windows, budget thresholds, and cost projection (completed 2026-03-04)
 - [ ] **Phase 23: Token Analytics & Export** — Model cost comparison view and CSV export of full token usage dataset
 - [ ] **Phase 24: Session Recording & Replay** — Record terminal output as asciicast v2 files, replay at variable speed, browsable recording library
 - [ ] **Phase 25: Recording Automation** — Auto-record sessions based on configurable trigger rules (stretch goal)
@@ -201,7 +201,7 @@ Plans:
   2. Operator can set a daily budget threshold per agent stored in SQLite; when an agent's daily spend crosses 80% of the threshold an amber warning badge appears on the History nav tab; at 100% the badge turns red
   3. The cost projection card shows estimated daily and weekly spend at the current burn rate, recalculating automatically when the operator changes the burn rate window
 
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans complete
 
 Plans:
 - [ ] 22-01-PLAN.md — Server-side burn rate & budget config: shared types, budget_config table migration, getBurnRate/getBudgetAlertStatus DB methods, four API endpoints (burn-rate, budget-config CRUD, budget-config status)
@@ -295,7 +295,7 @@ Plans:
 | 19. Operator Awareness Wiring | v3.0 | 2/2 | Complete | 2026-03-03 |
 | 20. Terminal Search & Browser Notifications | v3.0 | 2/2 | Complete | 2026-03-03 |
 | 21. Agent Lifecycle Controls | v3.1 | 3/3 | Complete | 2026-03-04 |
-| 22. Token Burn Rate & Budget Alerts | 1/2 | In Progress|  | - |
+| 22. Token Burn Rate & Budget Alerts | 2/2 | Complete   | 2026-03-04 | - |
 | 23. Token Analytics & Export | v3.1 | 0/2 | Not started | - |
 | 24. Session Recording & Replay | v3.1 | 0/2 | Not started | - |
 | 25. Recording Automation | v3.1 | 0/1 | Not started | - |

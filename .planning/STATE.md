@@ -6,14 +6,14 @@ See: .planning/PROJECT.md (updated 2026-03-04)
 
 **Core value:** Real-time visibility into all active Claude Code agent sessions from a single browser tab
 
-**Current focus:** v3.1 — Agent Control & Deep Insights (Phase 22 in progress)
+**Current focus:** v3.1 — Agent Control & Deep Insights (Phase 22 complete)
 
 ## Current Position
 
 Phase: 22 of 25 (Token Burn Rate & Budget Alerts)
-Plan: 1 of 2 complete
-Status: Phase 22 in progress — plan 01 executed (server layer: types, DB, API endpoints)
-Last activity: 2026-03-04 - Completed 22-01: burn rate + budget config server layer
+Plan: 2 of 2 complete (Phase 22 DONE)
+Status: Phase 22 complete — both plans executed (server layer + client UI)
+Last activity: 2026-03-04 - Completed 22-02: burn rate UI, budget editor, History nav badge
 
 Progress: [████████████████░░░░░░░░░░░░░░] 53% (20/25 phases complete)
 
@@ -49,6 +49,10 @@ Key decisions relevant to v3.1:
 - [22-01]: upsertBudgetConfig(agentId, 0) deletes row — "no budget = no alert" via delete-on-zero
 - [22-01]: /budget-config/status route before /:agentId — prevents Express param shadowing
 - [22-01]: Aggregate alertLevel computed in application layer, not SQL — clarity over cleverness
+- [22-02]: useBudgetAlerts uses previousRef guard — only calls setAlertLevel when value changes, preventing unnecessary re-renders every 30s
+- [22-02]: editingBudget Record<string,string> per agent — isolates draft state, avoids controlled/uncontrolled input issues
+- [22-02]: Amber badge animate-pulse, red badge static — visual distinction between warning and exceeded states
+- [22-02]: Projection card conditionally rendered when burnRates.length > 0 — no misleading $0.00 projections when no data
 
 ### Pending Todos
 
@@ -73,5 +77,5 @@ No active blockers for Phase 22.
 ## Session Continuity
 
 Last session: 2026-03-04
-Stopped at: Completed 22-01-PLAN.md (server layer: types, database methods, API endpoints)
-Next step: Execute 22-02-PLAN.md — client-side burn rate UI
+Stopped at: Completed 22-02-PLAN.md (client UI: burn rate display, budget editor, History nav badge)
+Next step: Execute Phase 23 — model comparison / cost breakdown by model
