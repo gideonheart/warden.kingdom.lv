@@ -8,7 +8,7 @@
 - ✅ **v2.1 GSD Manager Plugin** — Phases 12-14 (shipped 2026-02-18)
 - ✅ **v2.3 Code Hygiene & Token Usage** — Phases 15-18 (shipped 2026-03-03)
 - ✅ **v3.0 Operator Awareness & Terminal Power Tools** — Phases 19-20 (shipped 2026-03-04)
-- 🚧 **v3.1 Agent Control & Deep Insights** — Phases 21-24, 26 (in progress)
+- 🚧 **v3.1 Agent Control & Deep Insights** — Phases 21-24, 26-27 (in progress)
 
 ## Phases
 
@@ -68,7 +68,7 @@
 
 </details>
 
-### v3.1 Agent Control & Deep Insights (Phases 21-24, 26)
+### v3.1 Agent Control & Deep Insights (Phases 21-24, 26-27)
 
 **Milestone Goal:** Advance Warden from a monitoring tool to an active operations platform — agent lifecycle control, cost velocity insights, and session recording.
 
@@ -77,6 +77,7 @@
 - [x] **Phase 23: Token Analytics & Export** — Model cost comparison view and CSV export of full token usage dataset (completed 2026-03-04)
 - [x] **Phase 26: Token Analytics Polish & Tech Debt** — Fix agent filter accessibility on Model Costs tab, clean up unused imports and label semantics (gap closure) (completed 2026-03-04)
 - [x] **Phase 24: Session Recording & Replay** — Record terminal output as asciicast v2 files, replay at variable speed, browsable recording library (completed 2026-03-04)
+- [ ] **Phase 27: Recording State Cleanup & Tech Debt** — Fix recording state desync on session_ended, clean up unused variables, doc consistency (gap closure)
 
 ## Phase Details
 
@@ -274,6 +275,31 @@ Plans:
 
 ---
 
+### Phase 27: Recording State Cleanup & Tech Debt (Gap Closure)
+
+**Goal**: Close the last integration gap (recording state desync on session_ended) and clean up minor tech debt from Phases 23-24 — bringing v3.1 to a clean 22/22 integrations and 4/4 flows.
+
+**Depends on**: Phase 24 (useRecordingState hook, RecordingCaptureService)
+
+**Requirements**: None (integration/flow gap + tech debt — no new requirements)
+
+**Gap Closure:** Closes gaps from v3.1 milestone audit:
+- Integration: REC-02-STATE-DESYNC (client isRecording not reset on terminal:exit)
+- Flow: Flow D session_ended variant (REC button stays red after PTY exit)
+
+**Success Criteria** (what must be TRUE):
+  1. When a PTY process exits (terminal:exit event), `useRecordingState` resets `isRecording` to false — the REC button no longer stays red after session_ended
+  2. Flow D session_ended variant completes cleanly: PTY dies → server auto-stops recording → client REC state resets → no stale red indicator
+  3. Unused `__dirname` variable removed from RecordingCaptureService.ts
+  4. 23-VERIFICATION.md body text updated to match frontmatter (8/8, not 7/8)
+
+**Plans**: TBD
+
+Plans:
+- [ ] 27-01-PLAN.md — Fix useRecordingState terminal:exit listener, clean up RecordingCaptureService __dirname, fix 23-VERIFICATION.md body text
+
+---
+
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
@@ -301,5 +327,6 @@ Plans:
 | 21. Agent Lifecycle Controls | v3.1 | 3/3 | Complete | 2026-03-04 |
 | 22. Token Burn Rate & Budget Alerts | v3.1 | 2/2 | Complete | 2026-03-04 |
 | 23. Token Analytics & Export | v3.1 | 2/2 | Complete | 2026-03-04 |
-| 26. Token Analytics Polish & Tech Debt | 1/1 | Complete    | 2026-03-04 | - |
-| 24. Session Recording & Replay | 2/2 | Complete    | 2026-03-04 | - |
+| 26. Token Analytics Polish & Tech Debt | v3.1 | 1/1 | Complete | 2026-03-04 |
+| 24. Session Recording & Replay | v3.1 | 2/2 | Complete | 2026-03-04 |
+| 27. Recording State Cleanup & Tech Debt | v3.1 | 0/1 | Planned | - |
