@@ -275,6 +275,15 @@ export function TokenUsageView() {
           </button>
         </div>
 
+        {/* Agent filter — visible on all tabs */}
+        <input
+          type="text"
+          placeholder="Filter by agent"
+          value={agentFilter}
+          onChange={(e) => setAgentFilter(e.target.value)}
+          className="bg-warden-bg border border-warden-border rounded px-2 py-1 text-sm text-warden-text w-36"
+        />
+
         {/* Export CSV button */}
         <button
           onClick={handleExport}
@@ -295,15 +304,8 @@ export function TokenUsageView() {
       {/* Token Usage tab content — all existing content below */}
       {activeTab === 'usage' && (
         <>
-      {/* Filter controls and scan button */}
+      {/* Scan button */}
       <div className="flex items-center gap-3">
-        <input
-          type="text"
-          placeholder="Filter by agent ID"
-          value={agentFilter}
-          onChange={(e) => setAgentFilter(e.target.value)}
-          className="bg-warden-bg border border-warden-border rounded px-2 py-1 min-h-[44px] text-sm text-warden-text w-40"
-        />
         <button
           onClick={handleScanNow}
           disabled={isScanning}
