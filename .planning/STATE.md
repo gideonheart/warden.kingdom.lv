@@ -6,7 +6,7 @@ See: .planning/PROJECT.md (updated 2026-03-04)
 
 **Core value:** Real-time visibility into all active Claude Code agent sessions from a single browser tab
 
-**Current focus:** v3.1 — Agent Control & Deep Insights (Phase 21 in progress)
+**Current focus:** v3.1 — Agent Control & Deep Insights (Phase 22 next)
 
 ## Current Position
 
@@ -63,5 +63,5 @@ No active blockers for Phase 21.
 ## Session Continuity
 
 Last session: 2026-03-04
-Stopped at: Completed 21-03-PLAN.md (stopped session visibility gap closure)
-Next step: Phase 21 complete — proceed to Phase 22
+Stopped at: Completed quick-2039 (Phase 21 review, tech debt fix, ROADMAP corrections)
+Next step: /gsd:research-phase 22 — Token Burn Rate & Budget Alerts
