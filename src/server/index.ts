@@ -13,6 +13,7 @@ import { recordingRoutes } from './routes/recordingRoutes.js';
 import { terminalStreamService } from './services/TerminalStreamService.js';
 import { instanceTracker } from './services/InstanceTracker.js';
 import { sessionUsageReader } from './services/SessionUsageReader.js';
+import { recordingRotationService } from './services/RecordingRotationService.js';
 import { database } from './database/DatabaseConnection.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -92,6 +93,7 @@ terminalStreamService.setupSocketNamespace(socketServer);
 
 instanceTracker.startPeriodicSync();
 sessionUsageReader.startPeriodicScan();
+recordingRotationService.startPeriodicRotation();
 
 httpServer.listen(PORT, HOST, () => {
   console.log(`[Warden] Server running at http://${HOST}:${PORT}`);
@@ -107,6 +109,7 @@ function handleShutdown(signal: string): void {
   }, 10_000);
   forceExitTimeout.unref();
 
+  recordingRotationService.stopPeriodicRotation();
   sessionUsageReader.stopPeriodicScan();
   instanceTracker.stopPeriodicSync();
   httpServer.close(() => {

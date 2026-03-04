@@ -429,6 +429,12 @@ class DatabaseConnection {
     return row?.deletion_pending === 1;
   }
 
+  getDeletionPendingRecordings(): Array<{ id: number; filePath: string }> {
+    return this.db.prepare(
+      'SELECT id, file_path AS filePath FROM recordings WHERE deletion_pending = 1'
+    ).all() as Array<{ id: number; filePath: string }>;
+  }
+
   close(): void {
     console.log('[Database] Checkpointing WAL before close');
     this.db.pragma('wal_checkpoint(TRUNCATE)');

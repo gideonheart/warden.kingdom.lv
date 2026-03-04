@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { database } from '../database/DatabaseConnection.js';
 import { recordingCaptureService } from '../services/RecordingCaptureService.js';
+import { recordingRotationService } from '../services/RecordingRotationService.js';
 
 export const recordingRoutes = express.Router();
 
@@ -44,6 +45,37 @@ recordingRoutes.put('/api/recordings/auto-record-config/:agentId', (req, res) =>
   }
   database.setAutoRecord(agentId, enabled);
   res.json({ agentId, autoRecord: enabled });
+});
+
+// GET /api/recordings/storage-stats — current storage usage + cap
+// NOTE: must be placed before /:id routes to prevent Express param capture
+recordingRoutes.get('/api/recordings/storage-stats', (_req, res) => {
+  const stats = database.getStorageStats();
+  const config = database.getRotationConfig();
+  res.json({ ...stats, capBytes: config.capBytes });
+});
+
+// GET /api/recordings/rotation-config — current cap setting
+recordingRoutes.get('/api/recordings/rotation-config', (_req, res) => {
+  const config = database.getRotationConfig();
+  res.json(config);
+});
+
+// PUT /api/recordings/rotation-config — set storage cap in bytes (0 = disabled)
+recordingRoutes.put('/api/recordings/rotation-config', (req, res) => {
+  const { capBytes } = req.body as { capBytes?: number };
+  if (typeof capBytes !== 'number' || capBytes < 0) {
+    res.status(400).json({ error: 'capBytes (non-negative number) is required' });
+    return;
+  }
+  database.setRotationConfig(capBytes);
+  res.json({ capBytes });
+});
+
+// POST /api/recordings/rotation/prune — trigger immediate rotation manually
+recordingRoutes.post('/api/recordings/rotation/prune', (_req, res) => {
+  const result = recordingRotationService.runRotation();
+  res.json(result);
 });
 
 // POST /api/recordings/session/:sessionName/start — start recording
@@ -156,6 +188,12 @@ recordingRoutes.get('/api/recordings/:id/content', (req, res) => {
   const entry = database.findRecordingById(id);
   if (!entry) {
     res.status(404).json({ error: 'Recording not found' });
+    return;
+  }
+
+  // Guard: do not serve content for recordings pending deletion
+  if (database.isRecordingPendingDeletion(id)) {
+    res.status(404).json({ error: 'Recording is pending deletion' });
     return;
   }
 
