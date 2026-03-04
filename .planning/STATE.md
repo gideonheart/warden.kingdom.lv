@@ -10,19 +10,19 @@ See: .planning/PROJECT.md (updated 2026-03-04)
 ## Current Position
 
 Phase: 33 — Permission Prompt Detection and Forwarding
-Plan: 01 complete (1/2 plans done — Phase 33 in progress)
-Status: Phase 33 Plan 01 complete — NotificationDeduplicator and detectAgentState() TDD; PERM-04, PERM-05 satisfied
-Last activity: 2026-03-04 — 33-01-PLAN.md executed, NotificationDeduplicator built and tested with TDD
+Plan: 02 complete (2/2 plans done — Phase 33 COMPLETE)
+Status: Phase 33 complete — full notification pipeline operational; all 5 PERM requirements satisfied
+Last activity: 2026-03-04 — 33-02-PLAN.md executed, NotificationPoller built and wired into server lifecycle
 
 ```
-Progress: [##░░] 2/4 phases (Phase 32 complete, Phase 33 Plan 01 complete)
+Progress: [###░] 3/4 phases (Phase 32 complete, Phase 33 complete)
 Milestone: v3.3 Telegram Operator Awareness
 ```
 
 ## Performance Metrics
 
 **Completed milestones:** v1.0 (6 phases), v1.1 (2), v2.0 (3), v2.1 (3), v2.3 (4), v3.0 (2), v3.1 (6), v3.2 (4) = 31 phases shipped
-**Current milestone:** v3.3 — Phase 32 complete, Phase 33 Plan 01 complete (2/4 phases)
+**Current milestone:** v3.3 — Phase 32 complete, Phase 33 complete (3/4 phases)
 
 ## Accumulated Context
 
@@ -49,6 +49,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase 32-02]: Signal handlers use void pattern — () => { void handleShutdown('SIGTERM'); } correct async invocation without unhandled rejection
 - [Phase 33-01]: lastNotifiedAt reset to null on permission state exit — enables immediate re-notification on clean re-entry without cooldown wait
 - [Phase 33-01]: previousState checked BEFORE update in recordAndCheck() — transition detection requires reading old state before writing new state
+- [Phase 33-02]: ANSI stripping applied BEFORE detectAgentState() — ANSI codes around cursor character break permission prompt regex
+- [Phase 33-02]: notificationPoller lifecycle ordering: start after telegramBotService.start(), stop before telegramBotService.stop() — correct dependency sequencing
 
 ### Research Flags
 
@@ -75,6 +77,6 @@ None
 
 ## Session Continuity
 
-Last session: 2026-03-04 (Plan 33-01 execution)
-Stopped at: Completed 33-01-PLAN.md — NotificationDeduplicator built with TDD; detectAgentState() extracted; PERM-04, PERM-05 satisfied
-Next step: Execute Phase 33 Plan 02 — NotificationPoller service wiring
+Last session: 2026-03-04 (Plan 33-02 execution)
+Stopped at: Completed 33-02-PLAN.md — NotificationPoller built and wired; PERM-01, PERM-02, PERM-03 satisfied; Phase 33 complete
+Next step: Execute Phase 34 — Operator Messaging (or Phase 35 — Budget Alert Notifications)

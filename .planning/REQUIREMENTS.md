@@ -16,9 +16,9 @@ Requirements for Telegram Operator Awareness milestone. Each maps to roadmap pha
 
 ### Permission Notifications
 
-- [ ] **PERM-01**: Operator receives Telegram notification when any agent enters permission prompt state
-- [ ] **PERM-02**: Notification sent to agent's configured Telegram topic with pane excerpt (ANSI-stripped)
-- [ ] **PERM-03**: Detection runs via tmux capture-pane polling (works without browser open)
+- [x] **PERM-01**: Operator receives Telegram notification when any agent enters permission prompt state
+- [x] **PERM-02**: Notification sent to agent's configured Telegram topic with pane excerpt (ANSI-stripped)
+- [x] **PERM-03**: Detection runs via tmux capture-pane polling (works without browser open)
 - [x] **PERM-04**: Only state transitions trigger notifications (entering permission state, not sustained)
 - [x] **PERM-05**: Duplicate notifications suppressed within configurable cooldown (default 2 min)
 
@@ -72,9 +72,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | BOT-02 | Phase 32 | Complete |
 | BOT-03 | Phase 32 | Complete |
 | BOT-04 | Phase 32 | Complete |
-| PERM-01 | Phase 33 | Pending |
-| PERM-02 | Phase 33 | Pending |
-| PERM-03 | Phase 33 | Pending |
+| PERM-01 | Phase 33 | Complete |
+| PERM-02 | Phase 33 | Complete |
+| PERM-03 | Phase 33 | Complete |
 | PERM-04 | Phase 33 | Complete |
 | PERM-05 | Phase 33 | Complete |
 | APRV-01 | Phase 34 | Pending |

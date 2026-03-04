@@ -95,7 +95,7 @@
 ### v3.3 Telegram Operator Awareness
 
 - [x] **Phase 32: Bot Foundation** - Telegram bot client with secure token handling and graceful lifecycle (completed 2026-03-04)
-- [ ] **Phase 33: Permission Prompt Detection and Forwarding** - Server-side polling detects stalled agents and sends Telegram notifications
+- [x] **Phase 33: Permission Prompt Detection and Forwarding** - Server-side polling detects stalled agents and sends Telegram notifications (completed 2026-03-04)
 - [ ] **Phase 34: One-Tap Approve** - Inline keyboard button unblocks stalled agents from Telegram with operator-only authorization
 - [ ] **Phase 35: Budget Alerts and Notification Settings** - Budget threshold forwarding and dashboard settings panel for all notification preferences
 
@@ -181,7 +181,7 @@ Plans:
   3. The agent sustains the permission prompt for 5 minutes — the operator receives exactly one notification, not one per poll cycle
   4. Two different agents stall simultaneously — each receives a separate notification in their respective topics
   5. The agent exits the permission state and re-enters it — a new notification fires (transition detection resets the cooldown)
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans complete
 Plans:
 - [ ] 33-01-PLAN.md — TDD: NotificationDeduplicator + agentStateDetection extraction (PERM-04, PERM-05)
 - [ ] 33-02-PLAN.md — NotificationPoller + sendToTopic + server lifecycle wiring (PERM-01, PERM-02, PERM-03)
@@ -245,6 +245,6 @@ Plans:
 | 30. Auto-Record Per Agent | v3.2 | 2/2 | Complete | 2026-03-04 |
 | 31. Storage Rotation | v3.2 | 2/2 | Complete | 2026-03-04 |
 | 32. Bot Foundation | 2/2 | Complete    | 2026-03-04 | - |
-| 33. Permission Prompt Detection and Forwarding | 1/2 | In Progress|  | - |
+| 33. Permission Prompt Detection and Forwarding | 2/2 | Complete   | 2026-03-04 | - |
 | 34. One-Tap Approve | v3.3 | 0/? | Not started | - |
 | 35. Budget Alerts and Notification Settings | v3.3 | 0/? | Not started | - |
