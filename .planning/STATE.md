@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-03-04)
 
 **Core value:** Real-time visibility into all active Claude Code agent sessions from a single browser tab
-**Current focus:** v3.2 Mobile Operations & UX Polish — Phase 30: Auto-Record Per Agent
+**Current focus:** v3.2 Mobile Operations & UX Polish — Phase 31: Storage Rotation COMPLETE
 
 ## Current Position
 
 Phase: 31 of 31 (Recording Storage Rotation)
-Plan: 1 of 2 complete in current phase
-Status: Phase 31 Plan 01 complete — backend rotation system shipped
-Last activity: 2026-03-04 — Phase 31 Plan 01 complete: rotation_config table, deletion_pending two-phase safety, RecordingRotationService with 5-minute periodic scheduler, 4 REST endpoints
+Plan: 2 of 2 complete in current phase
+Status: Phase 31 COMPLETE — storage rotation backend + UI fully shipped
+Last activity: 2026-03-04 — Phase 31 Plan 02 complete: Storage settings collapsible panel in RecordingLibrary with usage bar, cap input, and Prune Now button
 
-Progress: [█████████████████████] 30/31 phases complete (97%)
+Progress: [█████████████████████] 31/31 phases complete (100%)
 
 ## Performance Metrics
 
@@ -27,6 +27,7 @@ Progress: [█████████████████████] 30/3
 | 30-auto-record-per-agent | 01 | 2min | 2 | 3 |
 | 30-auto-record-per-agent | 02 | 2min | 2 | 3 |
 | Phase 31-storage-rotation P01 | 2 | 2 tasks | 5 files |
+| Phase 31-storage-rotation P02 | 2 | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -54,6 +55,9 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase 31-storage-rotation]: Two-phase deletion: markDeletionPending -> fs.unlinkSync -> deleteRecording; getDeletionPendingRecordings queries deletion_pending=1 for orphan crash recovery on startup
 - [Phase 31-storage-rotation]: capBytes=0 means disabled; orphan cleanup always runs regardless of cap setting (happens before the cap=0 early-return check)
 - [Phase 31-storage-rotation]: Literal-path routes /storage-stats, /rotation-config, /rotation/prune placed before /:id param routes (same ordering lesson from Phase 30)
+- [Phase 31-storage-rotation]: Disable button only shown when cap > 0, Prune Now disabled when cap = 0 — clear UX guards
+- [Phase 31-storage-rotation]: fetchStorageStats wired to mount effect dependency array (not inside Promise.all) for cleaner separation
+- [Phase 31-storage-rotation]: pruneResult cleared via setTimeout(5000) in .then() so freed bytes still accessible when timer fires
 
 ### Pending Todos
 
@@ -74,6 +78,6 @@ None — v3.1 shipped cleanly. v3.2 scope is well-researched with HIGH confidenc
 
 ## Session Continuity
 
-Last session: 2026-03-04 (Plan 31-01)
-Stopped at: Completed 31-01-PLAN.md — Phase 31 Plan 01 complete (storage rotation backend: rotation_config table, RecordingRotationService, 4 REST endpoints)
-Next step: Execute Phase 31 Plan 02 (storage rotation UI)
+Last session: 2026-03-04 (Plan 31-02)
+Stopped at: Completed 31-02-PLAN.md — Phase 31 fully complete (storage rotation UI: Storage settings collapsible panel in RecordingLibrary with usage bar, cap input, and Prune Now button)
+Next step: Phase 31 complete — all 31 phases of v3.2 milestone shipped

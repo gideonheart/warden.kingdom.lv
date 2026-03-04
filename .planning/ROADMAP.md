@@ -88,7 +88,7 @@
 - [x] **Phase 28: Mobile Toolbar Fixes** — Enter button + keyboard persistence on toolbar taps (completed 2026-03-04)
 - [x] **Phase 29: Session Navigation** — History rows navigate to live terminal, recording replay, or explanatory feedback (completed 2026-03-04)
 - [x] **Phase 30: Auto-Record Per Agent** — Per-agent toggle to start recording automatically on session creation (completed 2026-03-04)
-- [ ] **Phase 31: Storage Rotation** — Configurable storage cap with safe oldest-first pruning and rotation UI
+- [x] **Phase 31: Storage Rotation** — Configurable storage cap with safe oldest-first pruning and rotation UI (completed 2026-03-04)
 
 ## Phase Details
 
@@ -233,4 +233,4 @@ Plans:
 | 28. Mobile Toolbar Fixes | 1/1 | Complete    | 2026-03-04 | - |
 | 29. Session Navigation | 1/1 | Complete    | 2026-03-04 | - |
 | 30. Auto-Record Per Agent | 2/2 | Complete    | 2026-03-04 | - |
-| 31. Storage Rotation | 1/2 | In Progress|  | - |
+| 31. Storage Rotation | 2/2 | Complete   | 2026-03-04 | - |
