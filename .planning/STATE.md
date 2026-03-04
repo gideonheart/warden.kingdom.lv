@@ -6,14 +6,14 @@ See: .planning/PROJECT.md (updated 2026-03-04)
 
 **Core value:** Real-time visibility into all active Claude Code agent sessions from a single browser tab
 
-**Current focus:** v3.1 — Agent Control & Deep Insights (Phase 22 complete)
+**Current focus:** v3.1 — Agent Control & Deep Insights (Phase 23 in progress)
 
 ## Current Position
 
-Phase: 22 of 25 (Token Burn Rate & Budget Alerts)
-Plan: 2 of 2 complete (Phase 22 DONE)
-Status: Phase 22 verified complete — re-verification passed 8/8 truths after quick-2040 fixes
-Last activity: 2026-03-04 - Phase 22 re-verification passed (quick-2041)
+Phase: 23 of 25 (Token Analytics & Export)
+Plan: 1 of 2 complete (Phase 23 Plan 01 DONE)
+Status: Phase 23 Plan 01 complete — data layer (token_usage_by_model table, scanner extension, model comparison API, CSV export endpoint)
+Last activity: 2026-03-04 - Phase 23 Plan 01 executed (23-01: data layer for TOKN-12 + TOKN-14)
 
 Progress: [████████████████░░░░░░░░░░░░░░] 53% (20/25 phases complete)
 
@@ -53,6 +53,9 @@ Key decisions relevant to v3.1:
 - [22-02]: editingBudget Record<string,string> per agent — isolates draft state, avoids controlled/uncontrolled input issues
 - [22-02]: Amber badge animate-pulse, red badge static — visual distinction between warning and exceeded states
 - [22-02]: Projection card conditionally rendered when burnRates.length > 0 — no misleading $0.00 projections when no data
+- [Phase 23-token-analytics-export]: processJsonlFile() receives both dailyUsage and modelDailyUsage maps — ensures both accumulators see identical records in single pass
+- [Phase 23-token-analytics-export]: model || 'unknown' as fallback key in per-model accumulation — handles JSONL records missing model field gracefully
+- [Phase 23-token-analytics-export]: CSV export always sends full unfiltered dataset with date-stamped filename — consistent with TOKN-14 spec
 
 ### Pending Todos
 
@@ -66,7 +69,7 @@ None
 **Phase 25 (Stretch):**
 - Depends on Phase 19 permission detection stability. If detectAgentState() heuristics produce false positives, auto-record trigger will over-record. Research phase should confirm false-positive rate before committing to on-permission-prompt trigger.
 
-No active blockers for Phase 22.
+No active blockers for Phase 23.
 
 ### Quick Tasks Completed
 
@@ -75,9 +78,8 @@ No active blockers for Phase 22.
 | 2039 | Review Phase 21 commits and confirm milestone completion readiness | 2026-03-04 | 494482e | [2039-review-phase-21-commits-and-confirm-mile](./quick/2039-review-phase-21-commits-and-confirm-mile/) |
 | 2040 | Fix Phase 22 verification gaps — API response key mismatches in TokenUsageView | 2026-03-04 | 24ddd1d | [2040-fix-phase-22-verification-gaps-inline-in](./quick/2040-fix-phase-22-verification-gaps-inline-in/) |
 | 2041 | Re-run Phase 22 verification — confirm all must-haves pass after quick-2040 fixes | 2026-03-04 | b73bf54 | [2041-re-run-phase-22-verification-after-quick](./quick/2041-re-run-phase-22-verification-after-quick/) |
-
 ## Session Continuity
 
 Last session: 2026-03-04
-Stopped at: Completed quick task 2041 (Phase 22 re-verification: 8/8 truths pass)
-Next step: Plan and execute Phase 23 — Token Analytics & Export
+Stopped at: Completed 23-01-PLAN.md (Token Analytics Export data layer: token_usage_by_model table, scanner extension, model comparison API, CSV export endpoint)
+Next step: Execute Phase 23 Plan 02 — client UI for model comparison charts and CSV export button
