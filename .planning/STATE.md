@@ -6,14 +6,14 @@ See: .planning/PROJECT.md (updated 2026-03-04)
 
 **Core value:** Real-time visibility into all active Claude Code agent sessions from a single browser tab
 
-**Current focus:** v3.1 — Agent Control & Deep Insights (Phase 22 next)
+**Current focus:** v3.1 — Agent Control & Deep Insights (Phase 22 in progress)
 
 ## Current Position
 
-Phase: 21 of 25 (Agent Lifecycle Controls)
-Plan: 3 of 3 complete
-Status: Phase 21 complete — all 3 plans executed
-Last activity: 2026-03-04 - Completed quick task 2039: Review Phase 21 commits and confirm milestone completion readiness
+Phase: 22 of 25 (Token Burn Rate & Budget Alerts)
+Plan: 1 of 2 complete
+Status: Phase 22 in progress — plan 01 executed (server layer: types, DB, API endpoints)
+Last activity: 2026-03-04 - Completed 22-01: burn rate + budget config server layer
 
 Progress: [████████████████░░░░░░░░░░░░░░] 53% (20/25 phases complete)
 
@@ -45,6 +45,10 @@ Key decisions relevant to v3.1:
 - [21-02]: Dismiss button uses client-side Set — no server call, tab reappears on next poll if still in DB
 - [21-03]: 30-minute retention window for stopped/error sessions in listActiveInstances() — balances restart access vs tab bar clutter
 - [21-03]: OR clause (not UNION) for stopped/error retention — simpler, readable, same single-pass performance
+- [22-01]: SQL numeric constants interpolated directly (hours/days) — not user input, no injection risk
+- [22-01]: upsertBudgetConfig(agentId, 0) deletes row — "no budget = no alert" via delete-on-zero
+- [22-01]: /budget-config/status route before /:agentId — prevents Express param shadowing
+- [22-01]: Aggregate alertLevel computed in application layer, not SQL — clarity over cleverness
 
 ### Pending Todos
 
@@ -58,7 +62,7 @@ None
 **Phase 25 (Stretch):**
 - Depends on Phase 19 permission detection stability. If detectAgentState() heuristics produce false positives, auto-record trigger will over-record. Research phase should confirm false-positive rate before committing to on-permission-prompt trigger.
 
-No active blockers for Phase 21.
+No active blockers for Phase 22.
 
 ### Quick Tasks Completed
 
@@ -69,5 +73,5 @@ No active blockers for Phase 21.
 ## Session Continuity
 
 Last session: 2026-03-04
-Stopped at: Completed quick-2039 (Phase 21 review, tech debt fix, ROADMAP corrections)
-Next step: /gsd:research-phase 22 — Token Burn Rate & Budget Alerts
+Stopped at: Completed 22-01-PLAN.md (server layer: types, database methods, API endpoints)
+Next step: Execute 22-02-PLAN.md — client-side burn rate UI

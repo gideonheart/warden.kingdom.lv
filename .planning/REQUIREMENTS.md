@@ -17,10 +17,10 @@ Requirements for v3.1 Agent Control & Deep Insights. Each maps to roadmap phases
 
 ### Token Insights
 
-- [ ] **TOKN-10**: Burn rate (cost/hour) displayed per agent with sliding window selector (1h/4h/24h), updating on each scan cycle
-- [ ] **TOKN-11**: Per-agent daily budget threshold stored in SQLite with visual warning at 80% (amber badge) and alert at 100% (red badge), visible on History nav tab
+- [x] **TOKN-10**: Burn rate (cost/hour) displayed per agent with sliding window selector (1h/4h/24h), updating on each scan cycle
+- [x] **TOKN-11**: Per-agent daily budget threshold stored in SQLite with visual warning at 80% (amber badge) and alert at 100% (red badge), visible on History nav tab
 - [ ] **TOKN-12**: Model comparison view showing cost breakdown by model variant (sonnet/opus/haiku) per agent as bar chart or table
-- [ ] **TOKN-13**: Cost projection showing estimated daily/weekly spend at current burn rate, updating when burn rate window changes
+- [x] **TOKN-13**: Cost projection showing estimated daily/weekly spend at current burn rate, updating when burn rate window changes
 - [ ] **TOKN-14**: Export button downloads full token usage dataset as CSV with columns: date, agent_id, model, input_tokens, output_tokens, cache_creation_input_tokens, cache_read_input_tokens, cost_usd
 
 ### Session Recording
@@ -121,10 +121,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | ORCH-03 | Phase 21 | Complete |
 | ORCH-04 | Phase 21 | Complete |
 | ORCH-05 | Phase 21 | Complete |
-| TOKN-10 | Phase 22 | Pending |
-| TOKN-11 | Phase 22 | Pending |
+| TOKN-10 | Phase 22 | Complete |
+| TOKN-11 | Phase 22 | Complete |
 | TOKN-12 | Phase 23 | Pending |
-| TOKN-13 | Phase 22 | Pending |
+| TOKN-13 | Phase 22 | Complete |
 | TOKN-14 | Phase 23 | Pending |
 | REC-01 | Phase 24 | Pending |
 | REC-02 | Phase 24 | Pending |
