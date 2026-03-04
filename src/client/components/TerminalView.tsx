@@ -4,6 +4,7 @@ import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import { SearchAddon } from 'xterm-addon-search';
 import { useTerminalSocket } from '../hooks/useTerminalSocket.js';
+import { useRecordingState } from '../hooks/useRecordingState.js';
 import type { AgentLiveStatus } from '../hooks/useAgentLiveStatus.js';
 import type { PressureLevel } from '@shared/gsdTypes.js';
 import type { AgentInstanceStatus } from '@shared/types.js';
@@ -31,6 +32,12 @@ interface TerminalViewProps {
   agentName?: string;
   /** Callback to trigger a restart for the current stopped/error session. */
   onRestart?: () => void;
+  /** Agent ID — passed to recording API on start. */
+  agentId?: string;
+  /** Project path — passed to recording API on start. */
+  projectPath?: string;
+  /** Callback when a recording completes — so RecordingLibrary can refresh. */
+  onRecordingComplete?: () => void;
 }
 
 // Strip mouse-tracking enable sequences so xterm.js uses native selection
@@ -208,6 +215,9 @@ export function TerminalView({
   instanceStatus,
   agentName,
   onRestart,
+  agentId,
+  projectPath,
+  onRecordingComplete,
 }: TerminalViewProps) {
   const terminalContainerRef = useRef<HTMLDivElement>(null);
   const terminalInstanceRef = useRef<Terminal | null>(null);
@@ -297,6 +307,30 @@ export function TerminalView({
     onSessionExit: handleSessionExit,
     getDimensions,
   });
+
+  const {
+    isRecording,
+    formattedElapsed,
+    startRecording,
+    stopRecording,
+  } = useRecordingState({
+    sessionName: tmuxSessionName,
+    agentId: agentId ?? '',
+    agentName: agentName ?? '',
+    projectPath: projectPath ?? '',
+    onRecordingStopped: () => onRecordingComplete?.(),
+  });
+
+  const handleToggleRecording = useCallback(async () => {
+    if (isRecording) {
+      await stopRecording();
+    } else {
+      const terminal = terminalInstanceRef.current;
+      const cols = terminal?.cols ?? 220;
+      const rows = terminal?.rows ?? 50;
+      await startRecording(cols, rows);
+    }
+  }, [isRecording, startRecording, stopRecording]);
 
   const handleToggleCopyMode = useCallback(() => {
     if (selectMode) {
@@ -649,6 +683,28 @@ export function TerminalView({
               </svg>
             </button>
           )}
+          {/* Recording indicator and toggle button */}
+          <button
+            onClick={() => { void handleToggleRecording(); }}
+            className={`flex items-center gap-1 px-2 py-0.5 text-[10px] rounded transition-colors ${
+              isRecording
+                ? 'text-red-400 bg-red-500/10 hover:bg-red-500/20'
+                : 'text-warden-text-dim hover:text-warden-text bg-warden-border/30'
+            }`}
+            title={isRecording ? 'Stop recording' : 'Start recording this session'}
+          >
+            {isRecording ? (
+              <>
+                <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse flex-shrink-0" />
+                <span className="font-mono">REC {formattedElapsed}</span>
+              </>
+            ) : (
+              <>
+                <span className="w-2 h-2 rounded-full bg-red-500/50 flex-shrink-0" />
+                <span>REC</span>
+              </>
+            )}
+          </button>
           <button
             onClick={cycleFontSize}
             className="px-2 py-0.5 text-[10px] text-warden-text-dim hover:text-warden-text bg-warden-border/30 rounded transition-colors"
