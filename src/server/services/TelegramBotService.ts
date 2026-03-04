@@ -80,6 +80,27 @@ export class TelegramBotService {
   isRunning(): boolean {
     return this.bot?.isRunning() ?? false;
   }
+
+  /**
+   * Send a text message to a specific Telegram group topic.
+   *
+   * No-op when the bot is not running (token not configured or bot stopped).
+   * Errors are caught and logged — never throws to callers.
+   */
+  async sendToTopic(chatId: string, topicId: string, text: string): Promise<void> {
+    if (!this.bot) {
+      console.warn('[TelegramBot] sendToTopic called but bot is not running — skipping');
+      return;
+    }
+    try {
+      await this.bot.api.sendMessage(chatId, text, {
+        message_thread_id: parseInt(topicId, 10),
+        parse_mode: 'Markdown',
+      });
+    } catch (error) {
+      console.error(`[TelegramBot] Failed to send to topic ${topicId}:`, error);
+    }
+  }
 }
 
 export const telegramBotService = new TelegramBotService();

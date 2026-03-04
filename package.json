@@ -24,6 +24,7 @@
     "grammy": "^1.41.1",
     "node-pty": "^1.0.0",
     "socket.io": "^4.8.0",
+    "strip-ansi": "^7.2.0",
     "xterm-addon-search": "^0.13.0"
   },
   "devDependencies": {
