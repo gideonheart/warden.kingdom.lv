@@ -221,11 +221,11 @@ Plans:
   1. A model comparison view in the token usage section shows cost breakdown by model variant (sonnet/opus/haiku) per agent as a bar chart or data table; operator can see which model is driving the most cost
   2. Clicking the Export button downloads a CSV file containing the full token usage dataset with columns: date, agent_id, model, input_tokens, output_tokens, cache_creation_input_tokens, cache_read_input_tokens, cost_usd
 
-**Plans**: TBD
+**Plans:** 2 plans
 
 Plans:
-- [ ] 23-01: Model comparison view — extend JSONL scanner for per-model daily aggregates; new API endpoint for model breakdown data; ModelComparisonView component (bar chart or table)
-- [ ] 23-02: CSV export — GET /api/token-usage/export?format=csv endpoint; Export button in TokenUsageView; correct Content-Disposition header for browser download
+- [ ] 23-01-PLAN.md — Server-side per-model data: token_usage_by_model table, extended JSONL scanner, model-comparison API endpoint, CSV export API endpoint
+- [ ] 23-02-PLAN.md — Client-side UI: ModelComparisonView component (bar chart with time ranges, insight headline), Model Costs tab in TokenUsageView, Export CSV button with toast notification
 
 ---
 
@@ -296,6 +296,6 @@ Plans:
 | 20. Terminal Search & Browser Notifications | v3.0 | 2/2 | Complete | 2026-03-03 |
 | 21. Agent Lifecycle Controls | v3.1 | 3/3 | Complete | 2026-03-04 |
 | 22. Token Burn Rate & Budget Alerts | v3.1 | 2/2 | Complete | 2026-03-04 |
-| 23. Token Analytics & Export | v3.1 | 0/2 | Not started | - |
+| 23. Token Analytics & Export | v3.1 | 0/2 | Planned | - |
 | 24. Session Recording & Replay | v3.1 | 0/2 | Not started | - |
 | 25. Recording Automation | v3.1 | 0/1 | Not started | - |
