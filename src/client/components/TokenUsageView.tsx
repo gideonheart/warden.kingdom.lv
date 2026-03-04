@@ -103,7 +103,7 @@ export function TokenUsageView() {
         const response = await fetch(`/api/history/burn-rate?window=${burnWindow}`);
         if (response.ok) {
           const data = await response.json();
-          setBurnRates(data.entries ?? []);
+          setBurnRates(data.burnRates ?? []);
         }
       } catch (error) {
         console.error('Failed to fetch burn rates:', error);
@@ -130,7 +130,7 @@ export function TokenUsageView() {
 
       if (statusResponse.ok) {
         const data = await statusResponse.json();
-        setBudgetStatuses(data.agents ?? []);
+        setBudgetStatuses(data.statuses ?? []);
       }
     } catch (error) {
       console.error('Failed to fetch budget data:', error);
