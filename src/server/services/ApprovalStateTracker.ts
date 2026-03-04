@@ -13,29 +13,62 @@ export interface ApprovalRecord {
  * Tracks pending approval records for one-tap approve feature.
  * Maps sessionName -> ApprovalRecord with expiry and idempotency support.
  *
- * This is a stub — implementation will be added in the GREEN phase (Task 2).
+ * Register an approval record when a permission notification is sent.
+ * Read via get() in the callback handler for expiry/consumed checks.
+ * Mark consumed synchronously BEFORE the async tmux call to prevent double-tap.
+ * Call pruneExpired() periodically (e.g., in NotificationPoller) to housekeep.
  */
 export class ApprovalStateTracker {
   private records = new Map<string, ApprovalRecord>();
 
-  register(_sessionName: string, _record: Omit<ApprovalRecord, 'consumed' | 'sentAt'>): void {
-    // stub — not yet implemented
+  /**
+   * Register (or overwrite) an approval record for the given session.
+   * Sets sentAt to current time and consumed to false.
+   */
+  register(sessionName: string, record: Omit<ApprovalRecord, 'consumed' | 'sentAt'>): void {
+    this.records.set(sessionName, {
+      ...record,
+      sentAt: Date.now(),
+      consumed: false,
+    });
   }
 
-  get(_sessionName: string): ApprovalRecord | undefined {
-    return undefined;
+  /**
+   * Retrieve the approval record for the given session, or undefined if not found.
+   */
+  get(sessionName: string): ApprovalRecord | undefined {
+    return this.records.get(sessionName);
   }
 
-  markConsumed(_sessionName: string): void {
-    // stub — not yet implemented
+  /**
+   * Mark the approval for the given session as consumed.
+   * No-op if the session has no approval record.
+   */
+  markConsumed(sessionName: string): void {
+    const record = this.records.get(sessionName);
+    if (record) {
+      record.consumed = true;
+    }
   }
 
+  /**
+   * Remove all records older than APPROVAL_EXPIRY_MS.
+   * Call periodically to prevent unbounded memory growth.
+   */
   pruneExpired(): void {
-    // stub — not yet implemented
+    const now = Date.now();
+    for (const [key, record] of this.records.entries()) {
+      if (now - record.sentAt > APPROVAL_EXPIRY_MS) {
+        this.records.delete(key);
+      }
+    }
   }
 
+  /**
+   * Remove all records. Used for testing and server shutdown.
+   */
   clear(): void {
-    // stub — not yet implemented
+    this.records.clear();
   }
 }
 
