@@ -16,6 +16,9 @@ import { sessionUsageReader } from './services/SessionUsageReader.js';
 import { recordingRotationService } from './services/RecordingRotationService.js';
 import { telegramBotService } from './services/TelegramBotService.js';
 import { notificationPoller } from './services/NotificationPoller.js';
+import { ApprovalCallbackHandler } from './services/ApprovalCallbackHandler.js';
+import { approvalStateTracker } from './services/ApprovalStateTracker.js';
+import { tmuxSessionManager } from './services/TmuxSessionManager.js';
 import { database } from './database/DatabaseConnection.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -96,7 +99,14 @@ terminalStreamService.setupSocketNamespace(socketServer);
 instanceTracker.startPeriodicSync();
 sessionUsageReader.startPeriodicScan();
 recordingRotationService.startPeriodicRotation();
-telegramBotService.start();   // NEW — Telegram bot (no-op if token missing)
+
+// Register the one-tap approve callback handler BEFORE bot.start() so it is
+// active from the first long-polling update. ApprovalCallbackHandler processes
+// "approve:{sessionName}" button taps and injects '1' into the agent's tmux session.
+const approvalCallbackHandler = new ApprovalCallbackHandler(approvalStateTracker, tmuxSessionManager);
+telegramBotService.registerCallbackHandler((bot) => approvalCallbackHandler.register(bot));
+
+telegramBotService.start();   // Telegram bot (no-op if token missing)
 notificationPoller.startPolling();   // Permission prompt detection (depends on telegramBotService)
 
 httpServer.listen(PORT, HOST, () => {

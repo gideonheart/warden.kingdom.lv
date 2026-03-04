@@ -6,6 +6,7 @@ import { telegramBotService } from './TelegramBotService.js';
 import { openClawConfigReader } from './OpenClawConfigReader.js';
 import { detectAgentState } from '../utils/agentStateDetection.js';
 import { NotificationDeduplicator } from './NotificationDeduplicator.js';
+import { approvalStateTracker } from './ApprovalStateTracker.js';
 
 const execFileAsync = promisify(execFile);
 const POLL_INTERVAL_MS = 10_000;
@@ -43,9 +44,11 @@ export class NotificationPoller {
 
   /**
    * Poll all currently active instances in parallel.
+   * Prunes expired approval records as free housekeeping on each cycle.
    * Failures on individual sessions are caught inside pollSession.
    */
   private async pollAllSessions(): Promise<void> {
+    approvalStateTracker.pruneExpired();
     const instances = instanceTracker.listActiveInstances();
     await Promise.allSettled(
       instances.map((instance) => this.pollSession(instance.tmuxSessionName, instance.agentId))
@@ -84,7 +87,9 @@ export class NotificationPoller {
   }
 
   /**
-   * Look up the agent's Telegram topic mapping and send a notification.
+   * Look up the agent's Telegram topic mapping and send a notification with
+   * an Approve inline button. Registers the sent message with ApprovalStateTracker
+   * so the callback handler can find it when the operator taps Approve.
    */
   private async sendPermissionNotification(
     agentId: string,
@@ -105,7 +110,21 @@ export class NotificationPoller {
         `Session: \`${sessionName}\`\n` +
         `\`\`\`\n${excerpt}\n\`\`\``;
 
-      await telegramBotService.sendToTopic(mapping.groupId, mapping.topicId, text);
+      const messageId = await telegramBotService.sendToTopicWithApproveButton(
+        mapping.groupId,
+        mapping.topicId,
+        text,
+        sessionName
+      );
+
+      if (messageId !== null) {
+        approvalStateTracker.register(sessionName, {
+          chatId: mapping.groupId,
+          messageId,
+          topicId: mapping.topicId,
+          originalText: text,
+        });
+      }
     } catch (error) {
       console.error(`[NotificationPoller] Failed to send notification for ${agentId}:`, error);
     }
