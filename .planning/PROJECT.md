@@ -62,9 +62,23 @@ Real-time visibility into all active Claude Code agent sessions from a single br
 
 ### Active
 
+- [ ] Enter button in mobile terminal toolbar
+- [ ] Mobile toolbar buttons keep soft keyboard open (re-focus xterm after press)
+- [ ] Clickable history session rows → navigate to terminal or replay
 - [ ] Auto-record option with configurable triggers (REC-05, deferred from v3.1)
 - [ ] Recording storage rotation policy (auto-delete, cap total storage)
-- [ ] Telegram integration for permission prompt forwarding
+- [ ] Clean up History/Events views — make actionable or reduce noise
+
+## Current Milestone: v3.2 Mobile Operations & UX Polish
+
+**Goal:** Fix daily mobile friction (toolbar gaps, keyboard dismissal, dead clicks) and finish the recording story (auto-record, storage rotation).
+
+**Target features:**
+- Mobile terminal toolbar: Enter button, keyboard persistence on button tap
+- Clickable history sessions with navigation to terminal or recording replay
+- Auto-record per agent with configurable triggers
+- Storage rotation with configurable cap and auto-prune
+- History/Events view cleanup — make existing views useful
 
 ## Current State
 
@@ -77,6 +91,7 @@ Warden has evolved from a monitoring dashboard to a full operations platform. Th
 - Multi-user auth — IP-whitelisted, single operator (Gideon)
 - Agent creation/deletion — managed via openclaw.json, not the dashboard
 - Telegram bot management — handled by OpenClaw gateway
+- Telegram permission prompt forwarding — agents run --dangerously-skip-permissions, no prompts to forward
 - Terminal themes/customization — monitoring tool, single dark theme
 - Multi-pane terminal splits — tmux handles layout within sessions
 - In-dashboard code editor — agents edit files, operator intervenes via prompts
@@ -139,4 +154,4 @@ Known tech debt: detectAgentState() regex heuristics fragile but functional; REC
 | sessionExited() resets client recording state | Server auto-stops; client only resets local state, no HTTP call | ✓ Good — clean separation of concerns |
 
 ---
-*Last updated: 2026-03-04 after v3.1 milestone*
+*Last updated: 2026-03-04 after v3.2 milestone start*
