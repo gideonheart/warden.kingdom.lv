@@ -293,7 +293,7 @@ Plans:
   3. Unused `__dirname` variable removed from RecordingCaptureService.ts
   4. 23-VERIFICATION.md body text updated to match frontmatter (8/8, not 7/8)
 
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
 - [ ] 27-01-PLAN.md — Fix useRecordingState terminal:exit listener, clean up RecordingCaptureService __dirname, fix 23-VERIFICATION.md body text
