@@ -42,9 +42,10 @@ None — v3.1 milestone shipped. All requirements satisfied, all integrations wi
 | 2039 | Review Phase 21 commits and confirm milestone completion readiness | 2026-03-04 | 494482e | [2039-review-phase-21-commits-and-confirm-mile](./quick/2039-review-phase-21-commits-and-confirm-mile/) |
 | 2040 | Fix Phase 22 verification gaps — API response key mismatches in TokenUsageView | 2026-03-04 | 24ddd1d | [2040-fix-phase-22-verification-gaps-inline-in](./quick/2040-fix-phase-22-verification-gaps-inline-in/) |
 | 2041 | Re-run Phase 22 verification — confirm all must-haves pass after quick-2040 fixes | 2026-03-04 | b73bf54 | [2041-re-run-phase-22-verification-after-quick](./quick/2041-re-run-phase-22-verification-after-quick/) |
+| 2042 | Propose top 3 concrete next milestone options (recording completion, Telegram awareness, audit replay) | 2026-03-04 | aed4d8d | [2042-propose-top-3-concrete-next-milestone-op](./quick/2042-propose-top-3-concrete-next-milestone-op/) |
 
 ## Session Continuity
 
 Last session: 2026-03-04
-Stopped at: v3.1 milestone complete — archived, tagged, ready for next milestone
-Next step: `/gsd:new-milestone` to define next milestone scope and requirements
+Stopped at: Quick task 2042 complete — MILESTONE-OPTIONS.md written with three concrete next milestone options
+Next step: Review MILESTONE-OPTIONS.md and run `/gsd:new-milestone` to define next milestone scope and requirements
