@@ -294,7 +294,7 @@ Plans:
 | 18. Fix token usage | v2.3 | 2/2 | Complete | 2026-02-23 |
 | 19. Operator Awareness Wiring | v3.0 | 2/2 | Complete | 2026-03-03 |
 | 20. Terminal Search & Browser Notifications | v3.0 | 2/2 | Complete | 2026-03-03 |
-| 21. Agent Lifecycle Controls | 3/3 | Complete   | 2026-03-04 | - |
+| 21. Agent Lifecycle Controls | 3/3 | Complete    | 2026-03-04 | - |
 | 22. Token Burn Rate & Budget Alerts | v3.1 | 0/2 | Not started | - |
 | 23. Token Analytics & Export | v3.1 | 0/2 | Not started | - |
 | 24. Session Recording & Replay | v3.1 | 0/2 | Not started | - |
