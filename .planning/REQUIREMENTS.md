@@ -25,10 +25,10 @@ Requirements for Telegram Operator Awareness milestone. Each maps to roadmap pha
 ### One-Tap Approve
 
 - [ ] **APRV-01**: Permission notification includes inline keyboard Approve button
-- [ ] **APRV-02**: Tapping Approve sends input to agent's tmux session to unblock it
-- [ ] **APRV-03**: Only configured operator Telegram user ID can trigger approve action
-- [ ] **APRV-04**: Approve button removed from message after processing (edit-after-approve)
-- [ ] **APRV-05**: Approval requests expire after configurable timeout (default 15 min)
+- [x] **APRV-02**: Tapping Approve sends input to agent's tmux session to unblock it
+- [x] **APRV-03**: Only configured operator Telegram user ID can trigger approve action
+- [x] **APRV-04**: Approve button removed from message after processing (edit-after-approve)
+- [x] **APRV-05**: Approval requests expire after configurable timeout (default 15 min)
 
 ### Budget Alerts
 
@@ -78,10 +78,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | PERM-04 | Phase 33 | Complete |
 | PERM-05 | Phase 33 | Complete |
 | APRV-01 | Phase 34 | Pending |
-| APRV-02 | Phase 34 | Pending |
-| APRV-03 | Phase 34 | Pending |
-| APRV-04 | Phase 34 | Pending |
-| APRV-05 | Phase 34 | Pending |
+| APRV-02 | Phase 34 | Complete |
+| APRV-03 | Phase 34 | Complete |
+| APRV-04 | Phase 34 | Complete |
+| APRV-05 | Phase 34 | Complete |
 | BUDG-01 | Phase 35 | Pending |
 | BUDG-02 | Phase 35 | Pending |
 | NSET-01 | Phase 35 | Pending |

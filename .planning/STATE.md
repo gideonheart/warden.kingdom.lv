@@ -9,20 +9,20 @@ See: .planning/PROJECT.md (updated 2026-03-04)
 
 ## Current Position
 
-Phase: 33 — Permission Prompt Detection and Forwarding
-Plan: 02 complete (2/2 plans done — Phase 33 COMPLETE)
-Status: Phase 33 complete — full notification pipeline operational; all 5 PERM requirements satisfied
-Last activity: 2026-03-04 — 33-02-PLAN.md executed, NotificationPoller built and wired into server lifecycle
+Phase: 34 — One-Tap Approve
+Plan: 01 complete (1/? plans — Phase 34 in progress)
+Status: Phase 34 plan 01 complete — ApprovalStateTracker and ApprovalCallbackHandler built with 16 unit tests; APRV-02/03/04/05 covered
+Last activity: 2026-03-04 — 34-01-PLAN.md executed, core approval services built via TDD
 
 ```
-Progress: [###░] 3/4 phases (Phase 32 complete, Phase 33 complete)
+Progress: [###░] 3/4 phases (Phase 32 complete, Phase 33 complete, Phase 34 in progress)
 Milestone: v3.3 Telegram Operator Awareness
 ```
 
 ## Performance Metrics
 
 **Completed milestones:** v1.0 (6 phases), v1.1 (2), v2.0 (3), v2.1 (3), v2.3 (4), v3.0 (2), v3.1 (6), v3.2 (4) = 31 phases shipped
-**Current milestone:** v3.3 — Phase 32 complete, Phase 33 complete (3/4 phases)
+**Current milestone:** v3.3 — Phase 32 complete, Phase 33 complete, Phase 34 in progress (3/4 phases)
 
 ## Accumulated Context
 
@@ -51,6 +51,9 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase 33-01]: previousState checked BEFORE update in recordAndCheck() — transition detection requires reading old state before writing new state
 - [Phase 33-02]: ANSI stripping applied BEFORE detectAgentState() — ANSI codes around cursor character break permission prompt regex
 - [Phase 33-02]: notificationPoller lifecycle ordering: start after telegramBotService.start(), stop before telegramBotService.stop() — correct dependency sequencing
+- [Phase 34-01]: ApprovalStateTracker uses in-memory Map; markConsumed() synchronous before async tmux call prevents double-tap race (Node.js single-threaded event loop)
+- [Phase 34-01]: ApprovalCallbackHandler.register(bot) pattern — handler class registers on bot reference; called after bot construction but before bot.start()
+- [Phase 34-01]: Expired approval returns 'Approval expired' without editing message; session-gone returns 'Session no longer available' without editing message (leaves button as failure indicator)
 
 ### Research Flags
 
@@ -77,6 +80,6 @@ None
 
 ## Session Continuity
 
-Last session: 2026-03-04 (Plan 33-02 execution)
-Stopped at: Completed 33-02-PLAN.md — NotificationPoller built and wired; PERM-01, PERM-02, PERM-03 satisfied; Phase 33 complete
-Next step: Execute Phase 34 — Operator Messaging (or Phase 35 — Budget Alert Notifications)
+Last session: 2026-03-04 (Plan 34-01 execution)
+Stopped at: Completed 34-01-PLAN.md — ApprovalStateTracker and ApprovalCallbackHandler built with TDD; APRV-02/03/04/05 satisfied
+Next step: Execute Phase 34 Plan 02 — Wire ApprovalCallbackHandler into TelegramBotService and extend NotificationPoller to send approve buttons
