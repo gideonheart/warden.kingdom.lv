@@ -1,12 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import type { AgentLiveStatus } from './useAgentLiveStatus.js';
-import type { AgentInstance } from '@shared/types.js';
 
 const NOTIFICATION_STORAGE_KEY = 'warden:notifications-enabled';
 
 interface UseBrowserNotificationsParams {
   sessionStatusMap: Map<string, AgentLiveStatus>;
-  instances: AgentInstance[];
   onSelectSession: (sessionName: string) => void;
 }
 
@@ -29,7 +27,6 @@ interface UseBrowserNotificationsResult {
  *  with the same tag, providing a second layer of dedup beyond the ref-based check. */
 export function useBrowserNotifications({
   sessionStatusMap,
-  instances,
   onSelectSession,
 }: UseBrowserNotificationsParams): UseBrowserNotificationsResult {
   // Feature detection — guard SSR and older browsers
@@ -55,7 +52,7 @@ export function useBrowserNotifications({
   // Only fire a notification when a session ENTERS the set (state transition).
   const permissionStateSessionsRef = useRef<Set<string>>(new Set());
 
-  // Main effect — runs when sessionStatusMap, instances, or notificationsEnabled changes.
+  // Main effect — runs when sessionStatusMap or notificationsEnabled changes.
   // Detects permission_prompt state transitions and fires desktop notifications.
   useEffect(() => {
     if (!notificationsEnabled || !isSupported || Notification.permission !== 'granted') {
@@ -88,7 +85,7 @@ export function useBrowserNotifications({
     }
 
     permissionStateSessionsRef.current = currentPermissionSessions;
-  }, [sessionStatusMap, instances, notificationsEnabled, isSupported, onSelectSession]);
+  }, [sessionStatusMap, notificationsEnabled, isSupported, onSelectSession]);
 
   // Toggle callback — must be triggered by a user gesture (button click).
   // Browser silently blocks Notification.requestPermission() outside user gesture context.

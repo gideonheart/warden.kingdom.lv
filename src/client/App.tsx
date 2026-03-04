@@ -173,7 +173,6 @@ export function App() {
   // which are defined above.
   const { notificationsEnabled, toggleNotifications, notificationPermission } = useBrowserNotifications({
     sessionStatusMap,
-    instances: activeInstances,
     onSelectSession: handleSelectSession,
   });
 
