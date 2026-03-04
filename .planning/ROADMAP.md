@@ -296,6 +296,6 @@ Plans:
 | 20. Terminal Search & Browser Notifications | v3.0 | 2/2 | Complete | 2026-03-03 |
 | 21. Agent Lifecycle Controls | v3.1 | 3/3 | Complete | 2026-03-04 |
 | 22. Token Burn Rate & Budget Alerts | v3.1 | 2/2 | Complete | 2026-03-04 |
-| 23. Token Analytics & Export | 2/2 | Complete   | 2026-03-04 | - |
+| 23. Token Analytics & Export | 2/2 | Complete    | 2026-03-04 | - |
 | 24. Session Recording & Replay | v3.1 | 0/2 | Not started | - |
 | 25. Recording Automation | v3.1 | 0/1 | Not started | - |
