@@ -232,5 +232,5 @@ Plans:
 | 27. Recording State Cleanup & Tech Debt | v3.1 | 1/1 | Complete | 2026-03-04 |
 | 28. Mobile Toolbar Fixes | 1/1 | Complete    | 2026-03-04 | - |
 | 29. Session Navigation | 1/1 | Complete    | 2026-03-04 | - |
-| 30. Auto-Record Per Agent | 2/2 | Complete   | 2026-03-04 | - |
+| 30. Auto-Record Per Agent | 2/2 | Complete    | 2026-03-04 | - |
 | 31. Storage Rotation | v3.2 | 0/2 | Not started | - |

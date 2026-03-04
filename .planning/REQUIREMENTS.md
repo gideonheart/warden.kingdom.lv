@@ -21,7 +21,7 @@ Requirements for v3.2 Mobile Operations & UX Polish. Each maps to roadmap phases
 ### Auto-Record
 
 - [x] **REC-05**: User can enable auto-record per agent via toggle in recording library UI
-- [ ] **REC-06**: Sessions for auto-record-enabled agents begin recording automatically on creation (first frame captured)
+- [x] **REC-06**: Sessions for auto-record-enabled agents begin recording automatically on creation (first frame captured)
 
 ### Storage Rotation
 
@@ -66,7 +66,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | NAV-02 | Phase 29 | Complete |
 | NAV-03 | Phase 29 | Complete |
 | REC-05 | Phase 30 | Complete |
-| REC-06 | Phase 30 | Pending |
+| REC-06 | Phase 30 | Complete |
 | ROT-01 | Phase 31 | Pending |
 | ROT-02 | Phase 31 | Pending |
 | ROT-03 | Phase 31 | Pending |
