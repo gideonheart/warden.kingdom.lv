@@ -15,6 +15,7 @@ import { instanceTracker } from './services/InstanceTracker.js';
 import { sessionUsageReader } from './services/SessionUsageReader.js';
 import { recordingRotationService } from './services/RecordingRotationService.js';
 import { telegramBotService } from './services/TelegramBotService.js';
+import { notificationPoller } from './services/NotificationPoller.js';
 import { database } from './database/DatabaseConnection.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -96,6 +97,7 @@ instanceTracker.startPeriodicSync();
 sessionUsageReader.startPeriodicScan();
 recordingRotationService.startPeriodicRotation();
 telegramBotService.start();   // NEW — Telegram bot (no-op if token missing)
+notificationPoller.startPolling();   // Permission prompt detection (depends on telegramBotService)
 
 httpServer.listen(PORT, HOST, () => {
   console.log(`[Warden] Server running at http://${HOST}:${PORT}`);
@@ -114,6 +116,7 @@ async function handleShutdown(signal: string): Promise<void> {
   recordingRotationService.stopPeriodicRotation();
   sessionUsageReader.stopPeriodicScan();
   instanceTracker.stopPeriodicSync();
+  notificationPoller.stopPolling();    // Stop polling before bot shutdown
   await telegramBotService.stop();   // NEW — stop bot before closing HTTP server
 
   httpServer.close(() => {
