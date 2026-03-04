@@ -76,6 +76,7 @@ function headerPressureText(percentage: number | null, level: PressureLevel | nu
 }
 
 const MOBILE_KEYS: Array<{ label: string; seq: string }> = [
+  { label: 'Enter', seq: '\r' },
   { label: 'Tab', seq: '\t' },
   { label: 'Ctrl+C', seq: '\x03' },
   { label: 'Ctrl+D', seq: '\x04' },
@@ -91,11 +92,16 @@ interface MobileKeyToolbarProps {
   sendInput: (data: string) => void;
   selectMode: boolean;
   onToggleCopyMode: () => void;
+  terminalRef: React.MutableRefObject<Terminal | null>;
 }
 
-function MobileKeyToolbar({ sendInput, selectMode, onToggleCopyMode }: MobileKeyToolbarProps) {
+function MobileKeyToolbar({ sendInput, selectMode, onToggleCopyMode, terminalRef }: MobileKeyToolbarProps) {
   const [showPasteInput, setShowPasteInput] = useState(false);
   const pasteInputRef = useRef<HTMLTextAreaElement>(null);
+
+  const refocusTerminal = () => {
+    terminalRef.current?.textarea?.focus();
+  };
 
   const handlePaste = async () => {
     try {
@@ -135,7 +141,7 @@ function MobileKeyToolbar({ sendInput, selectMode, onToggleCopyMode }: MobileKey
             className="flex-1 px-2 py-1 text-xs font-mono bg-warden-bg text-warden-text rounded border border-warden-border resize-none"
           />
           <button
-            onTouchStart={(event) => { event.preventDefault(); setShowPasteInput(false); }}
+            onTouchStart={(event) => { event.preventDefault(); refocusTerminal(); setShowPasteInput(false); }}
             onClick={() => setShowPasteInput(false)}
             className="px-2 py-1.5 min-h-[36px] text-xs text-warden-text-dim bg-warden-border/40 rounded"
           >
@@ -145,7 +151,7 @@ function MobileKeyToolbar({ sendInput, selectMode, onToggleCopyMode }: MobileKey
       )}
       <div className="flex items-center gap-1 px-2 py-1.5 overflow-x-auto touch-scroll">
         <button
-          onTouchStart={(event) => { event.preventDefault(); onToggleCopyMode(); }}
+          onTouchStart={(event) => { event.preventDefault(); refocusTerminal(); onToggleCopyMode(); }}
           className={`px-2 py-1.5 min-w-[40px] min-h-[36px] text-xs font-mono rounded whitespace-nowrap select-none ${
             selectMode
               ? 'bg-warden-accent/30 text-warden-accent border border-warden-accent/50'
@@ -155,13 +161,13 @@ function MobileKeyToolbar({ sendInput, selectMode, onToggleCopyMode }: MobileKey
           {selectMode ? 'Close' : 'Copy'}
         </button>
         <button
-          onTouchStart={(event) => { event.preventDefault(); handlePaste(); }}
+          onTouchStart={(event) => { event.preventDefault(); refocusTerminal(); handlePaste(); }}
           className="px-2 py-1.5 min-w-[40px] min-h-[36px] text-xs font-mono text-warden-text-dim bg-warden-border/40 rounded active:bg-warden-accent/30 active:text-warden-accent whitespace-nowrap select-none"
         >
           Paste
         </button>
         <button
-          onTouchStart={(event) => { event.preventDefault(); sendInput('\x1b'); }}
+          onTouchStart={(event) => { event.preventDefault(); refocusTerminal(); sendInput('\x1b'); }}
           title="Exit scroll/copy mode"
           className="px-2 py-1.5 min-w-[40px] min-h-[36px] text-xs font-mono text-warden-text-dim bg-warden-border/40 rounded active:bg-warden-accent/30 active:text-warden-accent whitespace-nowrap select-none"
         >
@@ -172,6 +178,7 @@ function MobileKeyToolbar({ sendInput, selectMode, onToggleCopyMode }: MobileKey
             key={key.label}
             onTouchStart={(event) => {
               event.preventDefault();
+              refocusTerminal();
               sendInput(key.seq);
             }}
             className="px-2 py-1.5 min-w-[40px] min-h-[36px] text-xs font-mono text-warden-text-dim bg-warden-border/40 rounded active:bg-warden-accent/30 active:text-warden-accent whitespace-nowrap select-none"
@@ -851,6 +858,7 @@ function TerminalViewInner({
           sendInput={sendInput}
           selectMode={selectMode}
           onToggleCopyMode={handleToggleCopyMode}
+          terminalRef={terminalInstanceRef}
         />
       )}
     </div>
