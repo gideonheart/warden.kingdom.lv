@@ -23,11 +23,22 @@ interface LiveStatusResponse {
   agents: LiveStatusAgent[];
 }
 
-export function useAgentLiveStatus(): Map<string, AgentLiveStatus> {
-  const [statusMap, setStatusMap] = useState<Map<string, AgentLiveStatus>>(new Map());
+const EMPTY_MAP = new Map<string, AgentLiveStatus>();
+
+/**
+ * Polls /api/gsd/agents/live-status for agent state and context pressure.
+ *
+ * @param enabled - When false, polling is paused and an empty Map is returned.
+ *   Pass `false` when the terminals view is active to prevent any possibility of
+ *   xterm.js layout disruption from background state updates.
+ */
+export function useAgentLiveStatus(enabled = true): Map<string, AgentLiveStatus> {
+  const [statusMap, setStatusMap] = useState<Map<string, AgentLiveStatus>>(EMPTY_MAP);
   const previousDataRef = useRef<string>('');
 
   useEffect(() => {
+    if (!enabled) return;
+
     const fetchStatus = async () => {
       try {
         const response = await fetch('/api/gsd/agents/live-status');
@@ -55,7 +66,7 @@ export function useAgentLiveStatus(): Map<string, AgentLiveStatus> {
     fetchStatus();
     const interval = setInterval(fetchStatus, POLL_INTERVAL_MS);
     return () => clearInterval(interval);
-  }, []);
+  }, [enabled]);
 
-  return statusMap;
+  return enabled ? statusMap : EMPTY_MAP;
 }

@@ -8,11 +8,20 @@ interface BudgetAlertStatusResponse {
 
 const POLL_INTERVAL_MS = 30_000;
 
-export function useBudgetAlerts(): BudgetAlertLevel {
+/**
+ * Polls /api/history/budget-config/status for budget alert level.
+ *
+ * @param enabled - When false, polling is paused and 'ok' is returned.
+ *   Pass `false` when the terminals view is active to eliminate background
+ *   network requests that could trigger React re-renders.
+ */
+export function useBudgetAlerts(enabled = true): BudgetAlertLevel {
   const [alertLevel, setAlertLevel] = useState<BudgetAlertLevel>('ok');
   const previousAlertLevelRef = useRef<BudgetAlertLevel>('ok');
 
   useEffect(() => {
+    if (!enabled) return;
+
     const fetchStatus = async () => {
       try {
         const response = await fetch('/api/history/budget-config/status');
@@ -31,7 +40,7 @@ export function useBudgetAlerts(): BudgetAlertLevel {
     fetchStatus();
     const interval = setInterval(fetchStatus, POLL_INTERVAL_MS);
     return () => clearInterval(interval);
-  }, []);
+  }, [enabled]);
 
   return alertLevel;
 }

@@ -89,9 +89,11 @@ export function App() {
     return ids;
   }, [instances]);
 
-  // Live status polling — runs once in App (not in AgentsTab) so TerminalView and
-  // InstanceTabBar can consume the data without adding a second poll interval.
-  const liveStatus = useAgentLiveStatus();
+  // Live status polling — disabled while on the terminals view to prevent any
+  // background state updates from cascading into xterm.js re-renders. AgentsTab
+  // has its own useAgentLiveStatus() call, so the GSD page still gets live data.
+  const isTerminalsView = currentView === 'terminals';
+  const liveStatus = useAgentLiveStatus(!isTerminalsView);
 
   // Bridge agentId → tmuxSessionName so live status can be looked up by session name.
   const sessionStatusMap = useMemo(() => {
@@ -239,8 +241,10 @@ export function App() {
   });
 
   // Budget alert level — polls /api/history/budget-config/status every 30s.
-  // Lifted to App so the History nav badge reflects worst-case alert level across all agents.
-  const budgetAlertLevel = useBudgetAlerts();
+  // Disabled while on the terminals view to eliminate background network requests
+  // that could trigger React re-renders. The History nav badge won't pulse on
+  // the terminals tab, but will update as soon as the user switches views.
+  const budgetAlertLevel = useBudgetAlerts(!isTerminalsView);
 
   const [activeRecording, setActiveRecording] = useState<RecordingEntry | null>(null);
   const [recordingLibraryRefreshKey, setRecordingLibraryRefreshKey] = useState(0);
