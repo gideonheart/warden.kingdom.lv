@@ -119,8 +119,8 @@ See `.planning/milestones/v2.3-ROADMAP.md`
 **Plans:** 2/2 plans complete
 
 Plans:
-- [ ] 19-01-PLAN.md — Server-side fixes (permission regex, pressure thresholds) + lift useAgentLiveStatus to App.tsx + permission badge on tabs + state chip and pressure in terminal header
-- [ ] 19-02-PLAN.md — Global keyboard shortcuts (useGlobalHotkeys hook, Ctrl+1-9/[/]/B/F/Escape) + xterm PTY key suppression
+- [x] 19-01-PLAN.md — Server-side fixes (permission regex, pressure thresholds) + lift useAgentLiveStatus to App.tsx + permission badge on tabs + state chip and pressure in terminal header
+- [x] 19-02-PLAN.md — Global keyboard shortcuts (useGlobalHotkeys hook, Ctrl+1-9/[/]/B/F/Escape) + xterm PTY key suppression
 
 ---
 
@@ -142,8 +142,8 @@ Plans:
 **Plans:** 2/2 plans complete
 
 Plans:
-- [ ] 20-01-PLAN.md — Terminal search: xterm-addon-search integration, TerminalSearchOverlay, Ctrl+F wiring, match count, gutter markers, debounced input
-- [ ] 20-02-PLAN.md — Browser notifications: useBrowserNotifications hook, bell icon toggle, state-transition firing, localStorage opt-in persistence
+- [x] 20-01-PLAN.md — Terminal search: xterm-addon-search integration, TerminalSearchOverlay, Ctrl+F wiring, match count, gutter markers, debounced input
+- [x] 20-02-PLAN.md — Browser notifications: useBrowserNotifications hook, bell icon toggle, state-transition firing, localStorage opt-in persistence
 
 ## Progress
 
