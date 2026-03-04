@@ -163,7 +163,7 @@ Plans:
   2. User taps a history row for a stopped session that has a recording and the recording player opens immediately
   3. User taps a history row for a stopped session with no recording and sees a clear toast or inline message explaining why navigation is not possible
   4. Tapping a session row never silently navigates to the wrong session or does nothing without feedback
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
 - [ ] 29-01: Wire onNavigateToSession callback through App.tsx, HistoryView, and SessionHistory with recording lookup
