@@ -149,7 +149,7 @@ See `.planning/milestones/v3.1-ROADMAP.md`
   1. User taps the Enter button in the mobile toolbar and the command is submitted to the terminal
   2. User taps any toolbar button (Enter, Tab, Esc, Ctrl+C, arrows, PgUp/PgDn, Copy, Paste) and the soft keyboard remains open immediately after the tap
   3. User can complete a multi-step command sequence (type, tap Enter, type more, tap arrow) without the keyboard ever dismissing between taps
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
 - [ ] 28-01: Add Enter key to MOBILE_KEYS and wire keyboard-persistence focus fix
