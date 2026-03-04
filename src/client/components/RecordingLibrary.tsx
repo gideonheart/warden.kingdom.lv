@@ -37,6 +37,9 @@ export function RecordingLibrary({ onPlayRecording, refreshKey }: RecordingLibra
   const [sortColumn, setSortColumn] = useState<SortColumn>('startedAt');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
+  const [autoRecordAgentIds, setAutoRecordAgentIds] = useState<Set<string>>(new Set());
+  const [agents, setAgents] = useState<Array<{ id: string; name: string }>>([]);
+  const [showAutoRecordSettings, setShowAutoRecordSettings] = useState(false);
 
   const fetchRecordings = useCallback(async () => {
     setIsLoading(true);
@@ -56,6 +59,38 @@ export function RecordingLibrary({ onPlayRecording, refreshKey }: RecordingLibra
   useEffect(() => {
     void fetchRecordings();
   }, [fetchRecordings, refreshKey]);
+
+  useEffect(() => {
+    void Promise.all([
+      fetch('/api/agents').then(r => r.json()),
+      fetch('/api/recordings/auto-record-config').then(r => r.json()),
+    ]).then(([agentsData, configData]) => {
+      const agentList = (agentsData as { agents?: Array<{ id: string; name: string }> }).agents ?? [];
+      setAgents(agentList);
+      const enabled = new Set<string>(
+        ((configData as { configs?: Array<{ agentId: string }> }).configs ?? []).map(c => c.agentId)
+      );
+      setAutoRecordAgentIds(enabled);
+    }).catch(err => console.error('Failed to load auto-record config:', err));
+  }, []);
+
+  const handleToggleAutoRecord = useCallback(async (agentId: string) => {
+    const enabled = !autoRecordAgentIds.has(agentId);
+    try {
+      await fetch(`/api/recordings/auto-record-config/${encodeURIComponent(agentId)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled }),
+      });
+      setAutoRecordAgentIds(prev => {
+        const next = new Set(prev);
+        enabled ? next.add(agentId) : next.delete(agentId);
+        return next;
+      });
+    } catch (error) {
+      console.error('Failed to toggle auto-record:', error);
+    }
+  }, [autoRecordAgentIds]);
 
   const handleSort = useCallback((col: SortColumn) => {
     setSortColumn((prev) => {
@@ -112,6 +147,59 @@ export function RecordingLibrary({ onPlayRecording, refreshKey }: RecordingLibra
         >
           Refresh
         </button>
+      </div>
+
+      {/* Auto-record settings — collapsible */}
+      <div className="border-b border-warden-border">
+        <button
+          onClick={() => setShowAutoRecordSettings(prev => !prev)}
+          className="w-full flex items-center justify-between px-4 py-2 text-xs text-warden-text-dim hover:text-warden-text transition-colors"
+        >
+          <span>Auto-record settings</span>
+          <span className="text-[10px]">{showAutoRecordSettings ? '▲' : '▼'}</span>
+        </button>
+        {showAutoRecordSettings && (
+          <div className="px-4 pb-3">
+            {agents.length === 0 ? (
+              <p className="text-xs text-warden-text-dim/60">No agents configured</p>
+            ) : (
+              <div className="space-y-1">
+                {agents.map(agent => (
+                  <label
+                    key={agent.id}
+                    className="flex items-center gap-2 py-1 cursor-pointer group"
+                  >
+                    <button
+                      onClick={() => void handleToggleAutoRecord(agent.id)}
+                      className={`w-8 h-4 rounded-full relative transition-colors ${
+                        autoRecordAgentIds.has(agent.id)
+                          ? 'bg-red-500/70'
+                          : 'bg-warden-border'
+                      }`}
+                    >
+                      <span
+                        className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-transform ${
+                          autoRecordAgentIds.has(agent.id)
+                            ? 'translate-x-4'
+                            : 'translate-x-0.5'
+                        }`}
+                      />
+                    </button>
+                    <span className="text-xs text-warden-text group-hover:text-warden-accent transition-colors">
+                      {agent.name || agent.id}
+                    </span>
+                    {autoRecordAgentIds.has(agent.id) && (
+                      <span className="text-[10px] text-red-400/70 ml-auto">REC</span>
+                    )}
+                  </label>
+                ))}
+              </div>
+            )}
+            <p className="text-[10px] text-warden-text-dim/50 mt-2">
+              Auto-recorded sessions start capturing from the first frame.
+            </p>
+          </div>
+        )}
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto">
