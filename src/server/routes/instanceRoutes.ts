@@ -1,6 +1,5 @@
 import { Router } from 'express';
 import path from 'path';
-import { openSync, closeSync } from 'fs';
 import { instanceTracker } from '../services/InstanceTracker.js';
 import { tmuxSessionManager } from '../services/TmuxSessionManager.js';
 import { database } from '../database/DatabaseConnection.js';

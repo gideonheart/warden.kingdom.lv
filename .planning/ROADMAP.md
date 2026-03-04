@@ -184,7 +184,7 @@ Plans:
 Plans:
 - [x] 21-01-PLAN.md — Server-side lifecycle API: extend AgentInstanceStatus with starting/stopping, TmuxSessionManager sendCtrlC + createSessionWithClaude, lifecycle API endpoints (start/stop/restart/force-kill), InstanceTracker transitional state reconciliation
 - [x] 21-02-PLAN.md — Client-side lifecycle UI: Start button in AgentSidebar, confirmation dialogs for stop, lifecycle badges (green/yellow-pulse/orange-pulse/gray/red), terminal overlays for transitional states, Force Kill escape hatch, Restart for stopped sessions
-- [ ] 21-03-PLAN.md — Gap closure: extend listActiveInstances() to include recently-stopped/errored sessions so stopped tabs persist for restart access
+- [x] 21-03-PLAN.md — Gap closure: extend listActiveInstances() to include recently-stopped/errored sessions so stopped tabs persist for restart access
 
 ---
 
@@ -294,7 +294,7 @@ Plans:
 | 18. Fix token usage | v2.3 | 2/2 | Complete | 2026-02-23 |
 | 19. Operator Awareness Wiring | v3.0 | 2/2 | Complete | 2026-03-03 |
 | 20. Terminal Search & Browser Notifications | v3.0 | 2/2 | Complete | 2026-03-03 |
-| 21. Agent Lifecycle Controls | 3/3 | Complete    | 2026-03-04 | - |
+| 21. Agent Lifecycle Controls | v3.1 | 3/3 | Complete | 2026-03-04 |
 | 22. Token Burn Rate & Budget Alerts | v3.1 | 0/2 | Not started | - |
 | 23. Token Analytics & Export | v3.1 | 0/2 | Not started | - |
 | 24. Session Recording & Replay | v3.1 | 0/2 | Not started | - |
