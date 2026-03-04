@@ -8,7 +8,7 @@
 - ✅ **v2.1 GSD Manager Plugin** — Phases 12-14 (shipped 2026-02-18)
 - ✅ **v2.3 Code Hygiene & Token Usage** — Phases 15-18 (shipped 2026-03-03)
 - ✅ **v3.0 Operator Awareness & Terminal Power Tools** — Phases 19-20 (shipped 2026-03-04)
-- 🚧 **v3.1 Agent Control & Deep Insights** — Phases 21-26 (in progress)
+- 🚧 **v3.1 Agent Control & Deep Insights** — Phases 21-24, 26 (in progress)
 
 ## Phases
 
@@ -68,7 +68,7 @@
 
 </details>
 
-### v3.1 Agent Control & Deep Insights (Phases 21-26)
+### v3.1 Agent Control & Deep Insights (Phases 21-24, 26)
 
 **Milestone Goal:** Advance Warden from a monitoring tool to an active operations platform — agent lifecycle control, cost velocity insights, and session recording.
 
@@ -77,7 +77,6 @@
 - [x] **Phase 23: Token Analytics & Export** — Model cost comparison view and CSV export of full token usage dataset (completed 2026-03-04)
 - [x] **Phase 26: Token Analytics Polish & Tech Debt** — Fix agent filter accessibility on Model Costs tab, clean up unused imports and label semantics (gap closure) (completed 2026-03-04)
 - [ ] **Phase 24: Session Recording & Replay** — Record terminal output as asciicast v2 files, replay at variable speed, browsable recording library
-- [ ] **Phase 25: Recording Automation** — Auto-record sessions based on configurable trigger rules (stretch goal)
 
 ## Phase Details
 
@@ -275,25 +274,6 @@ Plans:
 
 ---
 
-### Phase 25: Recording Automation (Stretch)
-
-**Goal**: Operator configures rules that trigger recording automatically — capturing critical moments without manual intervention.
-
-**Depends on**: Phase 24 (recording infrastructure), Phase 19 (permission prompt detection)
-
-**Requirements**: REC-05
-
-**Success Criteria** (what must be TRUE):
-  1. A settings panel exposes an auto-record dropdown with three options: always (record every session from start), never (recording is manual only), and on-permission-prompt (recording starts automatically when a permission prompt is detected)
-  2. When auto-record is set to on-permission-prompt, a recording begins within one polling cycle of a permission prompt being detected, without operator action
-
-**Plans**: TBD
-
-Plans:
-- [ ] 25-01: Auto-record settings — settings panel with auto-record dropdown; auto-record rule stored in SQLite or config file; server-side trigger hook in InstanceTracker or TerminalStreamService that fires recording based on configured condition
-
----
-
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
@@ -323,4 +303,3 @@ Plans:
 | 23. Token Analytics & Export | v3.1 | 2/2 | Complete | 2026-03-04 |
 | 26. Token Analytics Polish & Tech Debt | 1/1 | Complete    | 2026-03-04 | - |
 | 24. Session Recording & Replay | v3.1 | 0/2 | Not started | - |
-| 25. Recording Automation | v3.1 | 0/1 | Not started | - |
