@@ -105,3 +105,8 @@ export interface RecordingEntry {
   fileSizeBytes: number | null;
   stopReason: 'manual' | 'session_ended' | null;
 }
+
+export interface AutoRecordConfig {
+  agentId: string;
+  autoRecord: boolean;
+}

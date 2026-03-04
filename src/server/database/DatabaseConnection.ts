@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import type { AgentInstance, AgentInstanceCreateParams, AgentInstanceStatus, TokenUsageRow, BurnRateEntry, BudgetConfig, BudgetAlertStatus, BurnWindow, TokenUsageByModelRow, ModelComparisonRow, TokenUsageExportRow, RecordingEntry } from '../../shared/types.js';
+import type { AgentInstance, AgentInstanceCreateParams, AgentInstanceStatus, TokenUsageRow, BurnRateEntry, BudgetConfig, BudgetAlertStatus, BurnWindow, TokenUsageByModelRow, ModelComparisonRow, TokenUsageExportRow, RecordingEntry, AutoRecordConfig } from '../../shared/types.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -350,6 +350,36 @@ class DatabaseConnection {
     return entry;
   }
 
+  getAllAutoRecordConfigs(): AutoRecordConfig[] {
+    return (this.db.prepare(`
+      SELECT agent_id AS agentId, auto_record AS autoRecord
+      FROM auto_record_config
+      WHERE auto_record = 1
+    `).all() as Array<{ agentId: string; autoRecord: number }>).map(row => ({
+      agentId: row.agentId,
+      autoRecord: row.autoRecord === 1,
+    }));
+  }
+
+  setAutoRecord(agentId: string, enabled: boolean): void {
+    if (!enabled) {
+      this.db.prepare('DELETE FROM auto_record_config WHERE agent_id = ?').run(agentId);
+      return;
+    }
+    this.db.prepare(`
+      INSERT INTO auto_record_config (agent_id, auto_record, updated_at)
+      VALUES (?, 1, CURRENT_TIMESTAMP)
+      ON CONFLICT(agent_id) DO UPDATE SET auto_record = 1, updated_at = CURRENT_TIMESTAMP
+    `).run(agentId);
+  }
+
+  isAutoRecordEnabled(agentId: string): boolean {
+    const row = this.db.prepare(
+      'SELECT auto_record FROM auto_record_config WHERE agent_id = ?'
+    ).get(agentId) as { auto_record: number } | undefined;
+    return row?.auto_record === 1;
+  }
+
   close(): void {
     console.log('[Database] Checkpointing WAL before close');
     this.db.pragma('wal_checkpoint(TRUNCATE)');
@@ -472,6 +502,15 @@ class DatabaseConnection {
 
       CREATE INDEX IF NOT EXISTS idx_recordings_agent_id ON recordings(agent_id);
       CREATE INDEX IF NOT EXISTS idx_recordings_started_at ON recordings(started_at);
+    `);
+
+    // Migration: auto_record_config table (REC-05) for per-agent auto-record toggles
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS auto_record_config (
+        agent_id TEXT PRIMARY KEY,
+        auto_record INTEGER NOT NULL DEFAULT 1,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
     `);
   }
 
