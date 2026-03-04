@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { SessionHistory } from './SessionHistory.js';
 import { TokenUsageView } from './TokenUsageView.js';
 import { LogViewer } from './LogViewer.js';
+import type { RecordingEntry } from '@shared/types.js';
 
 type HistoryTab = 'sessions' | 'tokens' | 'logs';
 
@@ -26,9 +27,10 @@ function MobileAccordionSection({ title, defaultOpen, children }: {
 
 interface HistoryViewProps {
   onNavigateToSession?: (sessionName: string) => void;
+  onPlayRecording?: (recording: RecordingEntry) => void;
 }
 
-export function HistoryView({ onNavigateToSession: _onNavigateToSession }: HistoryViewProps) {
+export function HistoryView({ onNavigateToSession, onPlayRecording }: HistoryViewProps) {
   const [activeTab, setActiveTab] = useState<HistoryTab>('sessions');
 
   const tabs: { id: HistoryTab; label: string }[] = [
@@ -62,7 +64,7 @@ export function HistoryView({ onNavigateToSession: _onNavigateToSession }: Histo
         </div>
 
         <div className="flex-1 min-h-0 overflow-y-auto">
-          {activeTab === 'sessions' && <SessionHistory />}
+          {activeTab === 'sessions' && <SessionHistory onNavigateToSession={onNavigateToSession} onPlayRecording={onPlayRecording} />}
           {activeTab === 'tokens' && <TokenUsageView />}
           {activeTab === 'logs' && <LogViewer />}
         </div>
@@ -71,7 +73,7 @@ export function HistoryView({ onNavigateToSession: _onNavigateToSession }: Histo
       {/* Mobile: accordion layout */}
       <div className="sm:hidden flex flex-col h-full overflow-y-auto">
         <MobileAccordionSection title="Sessions" defaultOpen>
-          <SessionHistory />
+          <SessionHistory onNavigateToSession={onNavigateToSession} onPlayRecording={onPlayRecording} />
         </MobileAccordionSection>
         <MobileAccordionSection title="Token Usage">
           <TokenUsageView />

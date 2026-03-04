@@ -601,7 +601,13 @@ export function App() {
           ) : currentView === 'plugins' ? (
             <PluginRegistryView plugins={plugins} enabledState={enabledState} onToggle={togglePlugin} />
           ) : (
-            <HistoryView onNavigateToSession={handleSelectSession} />
+            <HistoryView
+              onNavigateToSession={handleSelectSession}
+              onPlayRecording={(recording) => {
+                handlePlayRecording(recording);
+                setCurrentView('recordings');
+              }}
+            />
           )}
           {currentView === 'terminals' && (
             <PluginSlotRenderer slot="bottom-panel" enabledPlugins={enabledPlugins} />
