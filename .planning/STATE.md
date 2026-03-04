@@ -6,16 +6,16 @@ See: .planning/PROJECT.md (updated 2026-03-04)
 
 **Core value:** Real-time visibility into all active Claude Code agent sessions from a single browser tab
 
-**Current focus:** v3.1 — Agent Control & Deep Insights (Phase 23 complete)
+**Current focus:** v3.1 — Agent Control & Deep Insights (Phase 26 Plan 01 complete)
 
 ## Current Position
 
-Phase: 23 of 25 (Token Analytics & Export) — COMPLETE
-Plan: 2 of 2 complete (Phase 23 fully done)
-Status: Phase 23 complete — data layer + client UI for TOKN-12 (model comparison bar chart) and TOKN-14 (CSV export with toast)
-Last activity: 2026-03-04 - Phase 23 Plan 02 executed (23-02: ModelComparisonView, Model Costs tab, Export CSV button)
+Phase: 26 of 26 (Token Analytics Polish & Tech Debt)
+Plan: 1 of 1 complete (Phase 26 Plan 01 done)
+Status: Phase 26 Plan 01 complete — agent filter moved to shared header, '24h' label renamed to 'Today' in ModelComparisonView
+Last activity: 2026-03-04 - Phase 26 Plan 01 executed (26-01: UX gap closure — shared agent filter, Today label)
 
-Progress: [████████████████░░░░░░░░░░░░░░] 53% (20/25 phases complete)
+Progress: [████████████████░░░░░░░░░░░░░░] 54% (21/26 phases complete)
 
 ## Performance Metrics
 
@@ -58,6 +58,9 @@ Key decisions relevant to v3.1:
 - [Phase 23-token-analytics-export]: CSV export always sends full unfiltered dataset with date-stamped filename — consistent with TOKN-14 spec
 - [Phase 23]: ModelComparisonView defines formatAgentId() locally — avoids cross-component import coupling
 - [Phase 23]: Global max scaling for bars — allows cross-agent cost comparison at a glance
+- [Phase 26-01]: Shared filter inputs (affecting multiple tabs) belong in the tab bar header row, not inside individual tab content blocks
+- [Phase 26-01]: TIME_RANGE_LABELS['24h'] = 'Today' — calculateDateFrom uses calendar-day midnight, not a rolling 24h window; label must match implementation semantics
+- [Phase 26-01]: Scan Now button stays in usage tab block — it is a usage-tab-specific action, unlike the agent filter which affects both tabs
 
 ### Pending Todos
 
@@ -71,7 +74,7 @@ None
 **Phase 25 (Stretch):**
 - Depends on Phase 19 permission detection stability. If detectAgentState() heuristics produce false positives, auto-record trigger will over-record. Research phase should confirm false-positive rate before committing to on-permission-prompt trigger.
 
-Phase 23 complete — no active blockers.
+Phase 26 Plan 01 complete — no active blockers.
 
 ### Quick Tasks Completed
 
@@ -84,5 +87,5 @@ Phase 23 complete — no active blockers.
 ## Session Continuity
 
 Last session: 2026-03-04
-Stopped at: Completed 23-02-PLAN.md (Token Analytics Export client UI: ModelComparisonView, Model Costs tab, Export CSV button with toast)
-Next step: Phase 24 — Recording Replay (research then execute)
+Stopped at: Completed 26-01-PLAN.md (Token Analytics Polish: shared agent filter header, Today label in ModelComparisonView)
+Next step: Continue Phase 26 plans if any remain, or proceed to Phase 24 — Recording Replay (research then execute)

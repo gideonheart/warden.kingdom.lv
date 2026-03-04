@@ -75,7 +75,7 @@
 - [x] **Phase 21: Agent Lifecycle Controls** — Start, stop, restart agent sessions with safety guards and real-time transitional state badges (completed 2026-03-04)
 - [x] **Phase 22: Token Burn Rate & Budget Alerts** — Real-time cost velocity with sliding windows, budget thresholds, and cost projection (completed 2026-03-04)
 - [x] **Phase 23: Token Analytics & Export** — Model cost comparison view and CSV export of full token usage dataset (completed 2026-03-04)
-- [ ] **Phase 26: Token Analytics Polish & Tech Debt** — Fix agent filter accessibility on Model Costs tab, clean up unused imports and label semantics (gap closure)
+- [x] **Phase 26: Token Analytics Polish & Tech Debt** — Fix agent filter accessibility on Model Costs tab, clean up unused imports and label semantics (gap closure) (completed 2026-03-04)
 - [ ] **Phase 24: Session Recording & Replay** — Record terminal output as asciicast v2 files, replay at variable speed, browsable recording library
 - [ ] **Phase 25: Recording Automation** — Auto-record sessions based on configurable trigger rules (stretch goal)
 
@@ -246,7 +246,7 @@ Plans:
   3. Unused `{ openSync, closeSync }` import removed from instanceRoutes.ts
   4. `24h` time range label in ModelComparisonView clarified (either rename to "Today" or calculate rolling 24h)
 
-**Plans:** 1 plan
+**Plans:** 1/1 plans complete
 
 Plans:
 - [ ] 26-01-PLAN.md — Move agent filter to shared header (visible on all tabs); rename '24h' label to 'Today' in ModelComparisonView; verify instanceRoutes.ts unused import already cleaned
@@ -321,6 +321,6 @@ Plans:
 | 21. Agent Lifecycle Controls | v3.1 | 3/3 | Complete | 2026-03-04 |
 | 22. Token Burn Rate & Budget Alerts | v3.1 | 2/2 | Complete | 2026-03-04 |
 | 23. Token Analytics & Export | v3.1 | 2/2 | Complete | 2026-03-04 |
-| 26. Token Analytics Polish & Tech Debt | v3.1 | 0/1 | Not started | - |
+| 26. Token Analytics Polish & Tech Debt | 1/1 | Complete   | 2026-03-04 | - |
 | 24. Session Recording & Replay | v3.1 | 0/2 | Not started | - |
 | 25. Recording Automation | v3.1 | 0/1 | Not started | - |
