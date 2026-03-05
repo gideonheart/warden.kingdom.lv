@@ -126,3 +126,19 @@ export interface StorageStats {
   totalBytes: number;
   recordingCount: number;
 }
+
+export type LifecycleEventType = 'started' | 'stopped' | 'crashed' | 'idle-timeout';
+
+export interface LifecycleEvent {
+  id: number;
+  sessionId: number;          // references instances.id
+  agentId: string;
+  sessionName: string;        // tmux session name for display
+  eventType: LifecycleEventType;
+  timestamp: string;          // ISO 8601 from SQLite CURRENT_TIMESTAMP
+  outcome: string | null;     // e.g. 'detected', 'force-killed', 'graceful', 'restart-pending'
+  uptimeSecs: number | null;  // seconds from instances.created_at to event time
+  projectSlug: string | null; // last path segment of projectPath
+  lastKnownState: string | null; // the instance status before this event
+  stopReason: string | null;  // 'operator-stop', 'crash', 'idle-timeout', 'error', etc.
+}

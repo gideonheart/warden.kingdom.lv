@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import type { AgentInstance, AgentInstanceCreateParams, AgentInstanceStatus, TokenUsageRow, BurnRateEntry, BudgetConfig, BudgetAlertStatus, BurnWindow, TokenUsageByModelRow, ModelComparisonRow, TokenUsageExportRow, RecordingEntry, AutoRecordConfig, RotationConfig, StorageStats, NotificationConfig } from '../../shared/types.js';
+import type { AgentInstance, AgentInstanceCreateParams, AgentInstanceStatus, TokenUsageRow, BurnRateEntry, BudgetConfig, BudgetAlertStatus, BurnWindow, TokenUsageByModelRow, ModelComparisonRow, TokenUsageExportRow, RecordingEntry, AutoRecordConfig, RotationConfig, StorageStats, NotificationConfig, LifecycleEvent, LifecycleEventType } from '../../shared/types.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -511,6 +511,75 @@ class DatabaseConnection {
     `).all() as Array<{ agentId: string; level: string; lastAlertedAt: number | null }>;
   }
 
+  insertLifecycleEvent(params: {
+    sessionId: number;
+    agentId: string;
+    sessionName: string;
+    eventType: LifecycleEventType;
+    outcome?: string;
+    uptimeSecs?: number;
+    projectSlug?: string;
+    lastKnownState?: string;
+    stopReason?: string;
+  }): LifecycleEvent {
+    const result = this.db.prepare(`
+      INSERT INTO session_lifecycle_events
+        (session_id, agent_id, session_name, event_type, outcome, uptime_secs, project_slug, last_known_state, stop_reason)
+      VALUES
+        (@sessionId, @agentId, @sessionName, @eventType, @outcome, @uptimeSecs, @projectSlug, @lastKnownState, @stopReason)
+    `).run({
+      sessionId: params.sessionId,
+      agentId: params.agentId,
+      sessionName: params.sessionName,
+      eventType: params.eventType,
+      outcome: params.outcome ?? null,
+      uptimeSecs: params.uptimeSecs ?? null,
+      projectSlug: params.projectSlug ?? null,
+      lastKnownState: params.lastKnownState ?? null,
+      stopReason: params.stopReason ?? null,
+    });
+
+    return this.db.prepare(`
+      SELECT id, session_id AS sessionId, agent_id AS agentId, session_name AS sessionName,
+             event_type AS eventType, timestamp, outcome, uptime_secs AS uptimeSecs,
+             project_slug AS projectSlug, last_known_state AS lastKnownState, stop_reason AS stopReason
+      FROM session_lifecycle_events WHERE id = ?
+    `).get(result.lastInsertRowid) as LifecycleEvent;
+  }
+
+  getLifecycleEvents(filters: { agentId?: string; eventType?: string; limit?: number; offset?: number } = {}): { events: LifecycleEvent[]; total: number } {
+    const conditions: string[] = [];
+    const params: (string | number)[] = [];
+
+    if (filters.agentId) {
+      conditions.push('agent_id = ?');
+      params.push(filters.agentId);
+    }
+    if (filters.eventType) {
+      conditions.push('event_type = ?');
+      params.push(filters.eventType);
+    }
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+    const limit = filters.limit ?? 50;
+    const offset = filters.offset ?? 0;
+
+    const total = (this.db.prepare(
+      `SELECT COUNT(*) as count FROM session_lifecycle_events ${whereClause}`
+    ).get(...params) as { count: number }).count;
+
+    const events = this.db.prepare(`
+      SELECT id, session_id AS sessionId, agent_id AS agentId, session_name AS sessionName,
+             event_type AS eventType, timestamp, outcome, uptime_secs AS uptimeSecs,
+             project_slug AS projectSlug, last_known_state AS lastKnownState, stop_reason AS stopReason
+      FROM session_lifecycle_events ${whereClause}
+      ORDER BY timestamp DESC
+      LIMIT ? OFFSET ?
+    `).all(...params, limit, offset) as LifecycleEvent[];
+
+    return { events, total };
+  }
+
   close(): void {
     console.log('[Database] Checkpointing WAL before close');
     this.db.pragma('wal_checkpoint(TRUNCATE)');
@@ -680,6 +749,27 @@ class DatabaseConnection {
         last_alerted_at INTEGER,
         updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
       )
+    `);
+
+    // Migration: session_lifecycle_events table (CRSH-01) — records all session lifecycle transitions
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS session_lifecycle_events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        session_id INTEGER NOT NULL REFERENCES instances(id),
+        agent_id TEXT NOT NULL,
+        session_name TEXT NOT NULL,
+        event_type TEXT NOT NULL,
+        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+        outcome TEXT,
+        uptime_secs REAL,
+        project_slug TEXT,
+        last_known_state TEXT,
+        stop_reason TEXT
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_lifecycle_events_agent_id ON session_lifecycle_events(agent_id);
+      CREATE INDEX IF NOT EXISTS idx_lifecycle_events_event_type ON session_lifecycle_events(event_type);
+      CREATE INDEX IF NOT EXISTS idx_lifecycle_events_timestamp ON session_lifecycle_events(timestamp);
     `);
   }
 
