@@ -219,11 +219,11 @@ Plans:
   2. When a crash is detected and the agent's policy allows restart, a new tmux session spawns automatically with the same project path
   3. Auto-restart outcomes (success or failure) are logged to the lifecycle events table
   4. After 3 restarts in one hour for the same agent, the restart policy flips to "none" and a Telegram alert notifies the operator of the restart storm
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 38-01: Restart policy table and dashboard config UI
-- [ ] 38-02: Auto-restart execution with rate limiter and Telegram storm alert
+- [ ] 38-01-PLAN.md — Restart policy types, database table, API endpoints, and AgentSidebar config dropdown (CRSH-03)
+- [ ] 38-02-PLAN.md — AutoRestartService with crash recovery execution, sliding-window rate limiter, Telegram storm alert, and client toast notification (CRSH-04, CRSH-05)
 
 ### Phase 39: Idle Timeout & Quick-Launch
 **Goal**: Warden automatically cleans up idle sessions and lets the operator launch new sessions with one click
