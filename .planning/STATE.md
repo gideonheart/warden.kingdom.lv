@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 Phase: 40 of 40 (Lifecycle History + E2E Verification)
 Plan: 2 of 2 complete
 Status: Phase 40 COMPLETE — v3.4 milestone done. All E2E tests pass (31 passed, 1 skipped).
-Last activity: 2026-03-05 - Completed quick task 2050: Refactor rotate session — extract hook, centralize paths, add confirmation UX
+Last activity: 2026-03-05 - Completed quick task 2051: Add per-session hooks pause toggle to AgentsTab
 
 Progress: [██████████] 100% (10/10 plans)
 
@@ -88,9 +88,10 @@ None
 | 2048 | Add Rotate Session button to terminal header + backend endpoint | 2026-03-05 | 14b7943 | [2048-add-rotate-session-button-to-gsd-manager](./quick/2048-add-rotate-session-button-to-gsd-manager/) |
 | 2049 | Analyse quick task 2048 rotate session implementation | 2026-03-05 | d99e561 | [2049-analyse-quick-task-2048-rotate-session-b](./quick/2049-analyse-quick-task-2048-rotate-session-b/) |
 | 2050 | Refactor rotate session: extract hook, centralize paths, add confirmation UX | 2026-03-05 | a62011d | [2050-refactor-rotate-session-extract-hook-fix](./quick/2050-refactor-rotate-session-extract-hook-fix/) |
+| 2051 | Add per-session hooks pause toggle to AgentsTab | 2026-03-05 | 717493b | [2051-add-per-session-hooks-pause-toggle-to-wa](./quick/2051-add-per-session-hooks-pause-toggle-to-wa/) |
 
 ## Session Continuity
 
 Last session: 2026-03-05
-Stopped at: Completed quick task 2050: Refactor rotate session — extract hook, centralize paths, add confirmation UX
+Stopped at: Completed quick task 2051: Add per-session hooks pause toggle to AgentsTab
 Next step: v3.4 DONE — ready for next milestone planning
