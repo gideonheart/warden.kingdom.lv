@@ -75,7 +75,16 @@ Real-time visibility into all active Claude Code agent sessions from a single br
 
 ### Active
 
-(None — define in next milestone)
+#### Current Milestone: v3.4 Smart Session Lifecycle
+
+**Goal:** Transform Warden from passive monitoring to autonomous session management — crash recovery, idle timeout cleanup, and one-click session launch.
+
+**Target features:**
+- Telegram pipeline hardening (EC-02/03/04 bug fixes)
+- Crash detection and auto-restart with configurable per-agent policy
+- Idle timeout enforcement to clean up completed sessions
+- Session templates with one-click launch from dashboard
+- Lifecycle event history for audit trail
 
 ### Deferred
 
@@ -88,6 +97,7 @@ Real-time visibility into all active Claude Code agent sessions from a single br
 ## Current State
 
 **Latest milestone:** v3.3 Telegram Operator Awareness (shipped 2026-03-05)
+**Current milestone:** v3.4 Smart Session Lifecycle (in progress)
 
 Warden is a complete operations platform with Telegram integration. The operator can manage agent sessions from desktop or phone; record sessions automatically with per-agent toggles; cap and rotate recording storage; navigate history rows directly to live terminals or recording replays; monitor cost velocity with budget alerts; receive Telegram notifications when agents stall on permission prompts; approve stalled agents with a single tap in Telegram; get budget alert notifications at amber/red thresholds; configure all notification preferences from the dashboard; and access all features from a mobile browser with keyboard persistence.
 
@@ -171,4 +181,4 @@ Known tech debt: detectAgentState() regex heuristics fragile but functional; NAV
 | onBlur save for cooldown inputs | Prevents rapid PUT calls while typing; key={value} resets on server data | ✓ Good — clean UX, minimal API calls |
 
 ---
-*Last updated: 2026-03-05 after v3.3 milestone complete*
+*Last updated: 2026-03-05 after v3.4 milestone started*

@@ -5,24 +5,24 @@
 See: .planning/PROJECT.md (updated 2026-03-05)
 
 **Core value:** Real-time visibility into all active Claude Code agent sessions from a single browser tab
-**Current focus:** Planning next milestone
+**Current focus:** v3.4 Smart Session Lifecycle
 
 ## Current Position
 
-Phase: —
+Phase: Not started (defining requirements)
 Plan: —
-Status: v3.3 milestone complete, planning next milestone
-Last activity: 2026-03-05 - Completed quick task 2044: Review recent commits for quality/edge cases/tech debt, then propose 3 concrete next-milestone directions
+Status: Defining requirements
+Last activity: 2026-03-05 — Milestone v3.4 started
 
 ```
-Progress: v3.3 SHIPPED — 4 phases, 8 plans, 19/19 requirements
-Next: /gsd:new-milestone
+Progress: Defining requirements
+Next: requirements → roadmap → /gsd:plan-phase 36
 ```
 
 ## Performance Metrics
 
 **Completed milestones:** v1.0 (6 phases), v1.1 (2), v2.0 (3), v2.1 (3), v2.3 (4), v3.0 (2), v3.1 (6), v3.2 (4), v3.3 (4) = 34 phases shipped
-**Current milestone:** None — planning next
+**Current milestone:** v3.4 Smart Session Lifecycle
 
 ## Accumulated Context
 
