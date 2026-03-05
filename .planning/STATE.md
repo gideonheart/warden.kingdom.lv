@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 Phase: 40 of 40 (Lifecycle History + E2E Verification)
 Plan: 2 of 2 complete
 Status: Phase 40 COMPLETE — v3.4 milestone done. All E2E tests pass (31 passed, 1 skipped).
-Last activity: 2026-03-05 - Completed quick task 2049: Analyse quick task 2048 rotate session implementation
+Last activity: 2026-03-05 - Completed quick task 2050: Refactor rotate session — extract hook, centralize paths, add confirmation UX
 
 Progress: [██████████] 100% (10/10 plans)
 
@@ -87,9 +87,10 @@ None
 | 2047 | Enhance agent sidebar with agent registry working directory and context fill | 2026-03-05 | eb9de31 | [2047-enhance-agent-sidebar-with-agent-registr](./quick/2047-enhance-agent-sidebar-with-agent-registr/) |
 | 2048 | Add Rotate Session button to terminal header + backend endpoint | 2026-03-05 | 14b7943 | [2048-add-rotate-session-button-to-gsd-manager](./quick/2048-add-rotate-session-button-to-gsd-manager/) |
 | 2049 | Analyse quick task 2048 rotate session implementation | 2026-03-05 | d99e561 | [2049-analyse-quick-task-2048-rotate-session-b](./quick/2049-analyse-quick-task-2048-rotate-session-b/) |
+| 2050 | Refactor rotate session: extract hook, centralize paths, add confirmation UX | 2026-03-05 | a62011d | [2050-refactor-rotate-session-extract-hook-fix](./quick/2050-refactor-rotate-session-extract-hook-fix/) |
 
 ## Session Continuity
 
 Last session: 2026-03-05
-Stopped at: Completed quick task 2049: Analyse quick task 2048 rotate session implementation
+Stopped at: Completed quick task 2050: Refactor rotate session — extract hook, centralize paths, add confirmation UX
 Next step: v3.4 DONE — ready for next milestone planning
