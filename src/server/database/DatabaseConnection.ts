@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import type { AgentInstance, AgentInstanceCreateParams, AgentInstanceStatus, TokenUsageRow, BurnRateEntry, BudgetConfig, BudgetAlertStatus, BurnWindow, TokenUsageByModelRow, ModelComparisonRow, TokenUsageExportRow, RecordingEntry, AutoRecordConfig, RotationConfig, StorageStats } from '../../shared/types.js';
+import type { AgentInstance, AgentInstanceCreateParams, AgentInstanceStatus, TokenUsageRow, BurnRateEntry, BudgetConfig, BudgetAlertStatus, BurnWindow, TokenUsageByModelRow, ModelComparisonRow, TokenUsageExportRow, RecordingEntry, AutoRecordConfig, RotationConfig, StorageStats, NotificationConfig } from '../../shared/types.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -395,6 +395,53 @@ class DatabaseConnection {
     `).run(capBytes);
   }
 
+  getNotificationConfig(): NotificationConfig {
+    const row = this.db.prepare(`
+      SELECT
+        permission_alerts_enabled AS permissionAlertsEnabled,
+        budget_alerts_enabled AS budgetAlertsEnabled,
+        permission_cooldown_ms AS permissionCooldownMs,
+        budget_cooldown_ms AS budgetCooldownMs
+      FROM notification_config WHERE id = 1
+    `).get() as { permissionAlertsEnabled: number; budgetAlertsEnabled: number; permissionCooldownMs: number; budgetCooldownMs: number } | undefined;
+
+    const defaults: NotificationConfig = {
+      permissionAlertsEnabled: true,
+      budgetAlertsEnabled: true,
+      permissionCooldownMs: 120000,
+      budgetCooldownMs: 600000,
+    };
+
+    if (!row) return defaults;
+
+    return {
+      permissionAlertsEnabled: row.permissionAlertsEnabled !== 0,
+      budgetAlertsEnabled: row.budgetAlertsEnabled !== 0,
+      permissionCooldownMs: row.permissionCooldownMs ?? defaults.permissionCooldownMs,
+      budgetCooldownMs: row.budgetCooldownMs ?? defaults.budgetCooldownMs,
+    };
+  }
+
+  setNotificationConfig(config: Partial<NotificationConfig>): void {
+    const current = this.getNotificationConfig();
+    const merged = { ...current, ...config };
+    this.db.prepare(`
+      INSERT INTO notification_config (id, permission_alerts_enabled, budget_alerts_enabled, permission_cooldown_ms, budget_cooldown_ms, updated_at)
+      VALUES (1, @permissionAlertsEnabled, @budgetAlertsEnabled, @permissionCooldownMs, @budgetCooldownMs, CURRENT_TIMESTAMP)
+      ON CONFLICT(id) DO UPDATE SET
+        permission_alerts_enabled = excluded.permission_alerts_enabled,
+        budget_alerts_enabled = excluded.budget_alerts_enabled,
+        permission_cooldown_ms = excluded.permission_cooldown_ms,
+        budget_cooldown_ms = excluded.budget_cooldown_ms,
+        updated_at = CURRENT_TIMESTAMP
+    `).run({
+      permissionAlertsEnabled: merged.permissionAlertsEnabled ? 1 : 0,
+      budgetAlertsEnabled: merged.budgetAlertsEnabled ? 1 : 0,
+      permissionCooldownMs: merged.permissionCooldownMs,
+      budgetCooldownMs: merged.budgetCooldownMs,
+    });
+  }
+
   getStorageStats(): StorageStats {
     const row = this.db.prepare(`
       SELECT COALESCE(SUM(file_size_bytes), 0) AS totalBytes,
@@ -583,6 +630,18 @@ class DatabaseConnection {
     } catch {
       // Column already exists — safe to ignore
     }
+
+    // Migration: notification_config table (NSET-03) — single-row notification preferences
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS notification_config (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        permission_alerts_enabled INTEGER NOT NULL DEFAULT 1,
+        budget_alerts_enabled INTEGER NOT NULL DEFAULT 1,
+        permission_cooldown_ms INTEGER NOT NULL DEFAULT 120000,
+        budget_cooldown_ms INTEGER NOT NULL DEFAULT 600000,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
   }
 
   upsertTokenUsageByModel(row: TokenUsageByModelRow): void {

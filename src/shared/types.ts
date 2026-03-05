@@ -115,6 +115,13 @@ export interface RotationConfig {
   capBytes: number;  // 0 = disabled
 }
 
+export interface NotificationConfig {
+  permissionAlertsEnabled: boolean;
+  budgetAlertsEnabled: boolean;
+  permissionCooldownMs: number;
+  budgetCooldownMs: number;
+}
+
 export interface StorageStats {
   totalBytes: number;
   recordingCount: number;
