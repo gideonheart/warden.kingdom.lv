@@ -80,11 +80,28 @@ export function useAgentConfig() {
     }
   }, [fetchConfig]);
 
+  const updateIdleTimeout = useCallback(async (agentId: string, minutes: number | null) => {
+    try {
+      const response = await fetch(`/api/idle-timeout/${encodeURIComponent(agentId)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idleTimeoutMinutes: minutes }),
+      });
+      if (!response.ok) {
+        console.error(`[useAgentConfig] Failed to update idle timeout for ${agentId}: ${response.statusText}`);
+        return;
+      }
+      await fetchConfig();
+    } catch (updateError) {
+      console.error(`[useAgentConfig] Error updating idle timeout for ${agentId}:`, updateError);
+    }
+  }, [fetchConfig]);
+
   useEffect(() => {
     fetchConfig();
     const interval = setInterval(fetchConfig, REFRESH_INTERVAL_MS);
     return () => clearInterval(interval);
   }, [fetchConfig]);
 
-  return { agents, topicMappings, restartPolicies, isLoading, error, refetch: fetchConfig, updateRestartPolicy };
+  return { agents, topicMappings, restartPolicies, isLoading, error, refetch: fetchConfig, updateRestartPolicy, updateIdleTimeout };
 }
