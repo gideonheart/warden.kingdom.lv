@@ -112,7 +112,9 @@ export function AgentSidebar({
       </div>
 
       <div className="flex flex-col gap-1 p-2">
-        {agents.map((agent) => (
+        {agents.map((agent) => {
+          const agentTopic = topicMappings.find((t) => t.agentId === agent.id);
+          return (
           <div
             key={agent.id}
             className={`flex items-center gap-2 px-2 py-1.5 min-h-[44px] rounded text-sm transition-colors ${
@@ -130,6 +132,11 @@ export function AgentSidebar({
               {agent.isDefault && (
                 <span className="text-xs opacity-50 flex-shrink-0">default</span>
               )}
+              {agentTopic && (
+                <span className="text-xs text-warden-text-dim/50 flex-shrink-0 font-mono">
+                  #{agentTopic.topicId}
+                </span>
+              )}
             </button>
             {onStartAgent && (
               <StartButton
@@ -139,7 +146,8 @@ export function AgentSidebar({
               />
             )}
           </div>
-        ))}
+          );
+        })}
       </div>
 
       {selectedAgent && (
