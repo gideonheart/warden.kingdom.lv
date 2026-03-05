@@ -5,24 +5,21 @@
 See: .planning/PROJECT.md (updated 2026-03-05)
 
 **Core value:** Real-time visibility into all active Claude Code agent sessions from a single browser tab
-**Current focus:** v3.4 Smart Session Lifecycle
+**Current focus:** v3.4 Smart Session Lifecycle — Phase 36: Telegram Pipeline Hardening
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-03-05 — Milestone v3.4 started
+Phase: 36 of 40 (Telegram Pipeline Hardening)
+Plan: 0 of 1 in current phase
+Status: Ready to plan
+Last activity: 2026-03-05 — Roadmap created for v3.4 (5 phases, 17 requirements)
 
-```
-Progress: Defining requirements
-Next: requirements → roadmap → /gsd:plan-phase 36
-```
+Progress: [░░░░░░░░░░] 0% (0/9 plans)
 
 ## Performance Metrics
 
 **Completed milestones:** v1.0 (6 phases), v1.1 (2), v2.0 (3), v2.1 (3), v2.3 (4), v3.0 (2), v3.1 (6), v3.2 (4), v3.3 (4) = 34 phases shipped
-**Current milestone:** v3.4 Smart Session Lifecycle
+**Current milestone:** v3.4 Smart Session Lifecycle — 5 phases, 9 plans, 17 requirements
 
 ## Accumulated Context
 
@@ -40,7 +37,8 @@ None
 
 ### Blockers/Concerns
 
-None
+- NotificationPoller polls stopped sessions (dead capture-pane calls) — pre-existing tech debt from v3.3
+- WARDEN_TELEGRAM_OPERATOR_ID not validated at startup — pre-existing, may affect CRSH-06 notification delivery
 
 ### Quick Tasks Completed
 
@@ -55,6 +53,6 @@ None
 
 ## Session Continuity
 
-Last session: 2026-03-05 (quick-2044 code review + milestone proposals)
-Stopped at: CODE-REVIEW.md (14 findings, 3 medium-severity in Telegram pipeline) + MILESTONE-OPTIONS.md (Analytics, Session Lifecycle, Quality Foundation); recommendation: v4.1 Smart Session Lifecycle with inline EC-02/03/04 fixes first
-Next step: /gsd:new-milestone
+Last session: 2026-03-05
+Stopped at: Roadmap created for v3.4 Smart Session Lifecycle (Phases 36-40, 17 requirements, 9 plans)
+Next step: /gsd:plan-phase 36

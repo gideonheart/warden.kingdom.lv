@@ -11,6 +11,7 @@
 - ✅ **v3.1 Agent Control & Deep Insights** — Phases 21-24, 26-27 (shipped 2026-03-04)
 - ✅ **v3.2 Mobile Operations & UX Polish** — Phases 28-31 (shipped 2026-03-04)
 - ✅ **v3.3 Telegram Operator Awareness** — Phases 32-35 (shipped 2026-03-05)
+- 🚧 **v3.4 Smart Session Lifecycle** — Phases 36-40 (in progress)
 
 ## Phases
 
@@ -102,6 +103,16 @@
 
 </details>
 
+### 🚧 v3.4 Smart Session Lifecycle (In Progress)
+
+**Milestone Goal:** Transform Warden from passive monitoring to autonomous session management — crash recovery, idle timeout cleanup, and one-click session launch.
+
+- [ ] **Phase 36: Telegram Pipeline Hardening** - Fix Markdown escaping, topicId validation, and budget alert persistence bugs
+- [ ] **Phase 37: Crash Detection Backend** - Detect crashed sessions, persist lifecycle events, send Telegram crash notifications
+- [ ] **Phase 38: Auto-Restart Engine** - Per-agent restart policy, automatic crash recovery, restart storm rate limiter
+- [ ] **Phase 39: Idle Timeout & Quick-Launch** - Auto-stop idle sessions and one-click session launch from dashboard
+- [ ] **Phase 40: Lifecycle History & E2E Verification** - Lifecycle event history UI with filters and end-to-end verification
+
 ## Phase Details
 
 <details>
@@ -167,7 +178,83 @@ See `.planning/milestones/v3.3-ROADMAP.md`
 
 </details>
 
+### Phase 36: Telegram Pipeline Hardening
+**Goal**: Telegram notification pipeline handles all edge cases without silent failures
+**Depends on**: Nothing (bug fixes to existing v3.3 code)
+**Requirements**: FIX-01, FIX-02, FIX-03
+**Success Criteria** (what must be TRUE):
+  1. Approval message edits succeed even when tmux pane content contains Markdown special characters (backticks, brackets, asterisks)
+  2. Telegram API calls with invalid or missing topicId produce a clear log warning and return gracefully instead of throwing unhandled errors
+  3. Budget alert state survives server restart — restarting the server does not re-fire alerts that were already sent
+**Plans**: TBD
+
+Plans:
+- [ ] 36-01: Telegram pipeline bug fixes (Markdown escaping, topicId validation, budget alert persistence)
+
+### Phase 37: Crash Detection Backend
+**Goal**: Warden detects when agent sessions crash and records/notifies the operator
+**Depends on**: Phase 36 (Telegram pipeline must be reliable for crash notifications)
+**Requirements**: CRSH-01, CRSH-02, CRSH-06
+**Success Criteria** (what must be TRUE):
+  1. When an active tmux session disappears without an operator-initiated stop, Warden logs it as a crash (not a normal stop) in the dashboard
+  2. Crash events are persisted to the database with session ID, agent ID, event type, timestamp, and outcome — surviving server restarts
+  3. Operator receives a Telegram notification within one poll cycle when an agent session crashes, including agent name and session name
+  4. Operator-initiated stops (via dashboard Stop button) are never misclassified as crashes
+**Plans**: TBD
+
+Plans:
+- [ ] 37-01: Crash detection in InstanceTracker (graceful stop marker, crash vs stop distinction)
+- [ ] 37-02: Lifecycle events table and Telegram crash notifications
+
+### Phase 38: Auto-Restart Engine
+**Goal**: Warden can automatically restart crashed sessions based on per-agent policy with safety limits
+**Depends on**: Phase 37 (crash detection must exist before auto-restart can act on it)
+**Requirements**: CRSH-03, CRSH-04, CRSH-05
+**Success Criteria** (what must be TRUE):
+  1. Operator can configure per-agent crash restart policy (none/once/always) from the dashboard, defaulting to none
+  2. When a crash is detected and the agent's policy allows restart, a new tmux session spawns automatically with the same project path
+  3. Auto-restart outcomes (success or failure) are logged to the lifecycle events table
+  4. After 3 restarts in one hour for the same agent, the restart policy flips to "none" and a Telegram alert notifies the operator of the restart storm
+**Plans**: TBD
+
+Plans:
+- [ ] 38-01: Restart policy table and dashboard config UI
+- [ ] 38-02: Auto-restart execution with rate limiter and Telegram storm alert
+
+### Phase 39: Idle Timeout & Quick-Launch
+**Goal**: Warden automatically cleans up idle sessions and lets the operator launch new sessions with one click
+**Depends on**: Phase 38 (shares `session_lifecycle_policy` table; restart engine must be stable)
+**Requirements**: IDLE-01, IDLE-02, IDLE-03, LNCH-01, LNCH-02, LNCH-03
+**Success Criteria** (what must be TRUE):
+  1. Operator can configure per-agent idle timeout (minimum 60 minutes, or disabled) from the dashboard
+  2. Sessions that remain idle beyond their configured timeout are automatically stopped, with the stop reason recorded as "idle-timeout" in lifecycle events
+  3. Dashboard shows a "New Session" button that opens an agent picker with each agent's last-used project path pre-filled
+  4. Operator can override the pre-filled project path before launching, and the session starts via the existing start API
+  5. Quick-launch works for agents that have never been started (no last-used path) — operator must provide a path manually
+**Plans**: TBD
+
+Plans:
+- [ ] 39-01: Idle timeout policy, enforcement, and lifecycle event logging
+- [ ] 39-02: Quick-launch UI with agent picker and project path override
+
+### Phase 40: Lifecycle History & E2E Verification
+**Goal**: Operator can review all lifecycle events and the full milestone is verified end-to-end
+**Depends on**: Phase 39 (all lifecycle event types must exist to display in history)
+**Requirements**: HIST-01, HIST-02
+**Success Criteria** (what must be TRUE):
+  1. History view shows a lifecycle events section displaying crashes, auto-restarts, and idle-timeout stops with agent name, timestamp, event type, and outcome
+  2. Lifecycle history is filterable by agent and by event type
+  3. All five phases of v3.4 pass end-to-end verification (Playwright tests or manual verification checklist)
+**Plans**: TBD
+
+Plans:
+- [ ] 40-01: Lifecycle events history UI with filters
+- [ ] 40-02: End-to-end milestone verification
+
 ## Progress
+
+**Execution Order:**
+Phases execute in numeric order: 36 → 37 → 38 → 39 → 40
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -205,3 +292,8 @@ See `.planning/milestones/v3.3-ROADMAP.md`
 | 33. Permission Prompt Detection and Forwarding | v3.3 | 2/2 | Complete | 2026-03-04 |
 | 34. One-Tap Approve | v3.3 | 2/2 | Complete | 2026-03-04 |
 | 35. Budget Alerts and Notification Settings | v3.3 | 2/2 | Complete | 2026-03-05 |
+| 36. Telegram Pipeline Hardening | v3.4 | 0/1 | Not started | - |
+| 37. Crash Detection Backend | v3.4 | 0/2 | Not started | - |
+| 38. Auto-Restart Engine | v3.4 | 0/2 | Not started | - |
+| 39. Idle Timeout & Quick-Launch | v3.4 | 0/2 | Not started | - |
+| 40. Lifecycle History & E2E Verification | v3.4 | 0/2 | Not started | - |

@@ -80,29 +80,29 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FIX-01 | — | Pending |
-| FIX-02 | — | Pending |
-| FIX-03 | — | Pending |
-| CRSH-01 | — | Pending |
-| CRSH-02 | — | Pending |
-| CRSH-03 | — | Pending |
-| CRSH-04 | — | Pending |
-| CRSH-05 | — | Pending |
-| CRSH-06 | — | Pending |
-| IDLE-01 | — | Pending |
-| IDLE-02 | — | Pending |
-| IDLE-03 | — | Pending |
-| LNCH-01 | — | Pending |
-| LNCH-02 | — | Pending |
-| LNCH-03 | — | Pending |
-| HIST-01 | — | Pending |
-| HIST-02 | — | Pending |
+| FIX-01 | Phase 36 | Pending |
+| FIX-02 | Phase 36 | Pending |
+| FIX-03 | Phase 36 | Pending |
+| CRSH-01 | Phase 37 | Pending |
+| CRSH-02 | Phase 37 | Pending |
+| CRSH-03 | Phase 38 | Pending |
+| CRSH-04 | Phase 38 | Pending |
+| CRSH-05 | Phase 38 | Pending |
+| CRSH-06 | Phase 37 | Pending |
+| IDLE-01 | Phase 39 | Pending |
+| IDLE-02 | Phase 39 | Pending |
+| IDLE-03 | Phase 39 | Pending |
+| LNCH-01 | Phase 39 | Pending |
+| LNCH-02 | Phase 39 | Pending |
+| LNCH-03 | Phase 39 | Pending |
+| HIST-01 | Phase 40 | Pending |
+| HIST-02 | Phase 40 | Pending |
 
 **Coverage:**
 - v3.4 requirements: 17 total
-- Mapped to phases: 0
-- Unmapped: 17
+- Mapped to phases: 17
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-05*
-*Last updated: 2026-03-05 after initial definition*
+*Last updated: 2026-03-05 after roadmap creation*
