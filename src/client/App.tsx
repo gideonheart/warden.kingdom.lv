@@ -11,6 +11,7 @@ import { MobilePromptSheet } from './components/MobilePromptSheet.js';
 import { GsdView } from './components/GsdView.js';
 import { RecordingLibrary } from './components/RecordingLibrary.js';
 import { RecordingPlayer } from './components/RecordingPlayer.js';
+import { QuickLaunchModal } from './components/QuickLaunchModal.js';
 import { useActiveInstances } from './hooks/useActiveInstances.js';
 import { useAgentConfig } from './hooks/useAgentConfig.js';
 import { usePluginRegistry } from './hooks/usePluginRegistry.js';
@@ -323,6 +324,25 @@ export function App() {
     onSelectSession: handleSelectSession,
   });
 
+  const [isQuickLaunchOpen, setIsQuickLaunchOpen] = useState(false);
+
+  // Quick-launch: called by QuickLaunchModal when operator confirms agent + project path.
+  const handleQuickLaunch = useCallback(
+    async (agentId: string, launchProjectPath: string) => {
+      const response = await fetch('/api/instances/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ agentId, projectPath: launchProjectPath }),
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({})) as { error?: string };
+        throw new Error(data.error ?? 'Launch failed');
+      }
+      refetch();
+    },
+    [refetch],
+  );
+
   const [activeRecording, setActiveRecording] = useState<RecordingEntry | null>(null);
   const [recordingLibraryRefreshKey, setRecordingLibraryRefreshKey] = useState(0);
 
@@ -495,6 +515,12 @@ export function App() {
           >
             Plugins
           </button>
+          <button
+            onClick={() => setIsQuickLaunchOpen(true)}
+            className="px-3 py-1 min-h-[44px] text-xs bg-warden-accent hover:bg-warden-accent-dim text-white rounded transition-colors flex items-center"
+          >
+            + New Session
+          </button>
           <span className="w-px h-4 bg-warden-border" />
           <button
             onClick={handleToggleSidebar}
@@ -565,6 +591,12 @@ export function App() {
                 className={`w-full text-left px-4 py-3 min-h-[44px] text-sm transition-colors ${currentView === 'plugins' ? 'text-warden-accent bg-warden-accent/10' : 'text-warden-text-dim hover:text-warden-text hover:bg-warden-border/30'}`}
               >
                 Plugins
+              </button>
+              <button
+                onClick={() => { setIsQuickLaunchOpen(true); setShowMobileMenu(false); }}
+                className="w-full text-left px-4 py-3 min-h-[44px] text-sm text-warden-accent hover:bg-warden-accent/10 transition-colors"
+              >
+                + New Session
               </button>
               <div className="border-t border-warden-border" />
               <button
@@ -728,6 +760,15 @@ export function App() {
       {currentView === 'terminals' && agents.length > 0 && (
         <MobilePromptSheet agents={agents} selectedAgentId={derivedAgentId} />
       )}
+
+      {/* Quick-launch modal — full-screen overlay for starting new agent sessions */}
+      <QuickLaunchModal
+        isOpen={isQuickLaunchOpen}
+        onClose={() => setIsQuickLaunchOpen(false)}
+        agents={agents}
+        activeAgentIds={activeAgentIds}
+        onLaunch={handleQuickLaunch}
+      />
 
       {/* Auto-restart toast notifications — fixed bottom-right, non-blocking */}
       {toastMessages.length > 0 && (
