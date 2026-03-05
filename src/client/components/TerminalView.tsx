@@ -8,6 +8,7 @@ import { useRecordingState } from '../hooks/useRecordingState.js';
 import type { AgentLiveStatus } from '../hooks/useAgentLiveStatus.js';
 import type { PressureLevel } from '@shared/gsdTypes.js';
 import type { AgentInstanceStatus } from '@shared/types.js';
+import type { AgentContextFill } from '@shared/openclawTypes.js';
 import { StateBadge, PRESSURE_COLORS } from './gsdShared.js';
 import { TerminalSearchOverlay } from './TerminalSearchOverlay.js';
 import 'xterm/css/xterm.css';
@@ -38,6 +39,10 @@ interface TerminalViewProps {
   projectPath?: string;
   /** Callback when a recording completes — so RecordingLibrary can refresh. */
   onRecordingComplete?: () => void;
+  /** Context fill data for the agent running this session. */
+  contextFill?: AgentContextFill | null;
+  /** Working directory from agent-registry.json, with home prefix stripped. */
+  workingDirectory?: string | null;
 }
 
 // Strip mouse-tracking enable sequences so xterm.js uses native selection
@@ -228,6 +233,8 @@ function TerminalViewInner({
   agentId,
   projectPath,
   onRecordingComplete,
+  contextFill,
+  workingDirectory,
 }: TerminalViewProps) {
   const terminalContainerRef = useRef<HTMLDivElement>(null);
   const terminalInstanceRef = useRef<Terminal | null>(null);
@@ -660,6 +667,33 @@ function TerminalViewInner({
         <div className="flex items-center gap-2">
           <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-warden-success' : isReconnecting ? 'bg-warden-warning animate-pulse' : 'bg-warden-error'}`} />
           <span className="text-xs text-warden-text-dim font-mono">{tmuxSessionName}</span>
+          {contextFill?.fillPercentage != null && (
+            <>
+              <div
+                className="w-12 h-1.5 rounded-full bg-warden-border/50 overflow-hidden flex-shrink-0"
+                title={`Context: ${contextFill.fillPercentage}% (${(contextFill.totalTokens ?? 0).toLocaleString()} / ${contextFill.contextTokens.toLocaleString()} tokens)`}
+              >
+                <div
+                  className={`h-full rounded-full ${
+                    contextFill.fillPercentage > 75 ? 'bg-warden-error' :
+                    contextFill.fillPercentage > 50 ? 'bg-amber-500' :
+                    'bg-warden-success'
+                  }`}
+                  style={{ width: `${Math.min(contextFill.fillPercentage, 100)}%` }}
+                />
+              </div>
+              <span className={`text-[10px] font-mono flex-shrink-0 ${
+                contextFill.fillPercentage > 75 ? 'text-warden-error' :
+                contextFill.fillPercentage > 50 ? 'text-amber-500' :
+                'text-warden-text-dim'
+              }`}>{contextFill.fillPercentage}%</span>
+            </>
+          )}
+          {workingDirectory && (
+            <span className="text-[10px] text-warden-text-dim/50 font-mono truncate max-w-[200px] hidden sm:inline" title={workingDirectory}>
+              {workingDirectory}
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-2">
           {agentLiveStatus && (

@@ -290,6 +290,11 @@ export function App() {
   );
   const derivedAgentId = selectedInstance?.agentId ?? null;
 
+  const selectedAgentDetails = useMemo(
+    () => derivedAgentId ? agents.find((agent) => agent.id === derivedAgentId) : undefined,
+    [agents, derivedAgentId],
+  );
+
   const handleSelectSession = useCallback((sessionName: string) => {
     selectSession(sessionName);
     setCurrentView('terminals');
@@ -674,6 +679,8 @@ export function App() {
                     agentId={selectedInstance?.agentId}
                     projectPath={selectedInstance?.projectPath}
                     onRecordingComplete={handleRecordingComplete}
+                    contextFill={selectedAgentDetails?.contextFill}
+                    workingDirectory={selectedAgentDetails?.workingDirectory?.replace(/^\/home\/forge\//, '~/')}
                   />
                 </ErrorBoundary>
               ) : (
