@@ -9,12 +9,9 @@ import { gsdRegistryService } from '../services/GsdRegistryService.js';
 import { gsdEventLogService } from '../services/GsdEventLogService.js';
 import { database } from '../database/DatabaseConnection.js';
 import { openClawSessionReader } from '../services/OpenClawSessionReader.js';
+import { SPAWN_SH_PATH, MENU_DRIVER_PATH, ROTATE_SESSION_PATH } from '../config/externalPaths.js';
 
 const execFileAsync = promisify(execFile);
-
-const SPAWN_SH_PATH = '/home/forge/.openclaw/workspace/skills/gsd-code-skill/scripts/spawn.sh';
-const MENU_DRIVER_PATH = '/home/forge/.openclaw/workspace/skills/gsd-code-skill/scripts/menu-driver.sh';
-const ROTATE_SESSION_PATH = '/home/forge/.openclaw/workspace/skills/gsd-code-skill/bin/rotate-session.mjs';
 const ALLOWED_ACTIONS = new Set(['snapshot', 'enter', 'esc', 'clear_then', 'choose', 'submit', 'type']);
 const SESSION_NAME_RE = /^[a-zA-Z][a-zA-Z0-9_-]*$/;
 const AGENT_NAME_RE = /^[a-zA-Z][a-zA-Z0-9_-]*$/;
