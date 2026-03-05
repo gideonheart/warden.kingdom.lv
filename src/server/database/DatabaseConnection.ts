@@ -98,11 +98,12 @@ class DatabaseConnection {
    * Returns true if a row was deleted, false if not found or wrong status.
    *
    * Runs inside a transaction to satisfy FOREIGN KEY constraints:
-   * session_lifecycle_events and session_logs reference instances(id) with NO ACTION,
-   * so child rows must be removed before the parent instance row.
+   * activity_events, session_lifecycle_events, and session_logs reference instances(id)
+   * with NO ACTION, so child rows must be removed before the parent instance row.
    */
   deleteInstance(id: number): boolean {
     const deleteChildren = this.db.transaction(() => {
+      this.db.prepare('DELETE FROM activity_events WHERE instance_id = ?').run(id);
       this.db.prepare('DELETE FROM session_lifecycle_events WHERE session_id = ?').run(id);
       this.db.prepare('DELETE FROM session_logs WHERE instance_id = ?').run(id);
       const result = this.db.prepare(
