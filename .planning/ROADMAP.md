@@ -249,11 +249,11 @@ Plans:
   1. History view shows a lifecycle events section displaying crashes, auto-restarts, and idle-timeout stops with agent name, timestamp, event type, and outcome
   2. Lifecycle history is filterable by agent and by event type
   3. All five phases of v3.4 pass end-to-end verification (Playwright tests or manual verification checklist)
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 40-01: Lifecycle events history UI with filters
-- [ ] 40-02: End-to-end milestone verification
+- [ ] 40-01-PLAN.md — Fix force-kill lifecycle logging (TD-4) + NaN guard (TD-5) + LifecycleEventsView component + Lifecycle tab in HistoryView (HIST-01, HIST-02)
+- [ ] 40-02-PLAN.md — Playwright E2E spec for lifecycle history UI + manual verification checklist for all 5 v3.4 phases (HIST-01, HIST-02)
 
 ## Progress
 
