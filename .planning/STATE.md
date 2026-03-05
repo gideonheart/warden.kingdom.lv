@@ -88,7 +88,7 @@ None
 | 2048 | Add Rotate Session button to terminal header + backend endpoint | 2026-03-05 | 14b7943 | [2048-add-rotate-session-button-to-gsd-manager](./quick/2048-add-rotate-session-button-to-gsd-manager/) |
 | 2049 | Analyse quick task 2048 rotate session implementation | 2026-03-05 | d99e561 | [2049-analyse-quick-task-2048-rotate-session-b](./quick/2049-analyse-quick-task-2048-rotate-session-b/) |
 | 2050 | Refactor rotate session: extract hook, centralize paths, add confirmation UX | 2026-03-05 | a62011d | [2050-refactor-rotate-session-extract-hook-fix](./quick/2050-refactor-rotate-session-extract-hook-fix/) |
-| 2051 | Add per-session hooks pause toggle to AgentsTab | 2026-03-05 | 717493b | [2051-add-per-session-hooks-pause-toggle-to-wa](./quick/2051-add-per-session-hooks-pause-toggle-to-wa/) |
+| 2051 | Add per-session hooks pause toggle to AgentsTab | 2026-03-05 | b452da7 | [2051-add-per-session-hooks-pause-toggle-to-wa](./quick/2051-add-per-session-hooks-pause-toggle-to-wa/) |
 
 ## Session Continuity
 
