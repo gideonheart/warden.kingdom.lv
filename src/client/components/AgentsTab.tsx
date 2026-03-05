@@ -1,8 +1,9 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useCallback } from 'react';
 import { STATUS_COLORS, PhaseProgress } from './gsdShared.js';
 import { useGsdRegistry } from '../hooks/useGsdRegistry.js';
 import { useActiveInstances } from '../hooks/useActiveInstances.js';
 import { useAgentStateFiles } from '../hooks/useAgentStateFiles.js';
+import { useHooksPauseState } from '../hooks/useHooksPauseState.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // AgentsTab — responsive card grid with state badges, pressure, phase progress
@@ -11,6 +12,28 @@ import { useAgentStateFiles } from '../hooks/useAgentStateFiles.js';
 export function AgentsTab() {
   const { registry, isLoading: registryLoading, error: registryError, getEffectiveEnabled, toggleEnabled } = useGsdRegistry();
   const { instances } = useActiveInstances();
+  const { pauseMap } = useHooksPauseState();
+  const [optimisticHooksPaused, setOptimisticHooksPaused] = useState<Record<string, boolean>>({});
+
+  const toggleHooksPaused = useCallback(async (sessionName: string, currentPaused: boolean) => {
+    const newPaused = !currentPaused;
+    setOptimisticHooksPaused((previous) => ({ ...previous, [sessionName]: newPaused }));
+    try {
+      const response = await fetch(`/api/gsd/sessions/${sessionName}/hooks-paused`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ paused: newPaused }),
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      setOptimisticHooksPaused((previous) => {
+        const next = { ...previous };
+        delete next[sessionName];
+        return next;
+      });
+    } catch {
+      setOptimisticHooksPaused((previous) => ({ ...previous, [sessionName]: currentPaused }));
+    }
+  }, []);
 
   const sessionNames = useMemo(
     () => (registry?.agents ?? []).filter((a) => a.tmux_session_name).map((a) => a.tmux_session_name),
@@ -54,6 +77,8 @@ export function AgentsTab() {
             const stateInfo = agent.tmux_session_name
               ? stateFiles.get(agent.tmux_session_name)
               : undefined;
+            const serverHooksPaused = pauseMap[agent.tmux_session_name] ?? false;
+            const effectiveHooksPaused = optimisticHooksPaused[agent.tmux_session_name] ?? serverHooksPaused;
 
             return (
               <div
@@ -82,21 +107,35 @@ export function AgentsTab() {
                   </div>
                 </div>
 
-                {/* Bottom row: session name + enabled toggle */}
+                {/* Bottom row: session name + hooks toggle + enabled toggle */}
                 <div className="flex items-center justify-between gap-2 pt-2 border-t border-warden-border/50">
                   <span className="text-xs text-warden-text-dim font-mono truncate">
                     {agent.tmux_session_name || '\u2014'}
                   </span>
-                  <button
-                    onClick={() => toggleEnabled(agent.agent_id, effectiveEnabled)}
-                    className={`px-2 py-0.5 rounded text-xs transition-colors flex-shrink-0 ${
-                      effectiveEnabled
-                        ? 'bg-warden-success/20 text-warden-success hover:bg-warden-success/30'
-                        : 'bg-warden-error/20 text-warden-error hover:bg-warden-error/30'
-                    }`}
-                  >
-                    {effectiveEnabled ? 'Enabled' : 'Disabled'}
-                  </button>
+                  <div className="flex items-center gap-1.5">
+                    {agent.tmux_session_name && (
+                      <button
+                        onClick={() => toggleHooksPaused(agent.tmux_session_name, effectiveHooksPaused)}
+                        className={`px-2 py-0.5 rounded text-xs transition-colors flex-shrink-0 ${
+                          effectiveHooksPaused
+                            ? 'bg-amber-500/20 text-amber-400 hover:bg-amber-500/30'
+                            : 'bg-warden-success/20 text-warden-success hover:bg-warden-success/30'
+                        }`}
+                      >
+                        {effectiveHooksPaused ? 'Hooks Paused' : 'Hooks Active'}
+                      </button>
+                    )}
+                    <button
+                      onClick={() => toggleEnabled(agent.agent_id, effectiveEnabled)}
+                      className={`px-2 py-0.5 rounded text-xs transition-colors flex-shrink-0 ${
+                        effectiveEnabled
+                          ? 'bg-warden-success/20 text-warden-success hover:bg-warden-success/30'
+                          : 'bg-warden-error/20 text-warden-error hover:bg-warden-error/30'
+                      }`}
+                    >
+                      {effectiveEnabled ? 'Enabled' : 'Disabled'}
+                    </button>
+                  </div>
                 </div>
               </div>
             );
