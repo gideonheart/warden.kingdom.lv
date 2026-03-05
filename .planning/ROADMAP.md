@@ -297,7 +297,7 @@ Phases execute in numeric order: 36 → 37 → 38 → 39 → 40
 | 34. One-Tap Approve | v3.3 | 2/2 | Complete | 2026-03-04 |
 | 35. Budget Alerts and Notification Settings | v3.3 | 2/2 | Complete | 2026-03-05 |
 | 36. Telegram Pipeline Pivot & Hardening | 2/2 | Complete    | 2026-03-05 | - |
-| 37. Crash Detection Backend | 2/2 | Complete   | 2026-03-05 | - |
+| 37. Crash Detection Backend | 2/2 | Complete    | 2026-03-05 | - |
 | 38. Auto-Restart Engine | v3.4 | 0/2 | Not started | - |
 | 39. Idle Timeout & Quick-Launch | v3.4 | 0/2 | Not started | - |
 | 40. Lifecycle History & E2E Verification | v3.4 | 0/2 | Not started | - |
