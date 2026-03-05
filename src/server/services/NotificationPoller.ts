@@ -46,13 +46,21 @@ export class NotificationPoller {
   /**
    * Poll all currently active instances in parallel.
    * Prunes expired approval records as free housekeeping on each cycle.
+   * Reads notification config fresh on each cycle so config changes take effect
+   * without a server restart.
    * Failures on individual sessions are caught inside pollSession.
    */
   private async pollAllSessions(): Promise<void> {
     approvalStateTracker.pruneExpired();
+    const config = database.getNotificationConfig();
+    if (!config.permissionAlertsEnabled) {
+      return;
+    }
     const instances = instanceTracker.listActiveInstances();
     await Promise.allSettled(
-      instances.map((instance) => this.pollSession(instance.tmuxSessionName, instance.agentId))
+      instances.map((instance) =>
+        this.pollSession(instance.tmuxSessionName, instance.agentId, config.permissionCooldownMs)
+      )
     );
   }
 
@@ -60,7 +68,7 @@ export class NotificationPoller {
    * Capture tmux pane output for a single session, detect state, and
    * send a notification if a new permission prompt is detected.
    */
-  private async pollSession(sessionName: string, agentId: string): Promise<void> {
+  private async pollSession(sessionName: string, agentId: string, cooldownMs: number): Promise<void> {
     try {
       const { stdout } = await execFileAsync('tmux', [
         'capture-pane',
@@ -75,8 +83,7 @@ export class NotificationPoller {
       const cleanPane = stripAnsi(stdout);
 
       const state = detectAgentState(cleanPane);
-      const notificationConfig = database.getNotificationConfig();
-      const shouldNotify = this.deduplicator.recordAndCheck(sessionName, state, notificationConfig.permissionCooldownMs);
+      const shouldNotify = this.deduplicator.recordAndCheck(sessionName, state, cooldownMs);
 
       if (shouldNotify) {
         const excerpt = cleanPane.slice(-EXCERPT_MAX_CHARS).trim();

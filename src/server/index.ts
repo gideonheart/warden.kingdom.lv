@@ -10,12 +10,14 @@ import { agentRoutes } from './routes/agentRoutes.js';
 import { historyRoutes } from './routes/historyRoutes.js';
 import { gsdRoutes } from './routes/gsdRoutes.js';
 import { recordingRoutes } from './routes/recordingRoutes.js';
+import { notificationRoutes } from './routes/notificationRoutes.js';
 import { terminalStreamService } from './services/TerminalStreamService.js';
 import { instanceTracker } from './services/InstanceTracker.js';
 import { sessionUsageReader } from './services/SessionUsageReader.js';
 import { recordingRotationService } from './services/RecordingRotationService.js';
 import { telegramBotService } from './services/TelegramBotService.js';
 import { notificationPoller } from './services/NotificationPoller.js';
+import { budgetAlertPoller } from './services/BudgetAlertPoller.js';
 import { ApprovalCallbackHandler } from './services/ApprovalCallbackHandler.js';
 import { approvalStateTracker } from './services/ApprovalStateTracker.js';
 import { tmuxSessionManager } from './services/TmuxSessionManager.js';
@@ -73,6 +75,7 @@ app.use(agentRoutes);
 app.use(historyRoutes);
 app.use(gsdRoutes);
 app.use(recordingRoutes);
+app.use(notificationRoutes);
 
 app.get('/api/health', (_request, response) => {
   response.json({
@@ -108,6 +111,7 @@ telegramBotService.registerCallbackHandler((bot) => approvalCallbackHandler.regi
 
 telegramBotService.start();   // Telegram bot (no-op if token missing)
 notificationPoller.startPolling();   // Permission prompt detection (depends on telegramBotService)
+budgetAlertPoller.startPolling();    // Budget threshold monitoring (depends on telegramBotService)
 
 httpServer.listen(PORT, HOST, () => {
   console.log(`[Warden] Server running at http://${HOST}:${PORT}`);
@@ -127,6 +131,7 @@ async function handleShutdown(signal: string): Promise<void> {
   sessionUsageReader.stopPeriodicScan();
   instanceTracker.stopPeriodicSync();
   notificationPoller.stopPolling();    // Stop polling before bot shutdown
+  budgetAlertPoller.stopPolling();     // Stop budget monitoring before bot shutdown
   await telegramBotService.stop();   // NEW — stop bot before closing HTTP server
 
   httpServer.close(() => {
