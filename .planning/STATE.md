@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-03-05)
 
 **Core value:** Real-time visibility into all active Claude Code agent sessions from a single browser tab
-**Current focus:** v3.4 Smart Session Lifecycle — Phase 40 in progress (Plan 01 complete)
+**Current focus:** v3.4 Smart Session Lifecycle — COMPLETE (all 5 phases, 20/20 requirements)
 
 ## Current Position
 
 Phase: 40 of 40 (Lifecycle History + E2E Verification)
-Plan: 1 of 2 complete
-Status: Phase 40 Plan 01 complete — lifecycle history UI shipped. Next: Phase 40 Plan 02 (E2E verification)
-Last activity: 2026-03-05 - Completed 40-01: LifecycleEventsView + Lifecycle tab + TD-4/TD-5 fixes
+Plan: 2 of 2 complete
+Status: Phase 40 COMPLETE — v3.4 milestone done. All E2E tests pass (31 passed, 1 skipped).
+Last activity: 2026-03-05 - Completed 40-02: lifecycle-history E2E spec + all test fixes
 
-Progress: [█████████░] 94% (9/10 plans)
+Progress: [██████████] 100% (10/10 plans)
 
 ## Performance Metrics
 
@@ -55,6 +55,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase 40-01]: Lifecycle tab placed second in HistoryView tabs array (after Sessions) — lifecycle events are most actionable v3.4 history data
 - [Phase 40-01]: Force-kill lifecycle insert placed inside existing try/catch — logging failure silently skips event log rather than returning 500
 - [Phase 40-01]: NaN guard pattern: rawVal !== undefined && !Number.isNaN(rawVal) ? rawVal : undefined — use for all parseInt query params
+- [Phase 40]: playwright.config.ts updated to use port 3001 (production server) — Vite dev server hits ENOSPC inotify limit on this host
+- [Phase 40]: Use .first() on all Playwright locators to handle mobile accordion DOM duplication
 
 ### Research Flags
 
@@ -82,9 +84,8 @@ None
 | 2044 | Code review of v3.3 milestone + 3 fresh milestone proposals (Analytics, Session Lifecycle, Quality Foundation) | 2026-03-05 | cb0fd37 | [2044-review-recent-commits-for-quality-edge-c](./quick/2044-review-recent-commits-for-quality-edge-c/) |
 | 2045 | Add Telegram topic ID inline label to AgentSidebar agent rows | 2026-03-05 | c9c7083 | [2045-add-telegram-topic-id-to-agent-sidebar-i](./quick/2045-add-telegram-topic-id-to-agent-sidebar-i/) |
 | 2046 | Review Phase 37 commits for edge cases and determine v3.4 milestone status | 2026-03-05 | 9702600 | [2046-review-phase-37-commits-for-edge-cases-a](./quick/2046-review-phase-37-commits-for-edge-cases-a/) |
-
 ## Session Continuity
 
 Last session: 2026-03-05
-Stopped at: Completed 40-01-PLAN.md — LifecycleEventsView component, Lifecycle tab in HistoryView, TD-4/TD-5 fixes
-Next step: Execute Phase 40 Plan 02 (E2E verification)
+Stopped at: Completed 40-02-PLAN.md — E2E verification spec, v3.4 milestone complete
+Next step: v3.4 DONE — ready for next milestone planning

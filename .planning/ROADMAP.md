@@ -111,7 +111,7 @@
 - [x] **Phase 37: Crash Detection Backend** - Detect crashed sessions, persist lifecycle events, send Telegram crash notifications (completed 2026-03-05)
 - [x] **Phase 38: Auto-Restart Engine** - Per-agent restart policy, automatic crash recovery, restart storm rate limiter (completed 2026-03-05)
 - [x] **Phase 39: Idle Timeout & Quick-Launch** - Auto-stop idle sessions and one-click session launch from dashboard (completed 2026-03-05)
-- [ ] **Phase 40: Lifecycle History & E2E Verification** - Lifecycle event history UI with filters and end-to-end verification
+- [x] **Phase 40: Lifecycle History & E2E Verification** - Lifecycle event history UI with filters and end-to-end verification (completed 2026-03-05)
 
 ## Phase Details
 
@@ -300,4 +300,4 @@ Phases execute in numeric order: 36 → 37 → 38 → 39 → 40
 | 37. Crash Detection Backend | 2/2 | Complete    | 2026-03-05 | - |
 | 38. Auto-Restart Engine | 2/2 | Complete    | 2026-03-05 | - |
 | 39. Idle Timeout & Quick-Launch | 2/2 | Complete    | 2026-03-05 | - |
-| 40. Lifecycle History & E2E Verification | 1/2 | In Progress|  | - |
+| 40. Lifecycle History & E2E Verification | 2/2 | Complete   | 2026-03-05 | - |
