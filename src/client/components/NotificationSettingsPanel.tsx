@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import type { NotificationConfig } from '@shared/types.js';
 
 interface NotificationConfigWithStatus extends NotificationConfig {
-  botConnected: boolean;
+  botConfigured: boolean;
 }
 
 export function NotificationSettingsPanel() {
@@ -65,11 +65,11 @@ export function NotificationSettingsPanel() {
       <div className="flex items-center gap-2">
         <div
           className={`w-2 h-2 rounded-full flex-shrink-0 ${
-            config.botConnected ? 'bg-green-500' : 'bg-red-500'
+            config.botConfigured ? 'bg-green-500' : 'bg-red-500'
           }`}
         />
         <span className="text-sm text-warden-text-dim">
-          {config.botConnected ? 'Bot connected' : 'Bot disconnected'}
+          {config.botConfigured ? 'Bot configured' : 'Bot not configured'}
         </span>
         {isSaving && (
           <span className="text-xs text-warden-text-dim ml-auto">Saving...</span>
