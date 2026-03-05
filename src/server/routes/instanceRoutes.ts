@@ -308,6 +308,19 @@ router.post('/api/instances/:id/force-kill', async (request, response) => {
       await tmuxSessionManager.destroySession(instance.tmuxSessionName);
     }
     instanceTracker.updateStatus(instanceId, 'stopped');
+    const uptimeSecs = (Date.now() - new Date(instance.createdAt).getTime()) / 1000;
+    const projectSlug = path.basename(instance.projectPath) || instance.agentId;
+    database.insertLifecycleEvent({
+      sessionId: instance.id,
+      agentId: instance.agentId,
+      sessionName: instance.tmuxSessionName,
+      eventType: 'stopped',
+      outcome: 'force-killed',
+      uptimeSecs,
+      projectSlug,
+      lastKnownState: instance.status,
+      stopReason: 'operator-stop',
+    });
     response.json({ success: true, instance: instanceTracker.findInstanceById(instanceId) });
   } catch (error) {
     console.error(`[API] Failed to force-kill instance ${instanceId}:`, error);
@@ -320,8 +333,10 @@ router.get('/api/lifecycle-events', (request, response) => {
   try {
     const agentId = typeof request.query.agentId === 'string' ? request.query.agentId : undefined;
     const eventType = typeof request.query.eventType === 'string' ? request.query.eventType : undefined;
-    const limit = typeof request.query.limit === 'string' ? parseInt(request.query.limit, 10) : undefined;
-    const offset = typeof request.query.offset === 'string' ? parseInt(request.query.offset, 10) : undefined;
+    const rawLimit = typeof request.query.limit === 'string' ? parseInt(request.query.limit, 10) : undefined;
+    const limit = rawLimit !== undefined && !Number.isNaN(rawLimit) ? rawLimit : undefined;
+    const rawOffset = typeof request.query.offset === 'string' ? parseInt(request.query.offset, 10) : undefined;
+    const offset = rawOffset !== undefined && !Number.isNaN(rawOffset) ? rawOffset : undefined;
 
     const result = database.getLifecycleEvents({ agentId, eventType, limit, offset });
     response.json(result);
