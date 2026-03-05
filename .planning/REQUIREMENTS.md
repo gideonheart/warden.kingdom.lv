@@ -37,8 +37,8 @@ Requirements for Telegram Operator Awareness milestone. Each maps to roadmap pha
 
 ### Notification Settings
 
-- [ ] **NSET-01**: Dashboard panel with toggles per notification type (permission prompts, budget alerts)
-- [ ] **NSET-02**: Configurable cooldown windows per notification type in settings panel
+- [x] **NSET-01**: Dashboard panel with toggles per notification type (permission prompts, budget alerts)
+- [x] **NSET-02**: Configurable cooldown windows per notification type in settings panel
 - [x] **NSET-03**: Notification preferences persisted in SQLite notification_config table
 
 ## Future Requirements
@@ -84,8 +84,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | APRV-05 | Phase 34 | Complete |
 | BUDG-01 | Phase 35 | Complete |
 | BUDG-02 | Phase 35 | Complete |
-| NSET-01 | Phase 35 | Pending |
-| NSET-02 | Phase 35 | Pending |
+| NSET-01 | Phase 35 | Complete |
+| NSET-02 | Phase 35 | Complete |
 | NSET-03 | Phase 35 | Complete |
 
 **Coverage:**

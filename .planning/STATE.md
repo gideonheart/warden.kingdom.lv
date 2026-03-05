@@ -10,19 +10,19 @@ See: .planning/PROJECT.md (updated 2026-03-04)
 ## Current Position
 
 Phase: 35 — Budget Alerts & Notification Settings
-Plan: 01 complete (1/2 plans — Phase 35 in progress)
-Status: Phase 35 plan 01 complete — BudgetAlertPoller, notification_config DB table, NotificationDeduplicator cooldown refactor; 90 tests pass; BUDG-01/02, NSET-03 covered
-Last activity: 2026-03-05 — 35-01-PLAN.md executed, BudgetAlertPoller service built, notification config persistence added
+Plan: 02 complete (2/2 plans — Phase 35 COMPLETE)
+Status: Phase 35 complete — notification settings UI, API routes, BudgetAlertPoller server wiring; NSET-01/02/03 covered
+Last activity: 2026-03-05 — 35-02-PLAN.md executed, NotificationSettingsPanel built, notificationRoutes wired, BudgetAlertPoller lifecycle connected
 
 ```
-Progress: [#] 1/2 plans (Phase 35 in progress — 35-01 complete)
-Milestone: v3.4 Budget Alerts & Notification Settings — IN PROGRESS
+Progress: [##] 2/2 plans (Phase 35 complete — v3.4 milestone done)
+Milestone: v3.4 Budget Alerts & Notification Settings — COMPLETE
 ```
 
 ## Performance Metrics
 
-**Completed milestones:** v1.0 (6 phases), v1.1 (2), v2.0 (3), v2.1 (3), v2.3 (4), v3.0 (2), v3.1 (6), v3.2 (4), v3.3 (4) = 35 phases shipped
-**Current milestone:** v3.4 Budget Alerts & Notification Settings — IN PROGRESS (Phase 35, plan 1/2 done)
+**Completed milestones:** v1.0 (6 phases), v1.1 (2), v2.0 (3), v2.1 (3), v2.3 (4), v3.0 (2), v3.1 (6), v3.2 (4), v3.3 (4), v3.4 (1) = 36 phases shipped
+**Current milestone:** v3.4 Budget Alerts & Notification Settings — COMPLETE (Phase 35, 2/2 done)
 
 ## Accumulated Context
 
@@ -61,6 +61,10 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase 35-01]: NotificationPoller reads permissionCooldownMs from database.getNotificationConfig() on each poll — no restart needed after config change
 - [Phase 35-01]: BudgetAlertPoller updates record BEFORE async sendBudgetAlert — prevents duplicate fire on re-entry during slow Telegram API calls
 - [Phase 35-01]: Budget level escalation uses rank map {ok:0, warning:1, exceeded:2} — clean O(1) comparison
+- [Phase 35-02]: GET /api/notifications/config spreads DB config and adds botConnected live — single endpoint gives UI everything it needs
+- [Phase 35-02]: PUT validates each field independently — clear per-field errors, partial patches are valid
+- [Phase 35-02]: pollAllSessions() reads config once per cycle, passes cooldownMs to pollSession() — reduces DB calls
+- [Phase 35-02]: onBlur for cooldown inputs prevents rapid PUT calls while typing; key={value} resets uncontrolled input on server data change
 
 ### Research Flags
 
@@ -87,6 +91,6 @@ None
 
 ## Session Continuity
 
-Last session: 2026-03-05 (Plan 35-01 execution)
-Stopped at: Completed 35-01-PLAN.md — BudgetAlertPoller built, notification_config DB table, NotificationDeduplicator cooldown refactor; 90 tests pass; BUDG-01/02/NSET-03 covered
-Next step: Execute 35-02-PLAN.md (notification settings UI + server wiring)
+Last session: 2026-03-05 (Plan 35-02 execution)
+Stopped at: Completed 35-02-PLAN.md — NotificationSettingsPanel built, notificationRoutes wired, BudgetAlertPoller lifecycle connected; 90 tests pass; NSET-01/02/03 covered; v3.4 complete
+Next step: Plan next milestone
