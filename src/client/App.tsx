@@ -47,7 +47,7 @@ function updateHash(view: AppView, session: string | null): void {
 
 export function App() {
   const { instances, isLoading, error, refetch } = useActiveInstances();
-  const { agents, topicMappings } = useAgentConfig();
+  const { agents, topicMappings, restartPolicies, updateRestartPolicy } = useAgentConfig();
   const { plugins, enabledState, enabledPlugins, togglePlugin } = usePluginRegistry();
   const [sidebarSelectedAgentId, setSidebarSelectedAgentId] = useState<string | null>(null);
   const [showSidebar, setShowSidebar] = useState(() => window.innerWidth >= 1024);
@@ -628,6 +628,8 @@ export function App() {
               onClose={() => setShowSidebar(false)}
               onStartAgent={handleStartAgent}
               activeAgentIds={activeAgentIds}
+              restartPolicies={restartPolicies}
+              onChangeRestartPolicy={updateRestartPolicy}
             />
             {currentView === 'terminals' && (
               <PromptPanel agents={agents} selectedAgentId={derivedAgentId} />
@@ -657,6 +659,8 @@ export function App() {
                 onClose={() => setShowSidebar(false)}
                 onStartAgent={handleStartAgent}
                 activeAgentIds={activeAgentIds}
+                restartPolicies={restartPolicies}
+                onChangeRestartPolicy={updateRestartPolicy}
               />
               {currentView === 'terminals' && (
                 <PromptPanel agents={agents} selectedAgentId={derivedAgentId} />

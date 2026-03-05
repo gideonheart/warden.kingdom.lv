@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import type { AgentDetails, TopicMapping } from '../../shared/openclawTypes.js';
+import type { RestartPolicy, CrashRestartMode } from '../../shared/types.js';
 
 interface AgentSidebarProps {
   agents: AgentDetails[];
@@ -9,6 +10,8 @@ interface AgentSidebarProps {
   onClose?: () => void;
   onStartAgent?: (agentId: string) => void;
   activeAgentIds?: Set<string>;
+  restartPolicies?: RestartPolicy[];
+  onChangeRestartPolicy?: (agentId: string, mode: CrashRestartMode) => void;
 }
 
 function formatBytes(bytes: number | null | undefined): string {
@@ -84,6 +87,55 @@ function StartButton({
   );
 }
 
+function RestartPolicyDropdown({
+  agentId,
+  currentMode,
+  stormDisabledAt,
+  onChangeMode,
+}: {
+  agentId: string;
+  currentMode: CrashRestartMode;
+  stormDisabledAt: string | null;
+  onChangeMode: (agentId: string, mode: CrashRestartMode) => void;
+}) {
+  const handleChange = useCallback(
+    (event: React.ChangeEvent<HTMLSelectElement>) => {
+      event.stopPropagation();
+      onChangeMode(agentId, event.target.value as CrashRestartMode);
+    },
+    [agentId, onChangeMode],
+  );
+
+  const stormTooltip = stormDisabledAt
+    ? `Auto-restart disabled by storm limiter at ${stormDisabledAt}. Select a mode to re-enable.`
+    : undefined;
+
+  return (
+    <div
+      className="flex items-center gap-1 px-2 py-1"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <span className="text-xs text-warden-text-dim flex-shrink-0">Restart:</span>
+      {stormDisabledAt && (
+        <span
+          className="w-2 h-2 rounded-full bg-amber-500 flex-shrink-0 animate-pulse"
+          title={stormTooltip}
+        />
+      )}
+      <select
+        value={currentMode}
+        onChange={handleChange}
+        className="text-xs bg-warden-bg border border-warden-border rounded px-1 py-0.5 text-warden-text-dim hover:text-warden-text focus:outline-none focus:border-warden-accent transition-colors cursor-pointer"
+        title={stormTooltip ?? `Crash restart policy for ${agentId}`}
+      >
+        <option value="none">none</option>
+        <option value="once">once</option>
+        <option value="always">always</option>
+      </select>
+    </div>
+  );
+}
+
 export function AgentSidebar({
   agents,
   topicMappings,
@@ -92,6 +144,8 @@ export function AgentSidebar({
   onClose,
   onStartAgent,
   activeAgentIds,
+  restartPolicies,
+  onChangeRestartPolicy,
 }: AgentSidebarProps) {
   const selectedAgent = agents.find((a) => a.id === selectedAgentId);
   const agentTopics = topicMappings.filter((t) => t.agentId === selectedAgentId);
@@ -114,35 +168,46 @@ export function AgentSidebar({
       <div className="flex flex-col gap-1 p-2">
         {agents.map((agent) => {
           const agentTopic = topicMappings.find((t) => t.agentId === agent.id);
+          const agentPolicy = restartPolicies?.find((p) => p.agentId === agent.id);
           return (
           <div
             key={agent.id}
-            className={`flex items-center gap-2 px-2 py-1.5 min-h-[44px] rounded text-sm transition-colors ${
+            className={`flex flex-col rounded text-sm transition-colors ${
               agent.id === selectedAgentId
                 ? 'bg-warden-accent/20 text-warden-accent'
                 : 'text-warden-text-dim hover:bg-warden-border/50 hover:text-warden-text'
             }`}
           >
-            <button
-              onClick={() => onSelectAgent(agent.id)}
-              className="flex items-center gap-2 flex-1 text-left min-w-0"
-            >
-              <div className="w-2 h-2 rounded-full bg-warden-success flex-shrink-0" />
-              <span className="font-medium truncate">{agent.name}</span>
-              {agent.isDefault && (
-                <span className="text-xs opacity-50 flex-shrink-0">default</span>
+            <div className="flex items-center gap-2 px-2 py-1.5 min-h-[44px]">
+              <button
+                onClick={() => onSelectAgent(agent.id)}
+                className="flex items-center gap-2 flex-1 text-left min-w-0"
+              >
+                <div className="w-2 h-2 rounded-full bg-warden-success flex-shrink-0" />
+                <span className="font-medium truncate">{agent.name}</span>
+                {agent.isDefault && (
+                  <span className="text-xs opacity-50 flex-shrink-0">default</span>
+                )}
+                {agentTopic && (
+                  <span className="text-xs text-warden-text-dim/50 flex-shrink-0 font-mono">
+                    #{agentTopic.topicId}
+                  </span>
+                )}
+              </button>
+              {onStartAgent && (
+                <StartButton
+                  agentId={agent.id}
+                  isActive={activeAgentIds?.has(agent.id) ?? false}
+                  onStartAgent={onStartAgent}
+                />
               )}
-              {agentTopic && (
-                <span className="text-xs text-warden-text-dim/50 flex-shrink-0 font-mono">
-                  #{agentTopic.topicId}
-                </span>
-              )}
-            </button>
-            {onStartAgent && (
-              <StartButton
+            </div>
+            {onChangeRestartPolicy && (
+              <RestartPolicyDropdown
                 agentId={agent.id}
-                isActive={activeAgentIds?.has(agent.id) ?? false}
-                onStartAgent={onStartAgent}
+                currentMode={agentPolicy?.crashRestartMode ?? 'none'}
+                stormDisabledAt={agentPolicy?.stormDisabledAt ?? null}
+                onChangeMode={onChangeRestartPolicy}
               />
             )}
           </div>

@@ -1,11 +1,13 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import type { AgentDetails, TopicMapping } from '../../shared/openclawTypes.js';
+import type { RestartPolicy, CrashRestartMode } from '../../shared/types.js';
 
 const REFRESH_INTERVAL_MS = 30_000;
 
 export function useAgentConfig() {
   const [agents, setAgents] = useState<AgentDetails[]>([]);
   const [topicMappings, setTopicMappings] = useState<TopicMapping[]>([]);
+  const [restartPolicies, setRestartPolicies] = useState<RestartPolicy[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -15,12 +17,14 @@ export function useAgentConfig() {
   // and cause a visible blink on the xterm.js canvas.
   const previousAgentsRef = useRef<string>('');
   const previousTopicsRef = useRef<string>('');
+  const previousPoliciesRef = useRef<string>('');
 
   const fetchConfig = useCallback(async () => {
     try {
-      const [agentsResponse, topicsResponse] = await Promise.all([
+      const [agentsResponse, topicsResponse, policiesResponse] = await Promise.all([
         fetch('/api/agents'),
         fetch('/api/agents/topics'),
+        fetch('/api/restart-policies'),
       ]);
 
       if (agentsResponse.ok) {
@@ -41,6 +45,15 @@ export function useAgentConfig() {
         }
       }
 
+      if (policiesResponse.ok) {
+        const policiesData = await policiesResponse.json();
+        const serialized = JSON.stringify(policiesData.policies);
+        if (serialized !== previousPoliciesRef.current) {
+          previousPoliciesRef.current = serialized;
+          setRestartPolicies(policiesData.policies);
+        }
+      }
+
       setError(null);
     } catch (fetchError) {
       const message = fetchError instanceof Error ? fetchError.message : 'Failed to fetch agent config';
@@ -50,11 +63,28 @@ export function useAgentConfig() {
     }
   }, []);
 
+  const updateRestartPolicy = useCallback(async (agentId: string, mode: CrashRestartMode) => {
+    try {
+      const response = await fetch(`/api/restart-policies/${encodeURIComponent(agentId)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ crashRestartMode: mode }),
+      });
+      if (!response.ok) {
+        console.error(`[useAgentConfig] Failed to update restart policy for ${agentId}: ${response.statusText}`);
+        return;
+      }
+      await fetchConfig();
+    } catch (updateError) {
+      console.error(`[useAgentConfig] Error updating restart policy for ${agentId}:`, updateError);
+    }
+  }, [fetchConfig]);
+
   useEffect(() => {
     fetchConfig();
     const interval = setInterval(fetchConfig, REFRESH_INTERVAL_MS);
     return () => clearInterval(interval);
   }, [fetchConfig]);
 
-  return { agents, topicMappings, isLoading, error, refetch: fetchConfig };
+  return { agents, topicMappings, restartPolicies, isLoading, error, refetch: fetchConfig, updateRestartPolicy };
 }
