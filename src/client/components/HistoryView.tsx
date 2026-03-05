@@ -4,9 +4,10 @@ import { SessionHistory } from './SessionHistory.js';
 import { TokenUsageView } from './TokenUsageView.js';
 import { LogViewer } from './LogViewer.js';
 import { NotificationSettingsPanel } from './NotificationSettingsPanel.js';
+import { LifecycleEventsView } from './LifecycleEventsView.js';
 import type { RecordingEntry } from '@shared/types.js';
 
-type HistoryTab = 'sessions' | 'tokens' | 'logs' | 'notifications';
+type HistoryTab = 'sessions' | 'tokens' | 'logs' | 'notifications' | 'lifecycle';
 
 function MobileAccordionSection({ title, defaultOpen, children }: {
   title: string;
@@ -36,6 +37,7 @@ export function HistoryView({ onNavigateToSession, onPlayRecording }: HistoryVie
 
   const tabs: { id: HistoryTab; label: string }[] = [
     { id: 'sessions', label: 'Sessions' },
+    { id: 'lifecycle', label: 'Lifecycle' },
     { id: 'tokens', label: 'Token Usage' },
     { id: 'logs', label: 'Gateway Logs' },
     { id: 'notifications', label: 'Notifications' },
@@ -67,6 +69,7 @@ export function HistoryView({ onNavigateToSession, onPlayRecording }: HistoryVie
 
         <div className="flex-1 min-h-0 overflow-y-auto">
           {activeTab === 'sessions' && <SessionHistory onNavigateToSession={onNavigateToSession} onPlayRecording={onPlayRecording} />}
+          {activeTab === 'lifecycle' && <LifecycleEventsView />}
           {activeTab === 'tokens' && <TokenUsageView />}
           {activeTab === 'logs' && <LogViewer />}
           {activeTab === 'notifications' && <NotificationSettingsPanel />}
@@ -77,6 +80,9 @@ export function HistoryView({ onNavigateToSession, onPlayRecording }: HistoryVie
       <div className="sm:hidden flex flex-col h-full overflow-y-auto">
         <MobileAccordionSection title="Sessions" defaultOpen>
           <SessionHistory onNavigateToSession={onNavigateToSession} onPlayRecording={onPlayRecording} />
+        </MobileAccordionSection>
+        <MobileAccordionSection title="Lifecycle">
+          <LifecycleEventsView />
         </MobileAccordionSection>
         <MobileAccordionSection title="Token Usage">
           <TokenUsageView />

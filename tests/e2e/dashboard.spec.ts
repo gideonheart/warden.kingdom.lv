@@ -35,8 +35,8 @@ test.describe('View Navigation', () => {
   test('switches to history view', async ({ page }) => {
     await page.goto('/');
     await page.getByRole('button', { name: 'History' }).click();
-    await expect(page.getByRole('button', { name: 'Activity' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Sessions' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Lifecycle' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Token Usage' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Gateway Logs' })).toBeVisible();
   });
