@@ -12,6 +12,7 @@ import { gsdRoutes } from './routes/gsdRoutes.js';
 import { recordingRoutes } from './routes/recordingRoutes.js';
 import { notificationRoutes } from './routes/notificationRoutes.js';
 import { terminalStreamService } from './services/TerminalStreamService.js';
+import { tmuxSessionManager } from './services/TmuxSessionManager.js';
 import { instanceTracker } from './services/InstanceTracker.js';
 import { autoRestartService } from './services/AutoRestartService.js';
 import { sessionUsageReader } from './services/SessionUsageReader.js';
@@ -98,6 +99,20 @@ if (CLIENT_DIST_PATH) {
 
 terminalStreamService.setSocketServer(socketServer);
 terminalStreamService.setupSocketNamespace(socketServer);
+
+// Load openclaw agent IDs and register them as known tmux session prefixes.
+// This ensures that sessions started via the Warden UI for agents like 'g2-gateway',
+// 'g2-frontend', 'k1-rust', etc. are discovered by InstanceTracker even though those
+// IDs were not in the original static KNOWN_AGENT_PREFIXES list.
+openClawConfigReader.getAgents()
+  .then((agents) => {
+    const agentIds = agents.map((a) => a.id);
+    tmuxSessionManager.registerAgentPrefixes(agentIds);
+    console.log(`[Warden] Registered ${agentIds.length} openclaw agent prefixes: ${agentIds.join(', ')}`);
+  })
+  .catch((error) => {
+    console.warn('[Warden] Could not load openclaw agents for prefix registration:', error);
+  });
 
 instanceTracker.startPeriodicSync();
 

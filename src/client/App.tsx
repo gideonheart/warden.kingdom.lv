@@ -429,6 +429,23 @@ export function App() {
     [refetch],
   );
 
+  // Dismiss (x button): permanently delete the stopped/error instance record from DB.
+  // This is a hard delete — the tab will not reappear after polling or page refresh.
+  const handleDismissInstance = useCallback(
+    async (instanceId: number) => {
+      try {
+        const response = await fetch(`/api/instances/${instanceId}`, { method: 'DELETE' });
+        if (!response.ok) {
+          console.error(`Dismiss failed: ${response.statusText}`);
+        }
+        refetch();
+      } catch (error) {
+        console.error('Error dismissing instance:', error);
+      }
+    },
+    [refetch],
+  );
+
   // Stable callback for restarting the currently selected instance.
   // Extracted from an inline arrow function so TerminalView receives a stable
   // prop reference across polling re-renders — allows React.memo to bail out.
@@ -625,6 +642,7 @@ export function App() {
           sessionStatusMap={sessionStatusMap}
           onRestart={handleRestartInstance}
           onForceKill={handleForceKillInstance}
+          onDismiss={handleDismissInstance}
         />
       )}
 

@@ -5,9 +5,38 @@ import type { TmuxSessionInfo } from '../../shared/types.js';
 
 const execFileAsync = promisify(execFile);
 
-const KNOWN_AGENT_PREFIXES = ['agent', 'gideon', 'warden', 'scout', 'builder', 'forge'];
+// Static baseline prefixes — always recognised regardless of openclaw config.
+// Dynamic prefixes (openclaw agent IDs) are registered at startup via registerAgentPrefixes().
+const STATIC_AGENT_PREFIXES = ['agent', 'gideon', 'warden', 'scout', 'builder', 'forge'];
 
 export class TmuxSessionManager {
+  // Mutable set of known agent ID prefixes. Starts with the static list and grows
+  // when the server loads openclaw config at startup (to include ids like 'g2-gateway',
+  // 'k1-rust', etc. that are not in the static list).
+  private knownAgentPrefixes: string[] = [...STATIC_AGENT_PREFIXES];
+
+  // Sorted list of known openclaw agent IDs, longest first.
+  // Used by extractAgentIdFromSessionName to match against the longest known agent ID prefix
+  // when parsing 'agent_' prefix session names (e.g. 'agent_g2-gateway_session_name' → 'g2-gateway').
+  private knownAgentIds: string[] = [];
+
+  /**
+   * Called at server startup after loading openclaw config.
+   * Registers all configured agent IDs so that sessions created for those agents
+   * are discovered by listAgentSessions().
+   */
+  registerAgentPrefixes(agentIds: string[]): void {
+    for (const agentId of agentIds) {
+      if (!this.knownAgentPrefixes.includes(agentId)) {
+        this.knownAgentPrefixes.push(agentId);
+      }
+    }
+    // Store sorted (longest first) for longest-match extraction
+    this.knownAgentIds = [...new Set([...this.knownAgentIds, ...agentIds])].sort(
+      (a, b) => b.length - a.length,
+    );
+  }
+
   async listAgentSessions(): Promise<TmuxSessionInfo[]> {
     const rawOutput = await this.executeTmuxCommand('list-sessions', [
       '-F',
@@ -85,12 +114,64 @@ export class TmuxSessionManager {
     await this.executeTmuxCommand('send-keys', ['-t', `${sessionName}:0.0`, 'Enter']);
   }
 
+  /**
+   * Extract the openclaw agent ID from a tmux session name.
+   *
+   * Two naming conventions are supported:
+   *
+   * 1. Legacy 'agent_' prefix: 'agent_{agentId}_{rest}'
+   *    Examples: 'agent_g2-gateway_session_name' → 'g2-gateway'
+   *              'agent_warden-kingdom_session_name' → 'warden'
+   *    Strategy: try longest-match against known openclaw agent IDs first;
+   *    fall back to splitting on the first underscore after 'agent_'.
+   *
+   * 2. Standard format: '{agentId}-{projectSlug}-{shortId}'
+   *    Examples: 'warden-dashboard-abc1' → 'warden'
+   *              'g2-gateway-workspace-ab12' → 'g2-gateway' (if registered)
+   *              'k1-rust-myproject-cd34' → 'k1-rust' (if registered)
+   *    Strategy: try longest-match against known openclaw agent IDs first;
+   *    fall back to the first dash-separated segment.
+   */
   extractAgentIdFromSessionName(sessionName: string): string {
-    // agent_warden-kingdom_session_name → warden
-    // warden-dashboard-uuid → warden
     if (sessionName.startsWith('agent_')) {
-      return sessionName.slice('agent_'.length).split('-')[0];
+      const afterPrefix = sessionName.slice('agent_'.length);
+
+      // Try to match the longest known agent ID against the start of afterPrefix.
+      // afterPrefix format: '{agentId}_{rest}' or '{agentId}-{rest}'
+      for (const knownId of this.knownAgentIds) {
+        if (
+          afterPrefix === knownId ||
+          afterPrefix.startsWith(`${knownId}_`) ||
+          afterPrefix.startsWith(`${knownId}-`)
+        ) {
+          return knownId;
+        }
+      }
+
+      // Fall back: use first underscore as delimiter between agentId and rest.
+      // e.g. 'g2-gateway_session_name' → 'g2-gateway'
+      const underscoreIndex = afterPrefix.indexOf('_');
+      if (underscoreIndex > 0) {
+        return afterPrefix.slice(0, underscoreIndex);
+      }
+
+      // Last resort: first dash segment (original behaviour)
+      return afterPrefix.split('-')[0];
     }
+
+    // Standard format: '{agentId}-{projectSlug}-{shortId}'
+    // Try longest-match against known agent IDs first so multi-segment IDs
+    // like 'g2-gateway' and 'k1-rust' are extracted correctly.
+    for (const knownId of this.knownAgentIds) {
+      if (
+        sessionName === knownId ||
+        sessionName.startsWith(`${knownId}-`)
+      ) {
+        return knownId;
+      }
+    }
+
+    // Fall back: first dash-separated segment (handles simple IDs like 'warden', 'forge')
     return sessionName.split('-')[0];
   }
 
@@ -100,7 +181,7 @@ export class TmuxSessionManager {
   }
 
   private isAgentManagedSession(sessionName: string): boolean {
-    return KNOWN_AGENT_PREFIXES.some(prefix =>
+    return this.knownAgentPrefixes.some(prefix =>
       sessionName.startsWith(`${prefix}-`) || sessionName.startsWith(`${prefix}_`)
     );
   }

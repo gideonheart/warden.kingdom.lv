@@ -11,6 +11,7 @@ interface InstanceTabBarProps {
   sessionStatusMap?: Map<string, AgentLiveStatus>;
   onRestart?: (instanceId: number) => void;
   onForceKill?: (instanceId: number) => void;
+  onDismiss?: (instanceId: number) => void;
 }
 
 /** Returns human-readable label for a lifecycle status. */
@@ -34,13 +35,12 @@ export function InstanceTabBar({
   sessionStatusMap,
   onRestart,
   onForceKill,
+  onDismiss,
 }: InstanceTabBarProps) {
   // Track which session has a pending stop confirmation dialog
   const [confirmingStopSession, setConfirmingStopSession] = useState<string | null>(null);
   // Track which session has a pending restart confirmation dialog
   const [confirmingRestartSession, setConfirmingRestartSession] = useState<string | null>(null);
-  // Track locally dismissed tabs (stopped/error sessions that operator dismissed)
-  const [dismissedSessions, setDismissedSessions] = useState<Set<string>>(new Set());
 
   const handleStopRequest = (instance: AgentInstance) => {
     setConfirmingStopSession(instance.tmuxSessionName);
@@ -68,14 +68,7 @@ export function InstanceTabBar({
     onRestart?.(instance.id);
   };
 
-  const handleDismiss = (sessionName: string) => {
-    setDismissedSessions((prev) => new Set([...prev, sessionName]));
-  };
-
-  // Filter out locally dismissed sessions
-  const visibleInstances = instances.filter(
-    (instance) => !dismissedSessions.has(instance.tmuxSessionName),
-  );
+  const visibleInstances = instances;
 
   if (visibleInstances.length === 0) {
     return (
@@ -86,7 +79,7 @@ export function InstanceTabBar({
   }
 
   return (
-    <div className="flex items-center gap-1 px-2 py-1.5 bg-warden-panel border-b border-warden-border overflow-x-auto touch-scroll tab-snap">
+    <div className="flex items-center gap-1 px-2 py-1.5 bg-warden-panel border-b border-warden-border overflow-x-auto touch-scroll">
       {visibleInstances.map((instance) => {
         const isSelected = instance.tmuxSessionName === selectedSessionName;
         const statusColor = STATUS_COLORS[instance.status] ?? 'bg-warden-idle';
@@ -121,7 +114,7 @@ export function InstanceTabBar({
             >
               <div className={`w-2 h-2 rounded-full flex-shrink-0 ${statusColor}`} title={statusLabel(instance.status)} />
               <span className="font-medium">{displayName}</span>
-              <span className="text-xs opacity-60 font-mono">{instance.tmuxSessionName.split('-').slice(1).join('-')}</span>
+              <span className="text-xs opacity-60 font-mono hidden sm:inline">{instance.tmuxSessionName.split('-').slice(1).join('-')}</span>
               {instance.projectPath && (
                 <span className="text-xs opacity-40 font-mono hidden lg:inline" title={instance.projectPath}>
                   {instance.projectPath.split('/').pop()}
@@ -217,9 +210,9 @@ export function InstanceTabBar({
                   )}
 
                   {/* Dismiss button for stopped/error tabs */}
-                  {(instance.status === 'stopped' || instance.status === 'error') && (
+                  {(instance.status === 'stopped' || instance.status === 'error') && onDismiss && (
                     <button
-                      onClick={(e) => { e.stopPropagation(); handleDismiss(instance.tmuxSessionName); }}
+                      onClick={(e) => { e.stopPropagation(); onDismiss(instance.id); }}
                       className="px-1 py-0.5 text-xs text-warden-text-dim/50 hover:text-warden-text-dim rounded hover:bg-warden-border/30 transition-colors"
                       title="Dismiss tab"
                       aria-label="Dismiss stopped session tab"

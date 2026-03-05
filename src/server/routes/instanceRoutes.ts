@@ -328,6 +328,39 @@ router.post('/api/instances/:id/force-kill', async (request, response) => {
   }
 });
 
+// DELETE /api/instances/:id — permanently remove a stopped or error instance record.
+// Only callable on sessions already in 'stopped' or 'error' state (active sessions cannot be deleted).
+// Used by the UI dismiss (X) button to clean up the database entry so the tab does not reappear.
+router.delete('/api/instances/:id', (request, response) => {
+  const instanceId = parseInt(request.params.id, 10);
+  if (Number.isNaN(instanceId)) {
+    response.status(400).json({ error: 'Invalid instance id' });
+    return;
+  }
+
+  const instance = instanceTracker.findInstanceById(instanceId);
+  if (!instance) {
+    response.status(404).json({ error: 'Instance not found' });
+    return;
+  }
+
+  if (instance.status !== 'stopped' && instance.status !== 'error') {
+    response.status(409).json({
+      error: 'Only stopped or error instances can be dismissed',
+      currentStatus: instance.status,
+    });
+    return;
+  }
+
+  const deleted = database.deleteInstance(instanceId);
+  if (!deleted) {
+    response.status(409).json({ error: 'Could not delete instance — status may have changed' });
+    return;
+  }
+
+  response.json({ success: true });
+});
+
 // GET /api/lifecycle-events — query session lifecycle events (crashes, stops, starts)
 router.get('/api/lifecycle-events', (request, response) => {
   try {

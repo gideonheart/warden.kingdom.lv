@@ -92,6 +92,18 @@ class DatabaseConnection {
     ).run(status, id);
   }
 
+  /**
+   * Permanently delete a stopped or error instance record.
+   * Only allowed for 'stopped' or 'error' status — active sessions must not be deleted.
+   * Returns true if a row was deleted, false if not found or wrong status.
+   */
+  deleteInstance(id: number): boolean {
+    const result = this.db.prepare(
+      "DELETE FROM instances WHERE id = ? AND status IN ('stopped', 'error')"
+    ).run(id);
+    return result.changes > 0;
+  }
+
   upsertInstance(params: AgentInstanceCreateParams): AgentInstance {
     const existing = this.findInstanceBySessionName(params.tmuxSessionName);
     if (existing) {
