@@ -16,8 +16,6 @@ import { useActiveInstances } from './hooks/useActiveInstances.js';
 import { useAgentConfig } from './hooks/useAgentConfig.js';
 import { usePluginRegistry } from './hooks/usePluginRegistry.js';
 import { useSessionSelection } from './hooks/useSessionSelection.js';
-import { useAgentLiveStatus } from './hooks/useAgentLiveStatus.js';
-import type { AgentLiveStatus } from './hooks/useAgentLiveStatus.js';
 import { useGlobalHotkeys } from './hooks/useGlobalHotkeys.js';
 import { useBrowserNotifications } from './hooks/useBrowserNotifications.js';
 import { useBudgetAlerts } from './hooks/useBudgetAlerts.js';
@@ -108,9 +106,7 @@ export function App() {
   const [currentView, setCurrentView] = useState<AppView>(() => parseHash().view);
 
   // Memoize activeInstances so the array reference is stable when instances data is
-  // unchanged. Without this, Array.filter() creates a new reference on every App render
-  // (e.g., when liveStatus data changes), which invalidates the sessionStatusMap useMemo
-  // and causes unnecessary TerminalView re-renders every ~5s.
+  // unchanged. Without this, Array.filter() creates a new reference on every App render.
   // Include all lifecycle states so transitional (starting/stopping) and stopped sessions
   // remain visible in the tab bar with appropriate visual treatment.
   const activeInstances = useMemo(
@@ -141,46 +137,7 @@ export function App() {
     return ids;
   }, [instances]);
 
-  // Live status polling — disabled while on the terminals view to prevent any
-  // background state updates from cascading into xterm.js re-renders. AgentsTab
-  // has its own useAgentLiveStatus() call, so the GSD page still gets live data.
   const isTerminalsView = currentView === 'terminals';
-  const liveStatus = useAgentLiveStatus(!isTerminalsView);
-
-  // Separate live status poll kept always-on exclusively for browser notifications.
-  // The main liveStatus above is disabled on the terminals view to protect xterm.js
-  // from re-renders. useBrowserNotifications needs live state even on the terminals
-  // view (that is where the toggle button lives), so it gets its own independent poll.
-  // This reference is passed only to useBrowserNotifications — NOT into sessionStatusMap
-  // used for rendering — so it cannot cascade into TerminalView re-renders.
-  const notificationLiveStatus = useAgentLiveStatus(true);
-
-  // Bridge agentId → tmuxSessionName so live status can be looked up by session name.
-  // Used for UI rendering (InstanceTabBar etc.) — disabled on terminals view.
-  const sessionStatusMap = useMemo(() => {
-    const map = new Map<string, AgentLiveStatus>();
-    for (const instance of activeInstances) {
-      const status = liveStatus.get(instance.agentId);
-      if (status) {
-        map.set(instance.tmuxSessionName, status);
-      }
-    }
-    return map;
-  }, [liveStatus, activeInstances]);
-
-  // Always-on session status map exclusively for browser notifications.
-  // Built from notificationLiveStatus which polls regardless of active view,
-  // so useBrowserNotifications receives data even while on the terminals view.
-  const notificationSessionStatusMap = useMemo(() => {
-    const map = new Map<string, AgentLiveStatus>();
-    for (const instance of activeInstances) {
-      const status = notificationLiveStatus.get(instance.agentId);
-      if (status) {
-        map.set(instance.tmuxSessionName, status);
-      }
-    }
-    return map;
-  }, [notificationLiveStatus, activeInstances]);
 
   // Focus callback ref — Plan 02 keyboard shortcuts will call this to return focus to terminal.
   const terminalFocusRef = useRef<(() => void) | null>(null);
@@ -205,30 +162,6 @@ export function App() {
     isLoading,
     initialSessionName: parseHash().session,
   });
-
-  // Stabilize the AgentLiveStatus object for the selected session by value — not by
-  // reference. sessionStatusMap.get() returns a NEW object on every poll cycle even when
-  // state/contextPressure/contextPressureLevel values are identical, because useMemo
-  // rebuilds the Map whenever liveStatus reference changes. Without this stabilization,
-  // TerminalView re-renders every 5s (whenever the agent's tmux pane output changes),
-  // causing avoidable reconciliation work and potential layout disruption to xterm.js.
-  const selectedSessionLiveStatusRef = useRef<AgentLiveStatus | null>(null);
-  const selectedSessionLiveStatus = useMemo(() => {
-    const next = sessionStatusMap.get(selectedSessionName ?? '') ?? null;
-    const prev = selectedSessionLiveStatusRef.current;
-    // Return the previous reference when all three fields are value-equal.
-    if (
-      prev !== null &&
-      next !== null &&
-      prev.state === next.state &&
-      prev.contextPressure === next.contextPressure &&
-      prev.contextPressureLevel === next.contextPressureLevel
-    ) {
-      return prev;
-    }
-    selectedSessionLiveStatusRef.current = next;
-    return next;
-  }, [sessionStatusMap, selectedSessionName]);
 
   // Auto-select first agent in sidebar when agents load (useEffect guard — not render body)
   useEffect(() => {
@@ -312,21 +245,13 @@ export function App() {
     onOpenSearch: handleOpenSearch,
   });
 
-  // Budget alert level — two separate instances:
-  // 1. Always-on: feeds browser notifications so alerts fire from any view.
-  // 2. View-gated: feeds the History nav badge (disabled on terminals view to
-  //    avoid background re-renders that could disturb xterm.js).
-  const budgetAlertLevelForNotifications = useBudgetAlerts(true);
+  // Budget alert level — disabled on terminals view to avoid background re-renders.
   const budgetAlertLevel = useBudgetAlerts(!isTerminalsView);
 
-  // Browser notification opt-in — fires when agent enters permission_prompt state
-  // or when budget thresholds are crossed, even while the browser tab is unfocused.
-  // Uses notificationSessionStatusMap (always-on poll) rather than sessionStatusMap
-  // (disabled on terminals view) so notifications can fire from the terminals view.
+  // Browser notification opt-in — fires when budget thresholds are crossed.
+  // Permission prompt notifications are handled server-side by NotificationPoller (Telegram).
   const { notificationsEnabled, toggleNotifications, notificationPermission } = useBrowserNotifications({
-    sessionStatusMap: notificationSessionStatusMap,
-    budgetAlertLevel: budgetAlertLevelForNotifications,
-    onSelectSession: handleSelectSession,
+    budgetAlertLevel,
   });
 
   const [isQuickLaunchOpen, setIsQuickLaunchOpen] = useState(false);
@@ -644,7 +569,6 @@ export function App() {
           selectedSessionName={selectedSessionName}
           onSelectSession={handleSelectSession}
           onSessionStopped={handleSessionStopped}
-          sessionStatusMap={sessionStatusMap}
           onRestart={handleRestartInstance}
           onForceKill={handleForceKillInstance}
           onDismiss={handleDismissInstance}
@@ -667,7 +591,6 @@ export function App() {
                   <TerminalView
                     tmuxSessionName={selectedSessionName}
                     onSessionExit={handleSessionExit}
-                    agentLiveStatus={selectedSessionLiveStatus}
                     terminalFocusRef={terminalFocusRef}
                     searchOpenRef={searchOpenRef}
                     notificationsEnabled={notificationsEnabled}

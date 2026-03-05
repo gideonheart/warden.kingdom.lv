@@ -1,14 +1,12 @@
 import { useState } from 'react';
 import type { AgentInstance } from '../../shared/types.js';
 import { STATUS_COLORS } from './gsdShared.js';
-import type { AgentLiveStatus } from '../hooks/useAgentLiveStatus.js';
 
 interface InstanceTabBarProps {
   instances: AgentInstance[];
   selectedSessionName: string | null;
   onSelectSession: (sessionName: string) => void;
   onSessionStopped?: (sessionName: string) => void;
-  sessionStatusMap?: Map<string, AgentLiveStatus>;
   onRestart?: (instanceId: number) => void;
   onForceKill?: (instanceId: number) => void;
   onDismiss?: (instanceId: number) => void;
@@ -32,7 +30,6 @@ export function InstanceTabBar({
   selectedSessionName,
   onSelectSession,
   onSessionStopped,
-  sessionStatusMap,
   onRestart,
   onForceKill,
   onDismiss,
@@ -83,8 +80,6 @@ export function InstanceTabBar({
       {visibleInstances.map((instance) => {
         const isSelected = instance.tmuxSessionName === selectedSessionName;
         const statusColor = STATUS_COLORS[instance.status] ?? 'bg-warden-idle';
-        const agentStatus = sessionStatusMap?.get(instance.tmuxSessionName);
-        const hasPermissionBadge = agentStatus?.state === 'permission_prompt';
         const isConfirmingStop = confirmingStopSession === instance.tmuxSessionName;
         const isConfirmingRestart = confirmingRestartSession === instance.tmuxSessionName;
         const displayName = instance.agentName || instance.agentId;
@@ -98,15 +93,6 @@ export function InstanceTabBar({
                 : 'text-warden-text-dim hover:bg-warden-border/50 hover:text-warden-text border border-transparent'
             }`}
           >
-            {/* Permission prompt badge */}
-            {hasPermissionBadge && (
-              <span
-                className="absolute top-1 right-1 w-2 h-2 rounded-full bg-warden-warning animate-pulse"
-                aria-label="Waiting for permission"
-                title="Waiting for permission input"
-              />
-            )}
-
             {/* Session select button */}
             <button
               onClick={() => onSelectSession(instance.tmuxSessionName)}

@@ -5,18 +5,14 @@ import { WebLinksAddon } from '@xterm/addon-web-links';
 import { SearchAddon } from 'xterm-addon-search';
 import { useTerminalSocket } from '../hooks/useTerminalSocket.js';
 import { useRecordingState } from '../hooks/useRecordingState.js';
-import type { AgentLiveStatus } from '../hooks/useAgentLiveStatus.js';
-import type { PressureLevel } from '@shared/gsdTypes.js';
 import type { AgentInstanceStatus } from '@shared/types.js';
 import type { AgentContextFill } from '@shared/openclawTypes.js';
-import { StateBadge, PRESSURE_COLORS } from './gsdShared.js';
 import { TerminalSearchOverlay } from './TerminalSearchOverlay.js';
 import 'xterm/css/xterm.css';
 
 interface TerminalViewProps {
   tmuxSessionName: string;
   onSessionExit: (sessionName: string, exitCode: number) => void;
-  agentLiveStatus?: AgentLiveStatus | null;
   terminalFocusRef?: React.MutableRefObject<(() => void) | null>;
   /** Ref for external callers (e.g. App.tsx Ctrl+F handler) to open the search overlay.
    *  TerminalView registers a callback on mount and clears it on unmount. */
@@ -69,15 +65,6 @@ function getStoredFontSize(): string {
 
 function getResponsiveFontSize(): number {
   return FONT_SIZES[getStoredFontSize()] ?? 13;
-}
-
-/** Render a compact pressure percentage for the terminal header.
- *  Uses text-[10px] to match the header's existing font-size budget. */
-function headerPressureText(percentage: number | null, level: PressureLevel | null) {
-  if (percentage === null) return <span className="text-[10px] text-warden-text-dim">—</span>;
-  const colorClass = level ? PRESSURE_COLORS[level] : 'text-warden-text-dim';
-  const pulseClass = level === 'critical' ? ' animate-pulse' : '';
-  return <span className={`text-[10px] font-mono ${colorClass}${pulseClass}`}>{percentage}%</span>;
 }
 
 const MOBILE_KEYS: Array<{ label: string; seq: string }> = [
@@ -216,12 +203,10 @@ function estimateTerminalDimensions(
 }
 
 // TerminalView is wrapped in React.memo to bail out of re-renders when all props are
-// reference-equal. Combined with the value-based agentLiveStatus stabilization in App.tsx,
-// this prevents xterm.js from being disturbed every 5s when the live-status poll fires.
+// reference-equal, preventing xterm.js from being disturbed by background polling.
 function TerminalViewInner({
   tmuxSessionName,
   onSessionExit,
-  agentLiveStatus,
   terminalFocusRef,
   searchOpenRef,
   notificationsEnabled = false,
@@ -696,13 +681,6 @@ function TerminalViewInner({
           )}
         </div>
         <div className="flex items-center gap-2">
-          {agentLiveStatus && (
-            <>
-              <StateBadge state={agentLiveStatus.state} />
-              {headerPressureText(agentLiveStatus.contextPressure, agentLiveStatus.contextPressureLevel)}
-              <span className="w-px h-3 bg-warden-border/50" />
-            </>
-          )}
           {/* Bell icon notification toggle — hidden when Notification API is unsupported */}
           {notificationPermission !== 'unsupported' && onToggleNotifications && (
             <button

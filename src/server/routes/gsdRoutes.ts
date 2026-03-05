@@ -8,8 +8,6 @@ import path from 'path';
 import { gsdRegistryService } from '../services/GsdRegistryService.js';
 import { gsdEventLogService } from '../services/GsdEventLogService.js';
 import { database } from '../database/DatabaseConnection.js';
-import type { AgentStateHint, PressureLevel } from '../../shared/gsdTypes.js';
-import { detectAgentState } from '../utils/agentStateDetection.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -22,82 +20,6 @@ const COMMAND_ARG_RE = /^[/a-zA-Z0-9 @:._-]+$/;
 const WORKDIR_PREFIX = '/home/forge/';
 
 const router = Router();
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Live-status helpers
-// ─────────────────────────────────────────────────────────────────────────────
-
-function extractContextPressure(pane: string): { contextPressure: number | null; contextPressureLevel: PressureLevel | null } {
-  const nonEmptyLines = pane.split('\n').filter((line) => line.trim().length > 0);
-  // Filter to short lines (< 80 chars) typical of status bars, then look for
-  // Unicode block/box-drawing characters or the word "context" preceding a percentage.
-  // This avoids false positives from arbitrary terminal output like "npm install 45%".
-  const statusCandidates = nonEmptyLines.slice(-5).filter((line) => line.trim().length < 80);
-  const candidateText = statusCandidates.join('\n');
-  const match = /(?:[\u2580-\u259F]|context).*?(\d{1,3})%/i.exec(candidateText);
-  if (!match) {
-    return { contextPressure: null, contextPressureLevel: null };
-  }
-  const percentage = parseInt(match[1], 10);
-  const level: PressureLevel = percentage >= 90 ? 'critical' : percentage >= 70 ? 'warning' : 'ok';
-  return { contextPressure: percentage, contextPressureLevel: level };
-}
-
-// GET /api/gsd/agents/live-status — capture tmux pane and return agent state + context pressure
-router.get('/api/gsd/agents/live-status', async (_request, response) => {
-  try {
-    const registry = await gsdRegistryService.getRegistry();
-
-    const results = await Promise.allSettled(
-      registry.agents.map(async (agent) => {
-        if (!agent.tmux_session_name) {
-          return {
-            agentId: agent.agent_id,
-            sessionName: agent.tmux_session_name,
-            state: null as AgentStateHint | null,
-            contextPressure: null as number | null,
-            contextPressureLevel: null as PressureLevel | null,
-          };
-        }
-
-        try {
-          const { stdout } = await execFileAsync('tmux', [
-            'capture-pane', '-pt', `${agent.tmux_session_name}:0.0`, '-S', '-5',
-          ]);
-          const state = detectAgentState(stdout);
-          const { contextPressure, contextPressureLevel } = extractContextPressure(stdout);
-          return {
-            agentId: agent.agent_id,
-            sessionName: agent.tmux_session_name,
-            state,
-            contextPressure,
-            contextPressureLevel,
-          };
-        } catch {
-          // Dead session — return nulls
-          return {
-            agentId: agent.agent_id,
-            sessionName: agent.tmux_session_name,
-            state: null as AgentStateHint | null,
-            contextPressure: null as number | null,
-            contextPressureLevel: null as PressureLevel | null,
-          };
-        }
-      }),
-    );
-
-    const agents = results.map((result) =>
-      result.status === 'fulfilled'
-        ? result.value
-        : { agentId: '', sessionName: null, state: null, contextPressure: null, contextPressureLevel: null },
-    );
-
-    response.json({ agents });
-  } catch (error) {
-    console.error('[GsdRoutes] Failed to get live status:', error);
-    response.status(500).json({ error: 'Failed to get live status' });
-  }
-});
 
 // GET /api/gsd/registry — return full registry JSON
 router.get('/api/gsd/registry', async (_request, response) => {

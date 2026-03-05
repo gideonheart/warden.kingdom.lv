@@ -1,8 +1,7 @@
 import { useMemo } from 'react';
-import { STATUS_COLORS, StateBadge, PressureIndicator, PhaseProgress } from './gsdShared.js';
+import { STATUS_COLORS, PhaseProgress } from './gsdShared.js';
 import { useGsdRegistry } from '../hooks/useGsdRegistry.js';
 import { useActiveInstances } from '../hooks/useActiveInstances.js';
-import { useAgentLiveStatus } from '../hooks/useAgentLiveStatus.js';
 import { useAgentStateFiles } from '../hooks/useAgentStateFiles.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -12,7 +11,6 @@ import { useAgentStateFiles } from '../hooks/useAgentStateFiles.js';
 export function AgentsTab() {
   const { registry, isLoading: registryLoading, error: registryError, getEffectiveEnabled, toggleEnabled } = useGsdRegistry();
   const { instances } = useActiveInstances();
-  const liveStatus = useAgentLiveStatus();
 
   const sessionNames = useMemo(
     () => (registry?.agents ?? []).filter((a) => a.tmux_session_name).map((a) => a.tmux_session_name),
@@ -53,7 +51,6 @@ export function AgentsTab() {
             const statusColor = STATUS_COLORS[status] ?? 'bg-warden-error';
             const statusLabel = status.charAt(0).toUpperCase() + status.slice(1);
             const effectiveEnabled = getEffectiveEnabled(agent.agent_id, agent.enabled);
-            const agentStatus = liveStatus.get(agent.agent_id);
             const stateInfo = agent.tmux_session_name
               ? stateFiles.get(agent.tmux_session_name)
               : undefined;
@@ -74,19 +71,8 @@ export function AgentsTab() {
                   </div>
                 </div>
 
-                {/* Middle section: state, context, phase */}
+                {/* Middle section: phase progress */}
                 <div className="space-y-1.5 mb-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs text-warden-text-dim">State</span>
-                    <StateBadge state={agentStatus?.state ?? null} />
-                  </div>
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs text-warden-text-dim">Context</span>
-                    <PressureIndicator
-                      percentage={agentStatus?.contextPressure ?? null}
-                      level={agentStatus?.contextPressureLevel ?? null}
-                    />
-                  </div>
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-xs text-warden-text-dim">Phase</span>
                     <PhaseProgress
