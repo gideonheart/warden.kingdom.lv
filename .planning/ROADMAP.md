@@ -189,10 +189,11 @@ See `.planning/milestones/v3.3-ROADMAP.md`
   4. Notification messages with Markdown special characters in pane excerpts are sent successfully
   5. Invalid topicId produces a clear log warning and graceful return (no silent failure)
   6. Budget alert state survives server restart — no false re-alerts after restart
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 36-01: Telegram pipeline pivot (Gideon bot token, remove approval infrastructure, fix edge cases)
+- [ ] 36-01-PLAN.md — Core pipeline pivot: rewrite TelegramBotService to send-only, remove approval infrastructure, fix Markdown escaping and topicId validation (FIX-01, FIX-02, FIX-03, FIX-04)
+- [ ] 36-02-PLAN.md — Budget alert persistence and UI update: persist BudgetAlertPoller state to SQLite, update NotificationSettingsPanel for send-only bot (FIX-05, FIX-06)
 
 ### Phase 37: Crash Detection Backend
 **Goal**: Warden detects when agent sessions crash and records/notifies the operator
@@ -295,7 +296,7 @@ Phases execute in numeric order: 36 → 37 → 38 → 39 → 40
 | 33. Permission Prompt Detection and Forwarding | v3.3 | 2/2 | Complete | 2026-03-04 |
 | 34. One-Tap Approve | v3.3 | 2/2 | Complete | 2026-03-04 |
 | 35. Budget Alerts and Notification Settings | v3.3 | 2/2 | Complete | 2026-03-05 |
-| 36. Telegram Pipeline Pivot & Hardening | v3.4 | 0/1 | Not started | - |
+| 36. Telegram Pipeline Pivot & Hardening | v3.4 | 0/2 | Not started | - |
 | 37. Crash Detection Backend | v3.4 | 0/2 | Not started | - |
 | 38. Auto-Restart Engine | v3.4 | 0/2 | Not started | - |
 | 39. Idle Timeout & Quick-Launch | v3.4 | 0/2 | Not started | - |
