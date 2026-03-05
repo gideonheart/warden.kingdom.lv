@@ -299,5 +299,5 @@ Phases execute in numeric order: 36 → 37 → 38 → 39 → 40
 | 36. Telegram Pipeline Pivot & Hardening | 2/2 | Complete    | 2026-03-05 | - |
 | 37. Crash Detection Backend | 2/2 | Complete    | 2026-03-05 | - |
 | 38. Auto-Restart Engine | 2/2 | Complete    | 2026-03-05 | - |
-| 39. Idle Timeout & Quick-Launch | 2/2 | Complete   | 2026-03-05 | - |
+| 39. Idle Timeout & Quick-Launch | 2/2 | Complete    | 2026-03-05 | - |
 | 40. Lifecycle History & E2E Verification | v3.4 | 0/2 | Not started | - |
