@@ -96,12 +96,21 @@ class DatabaseConnection {
    * Permanently delete a stopped or error instance record.
    * Only allowed for 'stopped' or 'error' status — active sessions must not be deleted.
    * Returns true if a row was deleted, false if not found or wrong status.
+   *
+   * Runs inside a transaction to satisfy FOREIGN KEY constraints:
+   * session_lifecycle_events and session_logs reference instances(id) with NO ACTION,
+   * so child rows must be removed before the parent instance row.
    */
   deleteInstance(id: number): boolean {
-    const result = this.db.prepare(
-      "DELETE FROM instances WHERE id = ? AND status IN ('stopped', 'error')"
-    ).run(id);
-    return result.changes > 0;
+    const deleteChildren = this.db.transaction(() => {
+      this.db.prepare('DELETE FROM session_lifecycle_events WHERE session_id = ?').run(id);
+      this.db.prepare('DELETE FROM session_logs WHERE instance_id = ?').run(id);
+      const result = this.db.prepare(
+        "DELETE FROM instances WHERE id = ? AND status IN ('stopped', 'error')"
+      ).run(id);
+      return result.changes > 0;
+    });
+    return deleteChildren() as boolean;
   }
 
   upsertInstance(params: AgentInstanceCreateParams): AgentInstance {
