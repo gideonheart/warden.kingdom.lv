@@ -62,11 +62,24 @@ router.get('/api/instances/:id', (request, response) => {
   response.json({ instance });
 });
 
+// GET /api/agents/last-projects — returns the most recent non-empty project_path per agent.
+// Used by the quick-launch modal to pre-fill the project path field.
+router.get('/api/agents/last-projects', (_request, response) => {
+  try {
+    const paths = database.getLastProjectPaths();
+    response.json({ paths });
+  } catch (error) {
+    console.error('[API] Failed to get last project paths:', error);
+    response.status(500).json({ error: 'Failed to get last project paths' });
+  }
+});
+
 // POST /api/instances/start — create a new tmux session with Claude Code running inside.
 // Returns 202 immediately; session appears in /api/instances within 10s via InstanceTracker.
 // Returns 409 if the agent already has an active/starting session.
+// Accepts optional `projectPath` in body to override the workspace path from openclaw.json.
 router.post('/api/instances/start', async (request, response) => {
-  const { agentId } = request.body as { agentId?: unknown };
+  const { agentId, projectPath: overridePath } = request.body as { agentId?: unknown; projectPath?: unknown };
 
   if (typeof agentId !== 'string' || !agentId.trim()) {
     response.status(400).json({ error: 'agentId is required and must be a non-empty string' });
@@ -85,7 +98,7 @@ router.post('/api/instances/start', async (request, response) => {
     return;
   }
 
-  // Look up agent config to obtain workspace path
+  // Look up agent config to obtain agent name (always required) and workspace path (used when no override)
   let projectPath: string;
   let agentName: string;
   try {
@@ -96,10 +109,17 @@ router.post('/api/instances/start', async (request, response) => {
       return;
     }
     agentName = agentConfig.name;
-    const rawWorkspace = agentConfig.workspace;
-    projectPath = path.isAbsolute(rawWorkspace)
-      ? rawWorkspace
-      : path.join(process.env.HOME ?? '/home/forge', '.openclaw', rawWorkspace);
+
+    if (typeof overridePath === 'string' && overridePath.trim()) {
+      // Operator-supplied project path override (from quick-launch modal)
+      projectPath = overridePath.trim();
+    } else {
+      // Default: derive project path from agent's configured workspace
+      const rawWorkspace = agentConfig.workspace;
+      projectPath = path.isAbsolute(rawWorkspace)
+        ? rawWorkspace
+        : path.join(process.env.HOME ?? '/home/forge', '.openclaw', rawWorkspace);
+    }
   } catch (error) {
     console.error(`[API] Failed to read agent config for ${trimmedAgentId}:`, error);
     response.status(500).json({ error: 'Failed to read agent configuration' });

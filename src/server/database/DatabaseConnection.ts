@@ -612,6 +612,28 @@ class DatabaseConnection {
   }
 
   /**
+   * Returns a map of agentId -> most recent non-empty project_path.
+   * Used by the quick-launch modal to pre-fill the project path field per agent.
+   */
+  getLastProjectPaths(): Record<string, string> {
+    const rows = this.db.prepare(`
+      SELECT agent_id, project_path
+      FROM instances
+      WHERE project_path != ''
+      ORDER BY last_active_at DESC
+    `).all() as Array<{ agent_id: string; project_path: string }>;
+
+    const result: Record<string, string> = {};
+    for (const row of rows) {
+      // Only keep the first occurrence (most recent due to ORDER BY last_active_at DESC)
+      if (!(row.agent_id in result)) {
+        result[row.agent_id] = row.project_path;
+      }
+    }
+    return result;
+  }
+
+  /**
    * Flip crash_restart_mode to 'none' and record the storm_disabled_at timestamp.
    * Uses upsert so that a row is created even if the agent never had a policy set.
    * Called by AutoRestartService when the sliding window rate limit is exceeded.
