@@ -42,6 +42,7 @@ export interface OpenClawConfig {
   channels?: {
     telegram?: {
       enabled: boolean;
+      botToken?: string;
       groups?: Record<string, {
         requireMention?: boolean;
         topics?: Record<string, { systemPrompt?: string }>;

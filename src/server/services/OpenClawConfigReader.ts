@@ -166,6 +166,11 @@ class OpenClawConfigReader {
     return mappings;
   }
 
+  async getBotToken(): Promise<string | null> {
+    const config = await this.getConfig();
+    return config.channels?.telegram?.botToken ?? null;
+  }
+
   async getGatewayUrl(): Promise<string> {
     const config = await this.getConfig();
     const port = config.gateway.port ?? 3434;

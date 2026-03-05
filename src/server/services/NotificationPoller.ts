@@ -7,7 +7,6 @@ import { openClawConfigReader } from './OpenClawConfigReader.js';
 import { database } from '../database/DatabaseConnection.js';
 import { detectAgentState } from '../utils/agentStateDetection.js';
 import { NotificationDeduplicator } from './NotificationDeduplicator.js';
-import { approvalStateTracker } from './ApprovalStateTracker.js';
 
 const execFileAsync = promisify(execFile);
 const POLL_INTERVAL_MS = 10_000;
@@ -45,13 +44,11 @@ export class NotificationPoller {
 
   /**
    * Poll all currently active instances in parallel.
-   * Prunes expired approval records as free housekeeping on each cycle.
    * Reads notification config fresh on each cycle so config changes take effect
    * without a server restart.
    * Failures on individual sessions are caught inside pollSession.
    */
   private async pollAllSessions(): Promise<void> {
-    approvalStateTracker.pruneExpired();
     const config = database.getNotificationConfig();
     if (!config.permissionAlertsEnabled) {
       return;
@@ -96,9 +93,9 @@ export class NotificationPoller {
   }
 
   /**
-   * Look up the agent's Telegram topic mapping and send a notification with
-   * an Approve inline button. Registers the sent message with ApprovalStateTracker
-   * so the callback handler can find it when the operator taps Approve.
+   * Look up the agent's Telegram topic mapping and send a plain-text notification.
+   * No inline button is added — approval happens via the Warden dashboard or
+   * through Gideon's conversation.
    */
   private async sendPermissionNotification(
     agentId: string,
@@ -114,26 +111,21 @@ export class NotificationPoller {
         return;
       }
 
+      // FIX-03: Strip backticks from excerpt to avoid premature code block termination
+      // in Telegram Markdown. The excerpt is wrapped in triple-backtick code fences,
+      // so any backtick inside would close the block unexpectedly.
+      const sanitizedExcerpt = excerpt.replace(/`/g, "'");
+
       const text =
         `⚠️ *${agentId}* needs permission\n\n` +
         `Session: \`${sessionName}\`\n` +
-        `\`\`\`\n${excerpt}\n\`\`\``;
+        `\`\`\`\n${sanitizedExcerpt}\n\`\`\``;
 
-      const messageId = await telegramBotService.sendToTopicWithApproveButton(
+      await telegramBotService.sendToTopic(
         mapping.groupId,
         mapping.topicId,
         text,
-        sessionName
       );
-
-      if (messageId !== null) {
-        approvalStateTracker.register(sessionName, {
-          chatId: mapping.groupId,
-          messageId,
-          topicId: mapping.topicId,
-          originalText: text,
-        });
-      }
     } catch (error) {
       console.error(`[NotificationPoller] Failed to send notification for ${agentId}:`, error);
     }

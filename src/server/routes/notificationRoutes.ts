@@ -10,7 +10,7 @@ notificationRoutes.get('/api/notifications/config', (_req, res) => {
   const config = database.getNotificationConfig();
   res.json({
     ...config,
-    botConnected: telegramBotService.isRunning(),
+    botConfigured: telegramBotService.isConfigured(),
   });
 });
 

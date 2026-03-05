@@ -18,9 +18,6 @@ import { recordingRotationService } from './services/RecordingRotationService.js
 import { telegramBotService } from './services/TelegramBotService.js';
 import { notificationPoller } from './services/NotificationPoller.js';
 import { budgetAlertPoller } from './services/BudgetAlertPoller.js';
-import { ApprovalCallbackHandler } from './services/ApprovalCallbackHandler.js';
-import { approvalStateTracker } from './services/ApprovalStateTracker.js';
-import { tmuxSessionManager } from './services/TmuxSessionManager.js';
 import { database } from './database/DatabaseConnection.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -103,13 +100,7 @@ instanceTracker.startPeriodicSync();
 sessionUsageReader.startPeriodicScan();
 recordingRotationService.startPeriodicRotation();
 
-// Register the one-tap approve callback handler BEFORE bot.start() so it is
-// active from the first long-polling update. ApprovalCallbackHandler processes
-// "approve:{sessionName}" button taps and injects '1' into the agent's tmux session.
-const approvalCallbackHandler = new ApprovalCallbackHandler(approvalStateTracker, tmuxSessionManager);
-telegramBotService.registerCallbackHandler((bot) => approvalCallbackHandler.register(bot));
-
-telegramBotService.start();   // Telegram bot (no-op if token missing)
+void telegramBotService.initialize();   // Telegram bot token load (send-only mode, no polling)
 notificationPoller.startPolling();   // Permission prompt detection (depends on telegramBotService)
 budgetAlertPoller.startPolling();    // Budget threshold monitoring (depends on telegramBotService)
 
@@ -130,9 +121,9 @@ async function handleShutdown(signal: string): Promise<void> {
   recordingRotationService.stopPeriodicRotation();
   sessionUsageReader.stopPeriodicScan();
   instanceTracker.stopPeriodicSync();
-  notificationPoller.stopPolling();    // Stop polling before bot shutdown
-  budgetAlertPoller.stopPolling();     // Stop budget monitoring before bot shutdown
-  await telegramBotService.stop();   // NEW — stop bot before closing HTTP server
+  notificationPoller.stopPolling();    // Stop polling before closing HTTP server
+  budgetAlertPoller.stopPolling();     // Stop budget monitoring before closing HTTP server
+  // TelegramBotService is send-only — no shutdown needed
 
   httpServer.close(() => {
     console.log('[Warden] HTTP server closed');
