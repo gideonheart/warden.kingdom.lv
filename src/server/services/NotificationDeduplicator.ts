@@ -1,7 +1,5 @@
 import type { AgentStateHint } from '../../shared/gsdTypes.js';
 
-const PERMISSION_COOLDOWN_MS = 2 * 60 * 1000;
-
 interface SessionRecord {
   previousState: AgentStateHint | null;
   lastNotifiedAt: number | null;
@@ -13,7 +11,7 @@ interface SessionRecord {
  * Rules:
  * - Fires on the first transition INTO permission_prompt (PERM-04)
  * - Suppresses if already in permission_prompt (sustained state = no repeat)
- * - Suppresses if re-entering within PERMISSION_COOLDOWN_MS after last notification
+ * - Suppresses if re-entering within cooldownMs after last notification
  *   AND the session never fully exited the permission state (PERM-05)
  * - Resets cooldown when the session fully exits permission_prompt,
  *   allowing immediate re-notification on re-entry
@@ -28,9 +26,10 @@ export class NotificationDeduplicator {
    *
    * @param sessionName - Unique tmux session identifier
    * @param state       - Current detected AgentStateHint
+   * @param cooldownMs  - Cooldown window in milliseconds; suppresses re-notification within this window
    * @returns true if a notification should be sent, false otherwise
    */
-  recordAndCheck(sessionName: string, state: AgentStateHint): boolean {
+  recordAndCheck(sessionName: string, state: AgentStateHint, cooldownMs: number): boolean {
     const record = this.records.get(sessionName) ?? { previousState: null, lastNotifiedAt: null };
     const now = Date.now();
     let shouldFire = false;
@@ -38,7 +37,7 @@ export class NotificationDeduplicator {
     if (state === 'permission_prompt') {
       const wasAlreadyInPermissionState = record.previousState === 'permission_prompt';
       const isWithinCooldown =
-        record.lastNotifiedAt !== null && now - record.lastNotifiedAt < PERMISSION_COOLDOWN_MS;
+        record.lastNotifiedAt !== null && now - record.lastNotifiedAt < cooldownMs;
 
       if (!wasAlreadyInPermissionState && !isWithinCooldown) {
         shouldFire = true;

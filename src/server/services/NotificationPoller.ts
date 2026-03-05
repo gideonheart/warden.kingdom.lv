@@ -4,6 +4,7 @@ import stripAnsi from 'strip-ansi';
 import { instanceTracker } from './InstanceTracker.js';
 import { telegramBotService } from './TelegramBotService.js';
 import { openClawConfigReader } from './OpenClawConfigReader.js';
+import { database } from '../database/DatabaseConnection.js';
 import { detectAgentState } from '../utils/agentStateDetection.js';
 import { NotificationDeduplicator } from './NotificationDeduplicator.js';
 import { approvalStateTracker } from './ApprovalStateTracker.js';
@@ -74,7 +75,8 @@ export class NotificationPoller {
       const cleanPane = stripAnsi(stdout);
 
       const state = detectAgentState(cleanPane);
-      const shouldNotify = this.deduplicator.recordAndCheck(sessionName, state);
+      const notificationConfig = database.getNotificationConfig();
+      const shouldNotify = this.deduplicator.recordAndCheck(sessionName, state, notificationConfig.permissionCooldownMs);
 
       if (shouldNotify) {
         const excerpt = cleanPane.slice(-EXCERPT_MAX_CHARS).trim();
