@@ -1,13 +1,25 @@
 import { Router } from 'express';
 import { openClawConfigReader } from '../services/OpenClawConfigReader.js';
+import { openClawSessionReader } from '../services/OpenClawSessionReader.js';
 import { gatewayApiClient } from '../services/GatewayApiClient.js';
 
 export const agentRoutes = Router();
 
 agentRoutes.get('/api/agents', async (_request, response) => {
   try {
-    const agents = await openClawConfigReader.getAgents();
-    response.json({ agents });
+    const [agents, workingDirectories, contextFills] = await Promise.all([
+      openClawConfigReader.getAgents(),
+      openClawSessionReader.getWorkingDirectories(),
+      openClawSessionReader.getContextFills(),
+    ]);
+
+    const enrichedAgents = agents.map((agent) => ({
+      ...agent,
+      workingDirectory: workingDirectories.get(agent.id) ?? null,
+      contextFill: contextFills.get(agent.id) ?? null,
+    }));
+
+    response.json({ agents: enrichedAgents });
   } catch {
     response.status(500).json({ error: 'Failed to read agent configuration' });
   }

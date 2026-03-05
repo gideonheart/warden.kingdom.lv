@@ -51,6 +51,13 @@ export interface OpenClawConfig {
   };
 }
 
+export interface AgentContextFill {
+  totalTokens: number | null;
+  contextTokens: number;
+  fillPercentage: number | null;
+  model: string | null;
+}
+
 export interface AgentDetails {
   id: string;
   name: string;
@@ -60,6 +67,8 @@ export interface AgentDetails {
   soulPreview: string | null;
   memoryExists?: boolean;
   memorySizeBytes?: number | null;
+  workingDirectory?: string | null;
+  contextFill?: AgentContextFill | null;
 }
 
 export interface TopicMapping {

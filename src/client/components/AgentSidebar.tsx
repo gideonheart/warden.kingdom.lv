@@ -247,6 +247,21 @@ export function AgentSidebar({
                     #{agentTopic.topicId}
                   </span>
                 )}
+                {agent.contextFill?.fillPercentage != null && (
+                  <div
+                    className="w-10 h-1 rounded-full bg-warden-border/50 flex-shrink-0 overflow-hidden"
+                    title={`Context: ${agent.contextFill.fillPercentage}% (${(agent.contextFill.totalTokens ?? 0).toLocaleString()} / ${agent.contextFill.contextTokens.toLocaleString()} tokens)`}
+                  >
+                    <div
+                      className={`h-full rounded-full ${
+                        agent.contextFill.fillPercentage > 75 ? 'bg-warden-error' :
+                        agent.contextFill.fillPercentage > 50 ? 'bg-amber-500' :
+                        'bg-warden-success'
+                      }`}
+                      style={{ width: `${Math.min(agent.contextFill.fillPercentage, 100)}%` }}
+                    />
+                  </div>
+                )}
               </button>
               {onStartAgent && (
                 <StartButton
@@ -285,6 +300,12 @@ export function AgentSidebar({
               <span className="text-warden-text-dim">Workspace</span>
               <p className="text-warden-text font-mono mt-0.5 break-all">{selectedAgent.workspace || 'N/A'}</p>
             </div>
+            {selectedAgent.workingDirectory && (
+              <div>
+                <span className="text-warden-text-dim">Working Directory</span>
+                <p className="text-warden-text font-mono mt-0.5 break-all">{selectedAgent.workingDirectory}</p>
+              </div>
+            )}
             <div>
               <span className="text-warden-text-dim">Model</span>
               <p className="text-warden-text font-mono mt-0.5">{selectedAgent.model}</p>
@@ -306,6 +327,36 @@ export function AgentSidebar({
                 </span>
               </div>
             </div>
+            {selectedAgent.contextFill && (
+              <div>
+                <span className="text-warden-text-dim">Context Fill</span>
+                <div className="mt-1 space-y-1">
+                  <div className="w-full h-2 rounded-full bg-warden-border/50 overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all ${
+                        (selectedAgent.contextFill.fillPercentage ?? 0) > 75 ? 'bg-warden-error' :
+                        (selectedAgent.contextFill.fillPercentage ?? 0) > 50 ? 'bg-amber-500' :
+                        'bg-warden-success'
+                      }`}
+                      style={{ width: `${Math.min(selectedAgent.contextFill.fillPercentage ?? 0, 100)}%` }}
+                    />
+                  </div>
+                  <div className="flex justify-between text-warden-text">
+                    <span>{selectedAgent.contextFill.fillPercentage != null ? `${selectedAgent.contextFill.fillPercentage}%` : 'N/A'}</span>
+                    <span className="text-warden-text-dim">
+                      {selectedAgent.contextFill.totalTokens != null ? selectedAgent.contextFill.totalTokens.toLocaleString() : '?'}
+                      {' / '}
+                      {selectedAgent.contextFill.contextTokens.toLocaleString()} tokens
+                    </span>
+                  </div>
+                  {selectedAgent.contextFill.model && (
+                    <div className="text-warden-text-dim">
+                      Model: <span className="text-warden-text">{selectedAgent.contextFill.model}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           {agentTopics.length > 0 && (
