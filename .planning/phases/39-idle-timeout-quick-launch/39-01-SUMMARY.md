@@ -121,6 +121,15 @@ None — no external service configuration required.
 - Sessions with `idleTimeoutMinutes = null` (default) are never auto-stopped
 - Lifecycle history UI (Phase 40) will be able to query idle-timeout events via existing `getLifecycleEvents()` with `eventType: 'idle-timeout'` filter
 
+## Self-Check: PASSED
+
+- FOUND: `src/server/services/IdleTimeoutService.ts`
+- FOUND: `39-01-SUMMARY.md`
+- FOUND commit: `0d778b3` (feat: idle timeout column, types, API, and service)
+- FOUND commit: `4ddd72d` (feat: sidebar dropdown and useAgentConfig)
+- TypeScript check: PASSED
+- Production build: PASSED
+
 ---
 *Phase: 39-idle-timeout-quick-launch*
 *Completed: 2026-03-05*
