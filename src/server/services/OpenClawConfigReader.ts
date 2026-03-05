@@ -9,6 +9,22 @@ class OpenClawConfigReader {
   private cachedConfig: OpenClawConfig | null = null;
   private lastReadAt = 0;
 
+  /**
+   * Strip JSON5-style line comments and block comments while preserving
+   * double-quoted string literals that may contain "//" (e.g. URLs).
+   *
+   * The regex alternation matches one of three things at each position:
+   *   1. A double-quoted string (possibly containing escaped chars) -- kept as-is
+   *   2. A line comment (double slash to end of line) -- replaced with empty string
+   *   3. A block comment (slash-star to star-slash) -- replaced with empty string
+   */
+  private stripJsonComments(raw: string): string {
+    return raw.replace(
+      /"(?:[^"\\]|\\.)*"|\/\/.*$|\/\*[\s\S]*?\*\//gm,
+      (match) => (match.startsWith('"') ? match : ''),
+    );
+  }
+
   async getConfig(): Promise<OpenClawConfig> {
     const now = Date.now();
     if (this.cachedConfig && now - this.lastReadAt < CACHE_TTL_MS) {
@@ -17,10 +33,8 @@ class OpenClawConfigReader {
 
     try {
       const rawContent = await readFile(CONFIG_PATH, 'utf-8');
-      // Strip JSON5 comments (// and /* */ style)
-      const jsonContent = rawContent
-        .replace(/\/\/.*$/gm, '')
-        .replace(/\/\*[\s\S]*?\*\//g, '')
+      // Strip JSON5 comments while preserving strings, then remove trailing commas
+      const jsonContent = this.stripJsonComments(rawContent)
         .replace(/,\s*([}\]])/g, '$1');
       this.cachedConfig = JSON.parse(jsonContent) as OpenClawConfig;
       this.lastReadAt = now;
