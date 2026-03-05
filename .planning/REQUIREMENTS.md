@@ -33,9 +33,9 @@ Requirements for v3.4 Smart Session Lifecycle. Each maps to roadmap phases.
 
 ### Quick-Launch Shortcuts
 
-- [ ] **LNCH-01**: Dashboard derives launch shortcuts from `openclaw.json` agent configs combined with last-used project path per agent (from `instances` table); no explicit template CRUD
-- [ ] **LNCH-02**: "New Session" button in dashboard opens agent picker showing available agents with their last-used project path; selecting one spawns a tmux session via existing start API
-- [ ] **LNCH-03**: Quick-launch pre-fills agent ID and project path; operator can override project path before launch
+- [x] **LNCH-01**: Dashboard derives launch shortcuts from `openclaw.json` agent configs combined with last-used project path per agent (from `instances` table); no explicit template CRUD
+- [x] **LNCH-02**: "New Session" button in dashboard opens agent picker showing available agents with their last-used project path; selecting one spawns a tmux session via existing start API
+- [x] **LNCH-03**: Quick-launch pre-fills agent ID and project path; operator can override project path before launch
 
 ### Lifecycle History
 
@@ -100,9 +100,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | IDLE-01 | Phase 39 | Pending |
 | IDLE-02 | Phase 39 | Pending |
 | IDLE-03 | Phase 39 | Pending |
-| LNCH-01 | Phase 39 | Pending |
-| LNCH-02 | Phase 39 | Pending |
-| LNCH-03 | Phase 39 | Pending |
+| LNCH-01 | Phase 39 | Complete |
+| LNCH-02 | Phase 39 | Complete |
+| LNCH-03 | Phase 39 | Complete |
 | HIST-01 | Phase 40 | Pending |
 | HIST-02 | Phase 40 | Pending |
 

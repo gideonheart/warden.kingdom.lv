@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-03-05)
 
 **Core value:** Real-time visibility into all active Claude Code agent sessions from a single browser tab
-**Current focus:** v3.4 Smart Session Lifecycle — Phase 38 complete, Phase 39 next
+**Current focus:** v3.4 Smart Session Lifecycle — Phase 39 complete (both plans done), Phase 40 next
 
 ## Current Position
 
-Phase: 38 of 40 (Auto-Restart Engine) — COMPLETE
+Phase: 39 of 40 (Idle Timeout + Quick Launch) — COMPLETE
 Plan: 2 of 2 in current phase (both plans complete)
-Status: Phase 38 complete — both plans done. Next: Phase 39
-Last activity: 2026-03-05 - Completed 38-02: auto-restart engine (AutoRestartService + storm limiter + toast notification)
+Status: Phase 39 complete — both plans done. Next: Phase 40
+Last activity: 2026-03-05 - Completed 39-02: quick-launch modal (QuickLaunchModal + GET /api/agents/last-projects + projectPath override)
 
-Progress: [██████░░░░] 67% (6/9 plans)
+Progress: [████████░░] 89% (8/9 plans)
 
 ## Performance Metrics
 
@@ -47,6 +47,9 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase 38]: 38-02: Record restart timestamp after both success and failure — storm limiter counts attempts not just successes
 - [Phase 38]: 38-02: Pre-register instance as 'starting' before spawning so UI tab appears during the 7s delay period
 - [Phase 38]: 38-02: Toast detection uses previousInstanceIdsRef + stopped sibling check — no server-side event stream needed
+- [Phase 39]: 39-02: getLastProjectPaths() uses ORDER BY last_active_at DESC with first-occurrence Map — one DB query for all agents
+- [Phase 39]: 39-02: projectPath override on start endpoint is backward compatible — omitting it restores original behavior
+- [Phase 39]: 39-02: QuickLaunchModal fetches /api/agents/last-projects lazily on isOpen=true, not at App mount
 
 ### Research Flags
 
@@ -78,5 +81,5 @@ None
 ## Session Continuity
 
 Last session: 2026-03-05
-Stopped at: Completed 38-02-PLAN.md — auto-restart engine (AutoRestartService + storm limiter + toast notification)
-Next step: Execute Phase 39 plans
+Stopped at: Completed 39-02-PLAN.md — quick-launch modal (QuickLaunchModal + GET /api/agents/last-projects + projectPath override)
+Next step: Execute Phase 40 plans
