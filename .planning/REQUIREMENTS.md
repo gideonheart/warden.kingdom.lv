@@ -27,9 +27,9 @@ Requirements for v3.4 Smart Session Lifecycle. Each maps to roadmap phases.
 
 ### Idle Timeout
 
-- [ ] **IDLE-01**: Per-agent idle timeout stored in `session_lifecycle_policy` table: `idle_timeout_minutes` (nullable, null = disabled); default disabled; minimum configurable value 60 minutes
-- [ ] **IDLE-02**: `NotificationPoller` tracks time-in-idle-state per session; when threshold exceeded and `idle_timeout_minutes` is set, auto-stops session with `stop_reason = 'idle-timeout'`
-- [ ] **IDLE-03**: Idle timeout stop logged to `session_lifecycle_events` table with event type `idle-timeout`
+- [x] **IDLE-01**: Per-agent idle timeout stored in `session_lifecycle_policy` table: `idle_timeout_minutes` (nullable, null = disabled); default disabled; minimum configurable value 60 minutes
+- [x] **IDLE-02**: `NotificationPoller` tracks time-in-idle-state per session; when threshold exceeded and `idle_timeout_minutes` is set, auto-stops session with `stop_reason = 'idle-timeout'`
+- [x] **IDLE-03**: Idle timeout stop logged to `session_lifecycle_events` table with event type `idle-timeout`
 
 ### Quick-Launch Shortcuts
 
@@ -97,9 +97,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CRSH-04 | Phase 38 | Complete |
 | CRSH-05 | Phase 38 | Complete |
 | CRSH-06 | Phase 37 | Complete |
-| IDLE-01 | Phase 39 | Pending |
-| IDLE-02 | Phase 39 | Pending |
-| IDLE-03 | Phase 39 | Pending |
+| IDLE-01 | Phase 39 | Complete |
+| IDLE-02 | Phase 39 | Complete |
+| IDLE-03 | Phase 39 | Complete |
 | LNCH-01 | Phase 39 | Complete |
 | LNCH-02 | Phase 39 | Complete |
 | LNCH-03 | Phase 39 | Complete |

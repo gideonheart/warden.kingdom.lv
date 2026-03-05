@@ -50,6 +50,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase 39]: 39-02: getLastProjectPaths() uses ORDER BY last_active_at DESC with first-occurrence Map — one DB query for all agents
 - [Phase 39]: 39-02: projectPath override on start endpoint is backward compatible — omitting it restores original behavior
 - [Phase 39]: 39-02: QuickLaunchModal fetches /api/agents/last-projects lazily on isOpen=true, not at App mount
+- [Phase 39-01]: IdleTimeoutService polls tmux sessions every 60s (not 10s like NotificationPoller) — minute-granularity timeout needs no finer resolution
+- [Phase 39-01]: idleTimeoutMinutes added to RestartPolicy type (same DB table as crash policy) rather than a separate type — consolidated fetch with restart policies
 
 ### Research Flags
 
