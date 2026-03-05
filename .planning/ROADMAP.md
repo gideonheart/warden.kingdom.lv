@@ -108,7 +108,7 @@
 **Milestone Goal:** Transform Warden from passive monitoring to autonomous session management — crash recovery, idle timeout cleanup, and one-click session launch.
 
 - [x] **Phase 36: Telegram Pipeline Pivot & Hardening** - Route notifications through Gideon's bot, remove standalone bot, fix edge cases (completed 2026-03-05)
-- [ ] **Phase 37: Crash Detection Backend** - Detect crashed sessions, persist lifecycle events, send Telegram crash notifications
+- [x] **Phase 37: Crash Detection Backend** - Detect crashed sessions, persist lifecycle events, send Telegram crash notifications (completed 2026-03-05)
 - [ ] **Phase 38: Auto-Restart Engine** - Per-agent restart policy, automatic crash recovery, restart storm rate limiter
 - [ ] **Phase 39: Idle Timeout & Quick-Launch** - Auto-stop idle sessions and one-click session launch from dashboard
 - [ ] **Phase 40: Lifecycle History & E2E Verification** - Lifecycle event history UI with filters and end-to-end verification
@@ -297,7 +297,7 @@ Phases execute in numeric order: 36 → 37 → 38 → 39 → 40
 | 34. One-Tap Approve | v3.3 | 2/2 | Complete | 2026-03-04 |
 | 35. Budget Alerts and Notification Settings | v3.3 | 2/2 | Complete | 2026-03-05 |
 | 36. Telegram Pipeline Pivot & Hardening | 2/2 | Complete    | 2026-03-05 | - |
-| 37. Crash Detection Backend | 1/2 | In Progress|  | - |
+| 37. Crash Detection Backend | 2/2 | Complete   | 2026-03-05 | - |
 | 38. Auto-Restart Engine | v3.4 | 0/2 | Not started | - |
 | 39. Idle Timeout & Quick-Launch | v3.4 | 0/2 | Not started | - |
 | 40. Lifecycle History & E2E Verification | v3.4 | 0/2 | Not started | - |

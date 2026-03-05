@@ -23,7 +23,7 @@ Requirements for v3.4 Smart Session Lifecycle. Each maps to roadmap phases.
 - [ ] **CRSH-03**: Per-agent crash restart policy stored in `session_lifecycle_policy` SQLite table: `crash_restart_mode` (none/once/always); default `none`; configurable from dashboard
 - [ ] **CRSH-04**: Auto-restart execution calls `TmuxSessionManager.spawnSession()` with saved project path when crash detected and policy allows; logs restart outcome to `session_lifecycle_events`
 - [ ] **CRSH-05**: Restart storm rate limiter enforces maximum 3 restarts per hour per agent; after limit hit, flips `crash_restart_mode` to `none` and sends Telegram alert
-- [ ] **CRSH-06**: Telegram notification sent on crash detection via existing notification pipeline, including agent name, session name, and crash timestamp
+- [x] **CRSH-06**: Telegram notification sent on crash detection via existing notification pipeline, including agent name, session name, and crash timestamp
 
 ### Idle Timeout
 
@@ -96,7 +96,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CRSH-03 | Phase 38 | Pending |
 | CRSH-04 | Phase 38 | Pending |
 | CRSH-05 | Phase 38 | Pending |
-| CRSH-06 | Phase 37 | Pending |
+| CRSH-06 | Phase 37 | Complete |
 | IDLE-01 | Phase 39 | Pending |
 | IDLE-02 | Phase 39 | Pending |
 | IDLE-03 | Phase 39 | Pending |

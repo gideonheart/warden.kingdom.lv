@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 ## Current Position
 
 Phase: 37 of 40 (Crash Detection Backend)
-Plan: 1 of 2 in current phase (plan complete)
-Status: Plan 37-01 complete — ready for 37-02
-Last activity: 2026-03-05 — Completed 37-01: Crash detection backend — session_lifecycle_events table, LifecycleEvent types, InstanceTracker crash logic
+Plan: 2 of 2 in current phase (phase complete)
+Status: Phase 37 complete — both plans done, ready for Phase 38
+Last activity: 2026-03-05 — Completed 37-02: Telegram crash notification wiring + GET /api/lifecycle-events endpoint
 
-Progress: [███░░░░░░░] 33% (3/9 plans)
+Progress: [████░░░░░░] 44% (4/9 plans)
 
 ## Performance Metrics
 
@@ -37,6 +37,9 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - 37-01: initialSyncComplete flag suppresses 'started' events on server restart — pre-existing sessions silently re-discovered
 - 37-01: stopping status sessions skip crash detection path; reconcileTransitionalStates handles them separately
 - 37-01: onCrashDetected callback on InstanceTracker as extension point for Plan 02 Telegram notifications
+- [Phase 37-02]: onCrashDetected callback assigned after instanceTracker.startPeriodicSync() — ensures wiring in place before first sync fires
+- [Phase 37-02]: Notification failure isolation via try/catch in callback — Telegram errors never propagate into crash detection flow
+- [Phase 37-02]: lifecycle-events endpoint placed in instanceRoutes — logically grouped with instance management routes
 
 ### Research Flags
 
@@ -65,5 +68,5 @@ None
 ## Session Continuity
 
 Last session: 2026-03-05
-Stopped at: Completed 37-01-PLAN.md — crash detection backend
-Next step: Execute 37-02 — Telegram crash notification wiring
+Stopped at: Completed 37-02-PLAN.md — Telegram crash notifications + lifecycle-events API (Phase 37 complete)
+Next step: Execute Phase 38 (next phase in v3.4 Smart Session Lifecycle milestone)
