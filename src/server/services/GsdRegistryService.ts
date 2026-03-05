@@ -10,6 +10,11 @@ class GsdRegistryService {
   private cachedRegistry: GsdRegistry | null = null;
   private lastReadAt = 0;
 
+  clearCache(): void {
+    this.cachedRegistry = null;
+    this.lastReadAt = 0;
+  }
+
   async getRegistry(): Promise<GsdRegistry> {
     const now = Date.now();
     if (this.cachedRegistry && now - this.lastReadAt < CACHE_TTL_MS) {

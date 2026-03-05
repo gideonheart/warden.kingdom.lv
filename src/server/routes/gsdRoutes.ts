@@ -8,6 +8,7 @@ import path from 'path';
 import { gsdRegistryService } from '../services/GsdRegistryService.js';
 import { gsdEventLogService } from '../services/GsdEventLogService.js';
 import { database } from '../database/DatabaseConnection.js';
+import { openClawSessionReader } from '../services/OpenClawSessionReader.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -307,6 +308,10 @@ router.post('/api/gsd/agents/:agentId/rotate-session', async (request, response)
     if (stderr && !oldSessionId && !newSessionId) {
       console.warn('[GsdRoutes] rotate-session stderr:', stderr);
     }
+
+    // Invalidate server caches so next client poll gets fresh data
+    gsdRegistryService.clearCache();
+    openClawSessionReader.clearCaches();
 
     response.json({ rotated: true, agentId, oldSessionId, newSessionId });
   } catch (error) {

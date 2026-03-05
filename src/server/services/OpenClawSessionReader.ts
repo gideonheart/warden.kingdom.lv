@@ -42,6 +42,13 @@ class OpenClawSessionReader {
 
   private hasLoggedCliWarning = false;
 
+  clearCaches(): void {
+    this.cachedWorkingDirectories = null;
+    this.workingDirectoriesLastReadAt = 0;
+    this.cachedContextFills = null;
+    this.contextFillsLastReadAt = 0;
+  }
+
   async getWorkingDirectories(): Promise<Map<string, string>> {
     const now = Date.now();
     if (this.cachedWorkingDirectories && now - this.workingDirectoriesLastReadAt < CACHE_TTL_MS) {

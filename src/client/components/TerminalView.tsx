@@ -39,6 +39,8 @@ interface TerminalViewProps {
   contextFill?: AgentContextFill | null;
   /** Working directory from agent-registry.json, with home prefix stripped. */
   workingDirectory?: string | null;
+  /** Callback triggered after successful session rotation — e.g. to refetch agent config. */
+  onRotateComplete?: () => void;
 }
 
 // Strip mouse-tracking enable sequences so xterm.js uses native selection
@@ -220,6 +222,7 @@ function TerminalViewInner({
   onRecordingComplete,
   contextFill,
   workingDirectory,
+  onRotateComplete,
 }: TerminalViewProps) {
   const terminalContainerRef = useRef<HTMLDivElement>(null);
   const terminalInstanceRef = useRef<Terminal | null>(null);
@@ -278,6 +281,7 @@ function TerminalViewInner({
       const data = await response.json();
       if (response.ok && data.rotated) {
         setRotateResult({ success: true, message: `Rotated to ${data.newSessionId?.slice(0, 8) ?? 'new'}...` });
+        onRotateComplete?.();
       } else {
         setRotateResult({ success: false, message: data.error ?? 'Rotation failed' });
       }
@@ -286,7 +290,7 @@ function TerminalViewInner({
     } finally {
       setIsRotating(false);
     }
-  }, [agentId, isRotating]);
+  }, [agentId, isRotating, onRotateComplete]);
 
   const handleTerminalOutput = useCallback((data: string) => {
     const filtered = data.replace(MOUSE_TRACKING_ENABLE_PATTERN, '');

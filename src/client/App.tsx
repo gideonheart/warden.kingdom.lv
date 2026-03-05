@@ -51,7 +51,7 @@ function updateHash(view: AppView, session: string | null): void {
 
 export function App() {
   const { instances, isLoading, error, refetch } = useActiveInstances();
-  const { agents, topicMappings, restartPolicies, updateRestartPolicy, updateIdleTimeout } = useAgentConfig();
+  const { agents, topicMappings, restartPolicies, updateRestartPolicy, updateIdleTimeout, refetch: refetchAgentConfig } = useAgentConfig();
 
   // --- Auto-restart toast notifications ---
   // Detects when a new session appears for an agent that already has a stopped session,
@@ -604,6 +604,7 @@ export function App() {
                     onRecordingComplete={handleRecordingComplete}
                     contextFill={selectedAgentDetails?.contextFill}
                     workingDirectory={selectedAgentDetails?.workingDirectory?.replace(/^\/home\/forge\//, '~/')}
+                    onRotateComplete={refetchAgentConfig}
                   />
                 </ErrorBoundary>
               ) : (
