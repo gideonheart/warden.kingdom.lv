@@ -161,3 +161,37 @@ See `.planning/milestones/v3.2-ROADMAP.md` for full phase details.
 
 ---
 
+
+## v3.3 Telegram Operator Awareness (Shipped: 2026-03-05)
+
+**Phases:** 4 (Phases 32-35) | **Plans:** 8 | **Commits:** 12 feat + docs | **LOC:** 12,252 TypeScript (net +1,023)
+**Timeline:** 1 day (2026-03-04 → 2026-03-05)
+**Git range:** `e4be4f1..2d119f5`
+**Tests:** 90 unit tests (Vitest)
+
+**Delivered:** Telegram-based operator awareness — Warden runs its own Telegram bot to notify the operator when agents stall on permission prompts, with one-tap approve to unblock agents without opening the browser, budget alert forwarding at amber/red thresholds, and a dashboard settings panel for all notification preferences.
+
+**Key accomplishments:**
+1. Telegram bot client (grammy) with long polling, auto-retry for rate limits, and graceful lifecycle (start on boot, stop on SIGTERM)
+2. Permission prompt detection via tmux capture-pane polling with state-transition deduplication — works without browser open
+3. One-tap Approve inline keyboard button with operator-only authorization, 15-minute expiry, and double-tap idempotency
+4. Budget alert forwarding (amber 80% / red 100% thresholds) with configurable 10-minute cooldown deduplication
+5. Notification settings panel with per-type toggles, cooldown config, and live bot connection status indicator
+6. Full TDD methodology — 90 unit tests across 4 phases covering all 19 requirements
+
+**Phases:**
+- Phase 32: Bot Foundation (2/2 plans) — `105d201`
+- Phase 33: Permission Prompt Detection and Forwarding (2/2 plans) — `7544fe3`
+- Phase 34: One-Tap Approve (2/2 plans) — `a532962`
+- Phase 35: Budget Alerts and Notification Settings (2/2 plans) — `18e2ca0`
+
+**Tech debt accepted:**
+- `gsdRoutes.ts` does not strip ANSI before `detectAgentState()` (inconsistent with NotificationPoller, pre-existing)
+- `WARDEN_TELEGRAM_OPERATOR_ID` not validated at startup (misconfigured ID only discovered on first button tap)
+- `NotificationPoller` polls stopped/error sessions (dead tmux capture-pane calls silently swallowed)
+- PUT `/api/notifications/config` accepts cooldownMs >= 0 while UI enforces >= 60000ms
+
+See `.planning/milestones/v3.3-ROADMAP.md` for full phase details.
+
+---
+

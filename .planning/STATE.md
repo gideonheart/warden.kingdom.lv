@@ -2,27 +2,27 @@
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-03-04)
+See: .planning/PROJECT.md (updated 2026-03-05)
 
 **Core value:** Real-time visibility into all active Claude Code agent sessions from a single browser tab
-**Current focus:** v3.4 Budget Alerts & Notification Settings
+**Current focus:** Planning next milestone
 
 ## Current Position
 
-Phase: 35 — Budget Alerts & Notification Settings
-Plan: 02 complete (2/2 plans — Phase 35 COMPLETE)
-Status: Phase 35 complete — notification settings UI, API routes, BudgetAlertPoller server wiring; NSET-01/02/03 covered
-Last activity: 2026-03-05 — 35-02-PLAN.md executed, NotificationSettingsPanel built, notificationRoutes wired, BudgetAlertPoller lifecycle connected
+Phase: —
+Plan: —
+Status: v3.3 milestone complete, planning next milestone
+Last activity: 2026-03-05 — v3.3 Telegram Operator Awareness milestone archived
 
 ```
-Progress: [##] 2/2 plans (Phase 35 complete — v3.4 milestone done)
-Milestone: v3.4 Budget Alerts & Notification Settings — COMPLETE
+Progress: v3.3 SHIPPED — 4 phases, 8 plans, 19/19 requirements
+Next: /gsd:new-milestone
 ```
 
 ## Performance Metrics
 
-**Completed milestones:** v1.0 (6 phases), v1.1 (2), v2.0 (3), v2.1 (3), v2.3 (4), v3.0 (2), v3.1 (6), v3.2 (4), v3.3 (4), v3.4 (1) = 36 phases shipped
-**Current milestone:** v3.4 Budget Alerts & Notification Settings — COMPLETE (Phase 35, 2/2 done)
+**Completed milestones:** v1.0 (6 phases), v1.1 (2), v2.0 (3), v2.1 (3), v2.3 (4), v3.0 (2), v3.1 (6), v3.2 (4), v3.3 (4) = 34 phases shipped
+**Current milestone:** None — planning next
 
 ## Accumulated Context
 
@@ -30,47 +30,9 @@ Milestone: v3.4 Budget Alerts & Notification Settings — COMPLETE
 
 See PROJECT.md Key Decisions table for full list with outcomes.
 
-**v3.3-specific decisions (to be made during implementation):**
-
-- grammy ^1.41.1 selected for Telegram bot client (TypeScript-first, long polling, inline keyboards, graceful shutdown)
-- `@grammyjs/auto-retry` for 429 rate-limit handling at bot init
-- `strip-ansi` for ANSI stripping of tmux pane excerpts before Telegram message composition
-- Bot token from `WARDEN_TELEGRAM_BOT_TOKEN` env var — never logged or committed
-- Operator Telegram user ID from `WARDEN_TELEGRAM_OPERATOR_ID` env var
-- `NotificationPoller` with 10-second interval using `tmux capture-pane` (NOT PTY `onData`) — works without browser open
-- `detectAgentState()` extracted from `gsdRoutes.ts` to `src/server/utils/agentStateDetection.ts` (shared utility)
-- `NotificationDeduplicator` with in-memory cooldown Map — configurable window, defaults: 2 min permission, 10 min budget
-- `notification_config` SQLite table following singleton-row pattern (same as `budget_config`, `rotation_config`)
-- Phase 33 depends on Phase 32; Phase 34 depends on Phase 33; Phase 35 depends on Phase 33
-- [Phase 32-bot-foundation]: MockBot vi.fn must use function() not arrow fn for constructability via new Bot(token)
-- [Phase 32-bot-foundation]: TelegramBotService.start() is void — bot.start() fire-and-forget, no await
-- [Phase 32-bot-foundation]: autoRetry() default config (unlimited retries) selected for Phase 32
-- [Phase 32-02]: handleShutdown() converted to async — await telegramBotService.stop() before httpServer.close() prevents 409 Conflict on rapid restart
-- [Phase 32-02]: Signal handlers use void pattern — () => { void handleShutdown('SIGTERM'); } correct async invocation without unhandled rejection
-- [Phase 33-01]: lastNotifiedAt reset to null on permission state exit — enables immediate re-notification on clean re-entry without cooldown wait
-- [Phase 33-01]: previousState checked BEFORE update in recordAndCheck() — transition detection requires reading old state before writing new state
-- [Phase 33-02]: ANSI stripping applied BEFORE detectAgentState() — ANSI codes around cursor character break permission prompt regex
-- [Phase 33-02]: notificationPoller lifecycle ordering: start after telegramBotService.start(), stop before telegramBotService.stop() — correct dependency sequencing
-- [Phase 34-01]: ApprovalStateTracker uses in-memory Map; markConsumed() synchronous before async tmux call prevents double-tap race (Node.js single-threaded event loop)
-- [Phase 34-01]: ApprovalCallbackHandler.register(bot) pattern — handler class registers on bot reference; called after bot construction but before bot.start()
-- [Phase 34-01]: Expired approval returns 'Approval expired' without editing message; session-gone returns 'Session no longer available' without editing message (leaves button as failure indicator)
-- [Phase 34-02]: sendToTopicWithApproveButton is a separate method — cleaner API, sendToTopic remains for non-approval messages
-- [Phase 34-02]: registerCallbackHandler stores handlers in array — supports multiple handlers without coupling
-- [Phase 34-02]: approvalStateTracker.pruneExpired() piggybacked on 10s poll cycle — no extra timer needed
-- [Phase 35-01]: vi.hoisted() required for BudgetAlertPoller tests — vi.mock factories are hoisted before const declarations, so mock fns must be created via vi.hoisted()
-- [Phase 35-01]: NotificationPoller reads permissionCooldownMs from database.getNotificationConfig() on each poll — no restart needed after config change
-- [Phase 35-01]: BudgetAlertPoller updates record BEFORE async sendBudgetAlert — prevents duplicate fire on re-entry during slow Telegram API calls
-- [Phase 35-01]: Budget level escalation uses rank map {ok:0, warning:1, exceeded:2} — clean O(1) comparison
-- [Phase 35-02]: GET /api/notifications/config spreads DB config and adds botConnected live — single endpoint gives UI everything it needs
-- [Phase 35-02]: PUT validates each field independently — clear per-field errors, partial patches are valid
-- [Phase 35-02]: pollAllSessions() reads config once per cycle, passes cooldownMs to pollSession() — reduces DB calls
-- [Phase 35-02]: onBlur for cooldown inputs prevents rapid PUT calls while typing; key={value} resets uncontrolled input on server data change
-
 ### Research Flags
 
-- **Phase 33:** Verify narrowed `detectAgentState()` regex (`❯ 1. Yes`) against actual Claude Code terminal output before finalizing. Capture a real permission prompt pane and confirm match.
-- **Phase 32 deployment:** `WARDEN_TELEGRAM_BOT_TOKEN` must be set in production (Laravel Forge env) before Phase 32 deploy.
-- **Phase 34 prereq:** Operator must look up their Telegram user ID via `@userinfobot` before Phase 34 testing.
+None
 
 ### Pending Todos
 
@@ -91,6 +53,6 @@ None
 
 ## Session Continuity
 
-Last session: 2026-03-05 (Plan 35-02 execution)
-Stopped at: Completed 35-02-PLAN.md — NotificationSettingsPanel built, notificationRoutes wired, BudgetAlertPoller lifecycle connected; 90 tests pass; NSET-01/02/03 covered; v3.4 complete
-Next step: Plan next milestone
+Last session: 2026-03-05 (v3.3 milestone completion)
+Stopped at: Milestone archived, all planning docs updated
+Next step: /gsd:new-milestone

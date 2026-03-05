@@ -2,7 +2,7 @@
 
 ## What This Is
 
-A browser-based terminal multiplexer and operations platform hosted at `warden.kingdom.lv` that streams live Claude Code output via xterm.js, provides agent lifecycle control (start/stop/restart), cost velocity tracking with budget alerts, session recording with automatic capture and storage rotation, mobile-optimized toolbar with keyboard persistence, and operator awareness features (permission badges, context pressure, keyboard navigation, terminal search, browser notifications). It is the observation, control, and audit layer for the multi-agent system orchestrated by Gideon.
+A browser-based terminal multiplexer and operations platform hosted at `warden.kingdom.lv` that streams live Claude Code output via xterm.js, provides agent lifecycle control (start/stop/restart), cost velocity tracking with budget alerts, session recording with automatic capture and storage rotation, mobile-optimized toolbar with keyboard persistence, operator awareness features (permission badges, context pressure, keyboard navigation, terminal search, browser notifications), and Telegram-based operator awareness with permission prompt forwarding, one-tap approve, and budget alert notifications. It is the observation, control, and audit layer for the multi-agent system orchestrated by Gideon.
 
 ## Core Value
 
@@ -67,13 +67,15 @@ Real-time visibility into all active Claude Code agent sessions from a single br
 - ✓ Recording storage rotation with configurable cap and two-phase safe deletion — v3.2
 - ✓ Storage stats UI with usage bar, cap input, and manual prune — v3.2
 
+- ✓ Telegram bot client (grammy) with long polling and graceful lifecycle — v3.3
+- ✓ Permission prompt forwarding to Telegram topics with one-tap approve — v3.3
+- ✓ Budget alert forwarding to Telegram (amber/red thresholds) — v3.3
+- ✓ Duplicate suppression with configurable cooldown — v3.3
+- ✓ Notification settings UI (toggle per alert type, cooldown config, bot status) — v3.3
+
 ### Active
 
-- [ ] Telegram bot client for operator notifications
-- [ ] Permission prompt forwarding to Telegram topics with one-tap approve
-- [ ] Budget alert forwarding to Telegram (amber/red thresholds)
-- [ ] Duplicate suppression with configurable cooldown
-- [ ] Notification settings UI (toggle per alert type, cooldown config)
+(None — define in next milestone)
 
 ### Deferred
 
@@ -83,23 +85,11 @@ Real-time visibility into all active Claude Code agent sessions from a single br
 - [ ] Auto-record on permission prompt detection (depends on detectAgentState reliability — REC-07)
 - [ ] Events tab row click navigates to relevant session's terminal (NAV-04)
 
-## Current Milestone: v3.3 Telegram Operator Awareness
-
-**Goal:** Extend operator awareness beyond the dashboard — forward permission prompts and budget alerts to Telegram, with one-tap approve to unblock stalled agents without opening the browser.
-
-**Target features:**
-- Own Telegram bot client (grammy or node-telegram-bot-api) running inside Warden
-- Permission prompt detection → Telegram message to agent's configured topic
-- Inline keyboard button for one-tap approve (sends input to agent tmux session)
-- Budget alert forwarding (amber/red thresholds) to operator's Telegram topic
-- Duplicate suppression with configurable cooldown window
-- Notification settings panel in dashboard UI
-
 ## Current State
 
-**Latest milestone:** v3.2 Mobile Operations & UX Polish (shipped 2026-03-04)
+**Latest milestone:** v3.3 Telegram Operator Awareness (shipped 2026-03-05)
 
-Warden is a complete operations platform with mobile support. The operator can manage agent sessions from desktop or phone; record sessions automatically with per-agent toggles; cap and rotate recording storage; navigate history rows directly to live terminals or recording replays; monitor cost velocity with budget alerts; and access all features from a mobile browser with keyboard persistence.
+Warden is a complete operations platform with Telegram integration. The operator can manage agent sessions from desktop or phone; record sessions automatically with per-agent toggles; cap and rotate recording storage; navigate history rows directly to live terminals or recording replays; monitor cost velocity with budget alerts; receive Telegram notifications when agents stall on permission prompts; approve stalled agents with a single tap in Telegram; get budget alert notifications at amber/red thresholds; configure all notification preferences from the dashboard; and access all features from a mobile browser with keyboard persistence.
 
 ### Out of Scope
 
@@ -114,13 +104,13 @@ Warden is a complete operations platform with mobile support. The operator can m
 
 ## Context
 
-Shipped v3.2 with 11,229 LOC TypeScript (src/). Net +544 LOC from v3.1.
-Tech stack: Express 5, Socket.IO 4, React 19, xterm.js 5, node-pty, SQLite (better-sqlite3), Tailwind CSS 4, Vite 6, Vitest.
-Features: live terminal streaming, agent lifecycle control (start/stop/restart), token burn rate with budget alerts, model cost comparison, CSV export, session recording (asciicast v2) with auto-record and storage rotation, variable-speed replay, mobile toolbar with keyboard persistence, clickable session navigation, terminal search, browser notifications, keyboard navigation, GSD Manager plugin, activity timeline.
+Shipped v3.3 with 12,252 LOC TypeScript (src/). Net +1,023 LOC from v3.2.
+Tech stack: Express 5, Socket.IO 4, React 19, xterm.js 5, node-pty, SQLite (better-sqlite3), Tailwind CSS 4, Vite 6, Vitest, grammy (Telegram bot).
+Features: live terminal streaming, agent lifecycle control (start/stop/restart), token burn rate with budget alerts, model cost comparison, CSV export, session recording (asciicast v2) with auto-record and storage rotation, variable-speed replay, mobile toolbar with keyboard persistence, clickable session navigation, terminal search, browser notifications, keyboard navigation, GSD Manager plugin, activity timeline, Telegram bot with permission prompt notifications, one-tap approve, budget alert forwarding, and notification settings panel.
 Runs on Ubuntu 24 server (Laravel Forge managed), same host as gideons.kingdom.lv.
-20 Playwright E2E tests + Vitest unit tests. Production Nginx config with SSL + IP whitelist + WebSocket.
+20 Playwright E2E tests + 90 Vitest unit tests. Production Nginx config with SSL + IP whitelist + WebSocket.
 tmux configured with mouse mode and 50,000-line scrollback buffer for monitoring workflows.
-Known tech debt: detectAgentState() regex heuristics fragile but functional; NAVIGABLE_STATUSES Set recreates per render (info-level); recordings fetched once on mount (no polling).
+Known tech debt: detectAgentState() regex heuristics fragile but functional; NAVIGABLE_STATUSES Set recreates per render (info-level); recordings fetched once on mount (no polling); WARDEN_TELEGRAM_OPERATOR_ID not validated at startup; NotificationPoller polls stopped sessions (dead capture-pane calls).
 
 ## Constraints
 
@@ -173,6 +163,12 @@ Known tech debt: detectAgentState() regex heuristics fragile but functional; NAV
 | Single-row rotation_config with CHECK(id=1) | INSERT OR REPLACE upsert, same pattern as budget_config | ✓ Good — simple, no multi-row confusion |
 | Two-phase deletion for storage rotation | deletion_pending flag prevents deleting files mid-playback or mid-capture | ✓ Good — safe concurrent access |
 | Literal routes before :id param routes | Express matches first-registered route; literal /storage-stats before /:id | ✓ Good — prevents param capture of literal strings |
+| grammy for Telegram bot client | TypeScript-first, long polling, inline keyboards, graceful shutdown | ✓ Good — clean API, auto-retry plugin for rate limits |
+| tmux capture-pane for notification polling | Works without browser open, 10s interval independent of Socket.IO | ✓ Good — reliable, no PTY dependency |
+| In-memory approval state tracking | Map with sentAt/consumed fields, synchronous markConsumed before async tmux | ✓ Good — prevents double-tap race via event loop |
+| Singleton-row notification_config table | Same pattern as budget_config and rotation_config (CHECK id=1) | ✓ Good — simple upsert, consistent across DB |
+| ANSI stripping before state detection | strip-ansi applied before detectAgentState() in NotificationPoller | ✓ Good — prevents cursor escape codes breaking regex |
+| onBlur save for cooldown inputs | Prevents rapid PUT calls while typing; key={value} resets on server data | ✓ Good — clean UX, minimal API calls |
 
 ---
-*Last updated: 2026-03-04 after v3.3 milestone started*
+*Last updated: 2026-03-05 after v3.3 milestone complete*

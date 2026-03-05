@@ -94,7 +94,7 @@ Each task was committed atomically:
 1. **Task 1: NotificationConfig type, DB migration, and DB methods** - `18e2ca0` (feat)
 2. **Task 2: BudgetAlertPoller, NotificationDeduplicator refactor, tests** - `4b4271b` (feat)
 
-**Plan metadata:** (docs commit pending)
+**Plan metadata:** `58d0d3a` (docs: complete budget alerts foundation plan)
 
 ## Files Created/Modified
 - `src/shared/types.ts` — Added `NotificationConfig` interface
