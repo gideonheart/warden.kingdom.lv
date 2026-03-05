@@ -3,9 +3,10 @@ import type { ReactNode } from 'react';
 import { SessionHistory } from './SessionHistory.js';
 import { TokenUsageView } from './TokenUsageView.js';
 import { LogViewer } from './LogViewer.js';
+import { NotificationSettingsPanel } from './NotificationSettingsPanel.js';
 import type { RecordingEntry } from '@shared/types.js';
 
-type HistoryTab = 'sessions' | 'tokens' | 'logs';
+type HistoryTab = 'sessions' | 'tokens' | 'logs' | 'notifications';
 
 function MobileAccordionSection({ title, defaultOpen, children }: {
   title: string;
@@ -37,6 +38,7 @@ export function HistoryView({ onNavigateToSession, onPlayRecording }: HistoryVie
     { id: 'sessions', label: 'Sessions' },
     { id: 'tokens', label: 'Token Usage' },
     { id: 'logs', label: 'Gateway Logs' },
+    { id: 'notifications', label: 'Notifications' },
   ];
 
   const handleTabChange = useCallback((tab: HistoryTab) => {
@@ -67,6 +69,7 @@ export function HistoryView({ onNavigateToSession, onPlayRecording }: HistoryVie
           {activeTab === 'sessions' && <SessionHistory onNavigateToSession={onNavigateToSession} onPlayRecording={onPlayRecording} />}
           {activeTab === 'tokens' && <TokenUsageView />}
           {activeTab === 'logs' && <LogViewer />}
+          {activeTab === 'notifications' && <NotificationSettingsPanel />}
         </div>
       </div>
 
@@ -80,6 +83,9 @@ export function HistoryView({ onNavigateToSession, onPlayRecording }: HistoryVie
         </MobileAccordionSection>
         <MobileAccordionSection title="Gateway Logs">
           <LogViewer />
+        </MobileAccordionSection>
+        <MobileAccordionSection title="Notifications">
+          <NotificationSettingsPanel />
         </MobileAccordionSection>
       </div>
     </div>
