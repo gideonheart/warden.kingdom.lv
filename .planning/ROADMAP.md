@@ -235,11 +235,11 @@ Plans:
   3. Dashboard shows a "New Session" button that opens an agent picker with each agent's last-used project path pre-filled
   4. Operator can override the pre-filled project path before launching, and the session starts via the existing start API
   5. Quick-launch works for agents that have never been started (no last-used path) — operator must provide a path manually
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 39-01: Idle timeout policy, enforcement, and lifecycle event logging
-- [ ] 39-02: Quick-launch UI with agent picker and project path override
+- [ ] 39-01-PLAN.md — Idle timeout policy, enforcement, and lifecycle event logging (IDLE-01, IDLE-02, IDLE-03)
+- [ ] 39-02-PLAN.md — Quick-launch UI with agent picker and project path override (LNCH-01, LNCH-02, LNCH-03)
 
 ### Phase 40: Lifecycle History & E2E Verification
 **Goal**: Operator can review all lifecycle events and the full milestone is verified end-to-end
