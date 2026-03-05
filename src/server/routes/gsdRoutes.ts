@@ -9,7 +9,7 @@ import { gsdRegistryService } from '../services/GsdRegistryService.js';
 import { gsdEventLogService } from '../services/GsdEventLogService.js';
 import { database } from '../database/DatabaseConnection.js';
 import { openClawSessionReader } from '../services/OpenClawSessionReader.js';
-import { SPAWN_SH_PATH, MENU_DRIVER_PATH, ROTATE_SESSION_PATH } from '../config/externalPaths.js';
+import { SPAWN_SH_PATH, MENU_DRIVER_PATH, ROTATE_SESSION_PATH, PAUSE_SESSION_PATH, PAUSE_STATE_FILE_PATH } from '../config/externalPaths.js';
 
 const execFileAsync = promisify(execFile);
 const ALLOWED_ACTIONS = new Set(['snapshot', 'enter', 'esc', 'clear_then', 'choose', 'submit', 'type']);
@@ -17,6 +17,19 @@ const SESSION_NAME_RE = /^[a-zA-Z][a-zA-Z0-9_-]*$/;
 const AGENT_NAME_RE = /^[a-zA-Z][a-zA-Z0-9_-]*$/;
 const COMMAND_ARG_RE = /^[/a-zA-Z0-9 @:._-]+$/;
 const WORKDIR_PREFIX = '/home/forge/';
+
+/**
+ * Read the pause-state.json file and return the parsed map.
+ * Returns empty object on any error (fail-open, matches gsd-code-skill behavior).
+ */
+async function readPauseStateMap(): Promise<Record<string, { paused: boolean; updatedAt: string }>> {
+  try {
+    const rawContent = await readFile(PAUSE_STATE_FILE_PATH, 'utf-8');
+    return JSON.parse(rawContent);
+  } catch {
+    return {};
+  }
+}
 
 const router = Router();
 
@@ -186,6 +199,44 @@ router.post('/api/gsd/sessions/:session/command', async (request, response) => {
   } catch (error) {
     console.error(`[GsdRoutes] menu-driver.sh failed for session ${session}:`, error);
     response.status(500).json({ error: 'Failed to dispatch command' });
+  }
+});
+
+// GET /api/gsd/hooks-pause-state — return bulk pause state map for all sessions
+router.get('/api/gsd/hooks-pause-state', async (_request, response) => {
+  try {
+    const pauseStateMap = await readPauseStateMap();
+    response.json(pauseStateMap);
+  } catch (error) {
+    console.error('[GsdRoutes] Failed to read hooks pause state:', error);
+    response.status(500).json({ error: 'Failed to read pause state' });
+  }
+});
+
+// PATCH /api/gsd/sessions/:session/hooks-paused — toggle auto-drive hooks pause state
+router.patch('/api/gsd/sessions/:session/hooks-paused', async (request, response) => {
+  const session = String(request.params.session);
+
+  if (!SESSION_NAME_RE.test(session)) {
+    response.status(400).json({ error: 'Invalid session name: must start with a letter and contain only letters, digits, hyphens, underscores' });
+    return;
+  }
+
+  const { paused } = request.body as { paused?: unknown };
+
+  if (typeof paused !== 'boolean') {
+    response.status(400).json({ error: 'paused must be a boolean' });
+    return;
+  }
+
+  try {
+    const action = paused ? 'on' : 'off';
+    const { stdout } = await execFileAsync('node', [PAUSE_SESSION_PATH, session, action]);
+    const result = JSON.parse(stdout);
+    response.json(result);
+  } catch (error) {
+    console.error(`[GsdRoutes] Failed to toggle hooks-paused for ${session}:`, error);
+    response.status(500).json({ error: 'Failed to toggle pause state' });
   }
 });
 
