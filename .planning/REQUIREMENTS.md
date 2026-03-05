@@ -7,11 +7,14 @@
 
 Requirements for v3.4 Smart Session Lifecycle. Each maps to roadmap phases.
 
-### Telegram Pipeline Hardening
+### Telegram Pipeline Pivot & Hardening
 
-- [ ] **FIX-01**: Telegram approval message edits escape or strip Markdown special characters from tmux pane excerpts, preventing `editMessageText` failures on truncated code blocks
-- [ ] **FIX-02**: `TelegramBotService.sendToTopic` and `sendToTopicWithApproveButton` validate `topicId` is a finite integer before API calls; log clear diagnostic and return early on invalid
-- [ ] **FIX-03**: `BudgetAlertPoller` persists `lastAlertedAt` per agent to SQLite and hydrates on startup, preventing false re-alerts after server restart
+- [ ] **FIX-01**: Rewrite `TelegramBotService` to read bot token from `openclaw.json` (`channels.telegram.botToken`) via `OpenClawConfigReader` instead of `WARDEN_TELEGRAM_BOT_TOKEN` env var; send-only mode (no long-polling), using Gideon's bot to deliver notifications to the correct project topic
+- [ ] **FIX-02**: Remove `ApprovalCallbackHandler`, `ApprovalStateTracker`, inline Approve button, `sendToTopicWithApproveButton()`, and `WARDEN_TELEGRAM_OPERATOR_ID` env var — approval now happens via Warden dashboard or Gideon conversation
+- [ ] **FIX-03**: Escape or strip Markdown special characters from tmux pane excerpts in notification messages, preventing `sendMessage` failures on truncated code blocks
+- [ ] **FIX-04**: `TelegramBotService.sendToTopic` validates `topicId` is a finite integer before API calls; log clear diagnostic and return early on invalid
+- [ ] **FIX-05**: `BudgetAlertPoller` persists `lastAlertedAt` per agent to SQLite and hydrates on startup, preventing false re-alerts after server restart
+- [ ] **FIX-06**: Update `NotificationSettingsPanel` UI — replace "Bot connected/disconnected" with "Bot configured/not configured" (no polling status to check), remove references to Approve button
 
 ### Crash Detection & Auto-Restart
 
@@ -73,6 +76,8 @@ Deferred to future milestones.
 | detectAgentState() rewrite | Regex heuristics fragile but functional; deferred to health monitoring milestone |
 | Agent creation/deletion | Managed via openclaw.json, not the dashboard |
 | Fleet coordination view | Deferred to v4.x when fleet size warrants it |
+| One-tap Telegram Approve button | Requires Warden to run its own bot polling loop, conflicting with Gideon's bot; operator approves via Warden dashboard or Gideon conversation instead |
+| Standalone Warden Telegram bot | Warden uses Gideon's bot token (send-only) to avoid running a second bot process |
 
 ## Traceability
 
@@ -83,6 +88,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | FIX-01 | Phase 36 | Pending |
 | FIX-02 | Phase 36 | Pending |
 | FIX-03 | Phase 36 | Pending |
+| FIX-04 | Phase 36 | Pending |
+| FIX-05 | Phase 36 | Pending |
+| FIX-06 | Phase 36 | Pending |
 | CRSH-01 | Phase 37 | Pending |
 | CRSH-02 | Phase 37 | Pending |
 | CRSH-03 | Phase 38 | Pending |
@@ -99,8 +107,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | HIST-02 | Phase 40 | Pending |
 
 **Coverage:**
-- v3.4 requirements: 17 total
-- Mapped to phases: 17
+- v3.4 requirements: 20 total
+- Mapped to phases: 20
 - Unmapped: 0
 
 ---

@@ -105,7 +105,8 @@ Warden is a complete operations platform with Telegram integration. The operator
 
 - Multi-user auth — IP-whitelisted, single operator (Gideon)
 - Agent creation/deletion — managed via openclaw.json, not the dashboard
-- Telegram bot management — OpenClaw gateway manages the main bot; Warden runs a separate notification-only bot
+- Standalone Warden Telegram bot — Warden uses Gideon's bot token (send-only) to avoid polling conflicts
+- One-tap Telegram Approve button — requires own bot polling loop; operator approves via dashboard or Gideon conversation
 - Terminal themes/customization — monitoring tool, single dark theme
 - Multi-pane terminal splits — tmux handles layout within sessions
 - In-dashboard code editor — agents edit files, operator intervenes via prompts
@@ -179,6 +180,8 @@ Known tech debt: detectAgentState() regex heuristics fragile but functional; NAV
 | Singleton-row notification_config table | Same pattern as budget_config and rotation_config (CHECK id=1) | ✓ Good — simple upsert, consistent across DB |
 | ANSI stripping before state detection | strip-ansi applied before detectAgentState() in NotificationPoller | ✓ Good — prevents cursor escape codes breaking regex |
 | onBlur save for cooldown inputs | Prevents rapid PUT calls while typing; key={value} resets on server data | ✓ Good — clean UX, minimal API calls |
+| Route notifications through Gideon's bot | Warden can't run its own polling loop without conflicting with Gideon's bot; send-only mode uses Gideon's token from openclaw.json | — Pending |
+| Drop one-tap Approve inline button | Requires separate bot polling; operator approves via Warden dashboard or Gideon conversation instead | — Pending |
 
 ---
 *Last updated: 2026-03-05 after v3.4 milestone started*

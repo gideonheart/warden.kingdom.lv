@@ -107,7 +107,7 @@
 
 **Milestone Goal:** Transform Warden from passive monitoring to autonomous session management — crash recovery, idle timeout cleanup, and one-click session launch.
 
-- [ ] **Phase 36: Telegram Pipeline Hardening** - Fix Markdown escaping, topicId validation, and budget alert persistence bugs
+- [ ] **Phase 36: Telegram Pipeline Pivot & Hardening** - Route notifications through Gideon's bot, remove standalone bot, fix edge cases
 - [ ] **Phase 37: Crash Detection Backend** - Detect crashed sessions, persist lifecycle events, send Telegram crash notifications
 - [ ] **Phase 38: Auto-Restart Engine** - Per-agent restart policy, automatic crash recovery, restart storm rate limiter
 - [ ] **Phase 39: Idle Timeout & Quick-Launch** - Auto-stop idle sessions and one-click session launch from dashboard
@@ -178,18 +178,21 @@ See `.planning/milestones/v3.3-ROADMAP.md`
 
 </details>
 
-### Phase 36: Telegram Pipeline Hardening
-**Goal**: Telegram notification pipeline handles all edge cases without silent failures
-**Depends on**: Nothing (bug fixes to existing v3.3 code)
-**Requirements**: FIX-01, FIX-02, FIX-03
+### Phase 36: Telegram Pipeline Pivot & Hardening
+**Goal**: Route Telegram notifications through Gideon's bot (send-only, no polling), remove standalone bot infrastructure, fix notification edge cases
+**Depends on**: Nothing (refactor + bug fixes to existing v3.3 code)
+**Requirements**: FIX-01, FIX-02, FIX-03, FIX-04, FIX-05, FIX-06
 **Success Criteria** (what must be TRUE):
-  1. Approval message edits succeed even when tmux pane content contains Markdown special characters (backticks, brackets, asterisks)
-  2. Telegram API calls with invalid or missing topicId produce a clear log warning and return gracefully instead of throwing unhandled errors
-  3. Budget alert state survives server restart — restarting the server does not re-fire alerts that were already sent
+  1. Notifications are sent using Gideon's bot token from `openclaw.json` — no `WARDEN_TELEGRAM_BOT_TOKEN` env var needed
+  2. Notifications land in the correct Telegram topic based on agent-to-topic mapping (e.g., Warden session → topic 41)
+  3. ApprovalCallbackHandler, ApprovalStateTracker, and inline Approve button code are removed — dead code deleted
+  4. Notification messages with Markdown special characters in pane excerpts are sent successfully
+  5. Invalid topicId produces a clear log warning and graceful return (no silent failure)
+  6. Budget alert state survives server restart — no false re-alerts after restart
 **Plans**: TBD
 
 Plans:
-- [ ] 36-01: Telegram pipeline bug fixes (Markdown escaping, topicId validation, budget alert persistence)
+- [ ] 36-01: Telegram pipeline pivot (Gideon bot token, remove approval infrastructure, fix edge cases)
 
 ### Phase 37: Crash Detection Backend
 **Goal**: Warden detects when agent sessions crash and records/notifies the operator
@@ -292,7 +295,7 @@ Phases execute in numeric order: 36 → 37 → 38 → 39 → 40
 | 33. Permission Prompt Detection and Forwarding | v3.3 | 2/2 | Complete | 2026-03-04 |
 | 34. One-Tap Approve | v3.3 | 2/2 | Complete | 2026-03-04 |
 | 35. Budget Alerts and Notification Settings | v3.3 | 2/2 | Complete | 2026-03-05 |
-| 36. Telegram Pipeline Hardening | v3.4 | 0/1 | Not started | - |
+| 36. Telegram Pipeline Pivot & Hardening | v3.4 | 0/1 | Not started | - |
 | 37. Crash Detection Backend | v3.4 | 0/2 | Not started | - |
 | 38. Auto-Restart Engine | v3.4 | 0/2 | Not started | - |
 | 39. Idle Timeout & Quick-Launch | v3.4 | 0/2 | Not started | - |
