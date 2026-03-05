@@ -13,6 +13,7 @@ import { recordingRoutes } from './routes/recordingRoutes.js';
 import { notificationRoutes } from './routes/notificationRoutes.js';
 import { terminalStreamService } from './services/TerminalStreamService.js';
 import { instanceTracker } from './services/InstanceTracker.js';
+import { autoRestartService } from './services/AutoRestartService.js';
 import { sessionUsageReader } from './services/SessionUsageReader.js';
 import { recordingRotationService } from './services/RecordingRotationService.js';
 import { telegramBotService } from './services/TelegramBotService.js';
@@ -131,6 +132,9 @@ instanceTracker.onCrashDetected = async ({ instance, uptimeSecs, projectSlug }) 
     // Notification failure must never block crash detection
     console.error(`[CrashNotify] Failed to send crash notification for ${instance.agentId}:`, error);
   }
+
+  // Auto-restart engine (CRSH-04) — fire-and-forget, must not block crash detection
+  void autoRestartService.attemptRestart(instance, uptimeSecs, projectSlug);
 };
 
 sessionUsageReader.startPeriodicScan();

@@ -611,6 +611,22 @@ class DatabaseConnection {
     `).all() as RestartPolicy[];
   }
 
+  /**
+   * Flip crash_restart_mode to 'none' and record the storm_disabled_at timestamp.
+   * Uses upsert so that a row is created even if the agent never had a policy set.
+   * Called by AutoRestartService when the sliding window rate limit is exceeded.
+   */
+  markStormDisabled(agentId: string): void {
+    this.db.prepare(`
+      INSERT INTO session_lifecycle_policy (agent_id, crash_restart_mode, storm_disabled_at, updated_at)
+      VALUES (?, 'none', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      ON CONFLICT(agent_id) DO UPDATE SET
+        crash_restart_mode = 'none',
+        storm_disabled_at = CURRENT_TIMESTAMP,
+        updated_at = CURRENT_TIMESTAMP
+    `).run(agentId);
+  }
+
   close(): void {
     console.log('[Database] Checkpointing WAL before close');
     this.db.pragma('wal_checkpoint(TRUNCATE)');
