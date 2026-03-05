@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-03-05)
 
 **Core value:** Real-time visibility into all active Claude Code agent sessions from a single browser tab
-**Current focus:** v3.4 Smart Session Lifecycle — Phase 39 complete (both plans done), Phase 40 next
+**Current focus:** v3.4 Smart Session Lifecycle — Phase 40 in progress (Plan 01 complete)
 
 ## Current Position
 
-Phase: 39 of 40 (Idle Timeout + Quick Launch) — COMPLETE
-Plan: 2 of 2 in current phase (both plans complete)
-Status: Phase 39 complete — both plans done. Next: Phase 40
-Last activity: 2026-03-05 - Completed 39-02: quick-launch modal (QuickLaunchModal + GET /api/agents/last-projects + projectPath override)
+Phase: 40 of 40 (Lifecycle History + E2E Verification)
+Plan: 1 of 2 complete
+Status: Phase 40 Plan 01 complete — lifecycle history UI shipped. Next: Phase 40 Plan 02 (E2E verification)
+Last activity: 2026-03-05 - Completed 40-01: LifecycleEventsView + Lifecycle tab + TD-4/TD-5 fixes
 
-Progress: [████████░░] 89% (8/9 plans)
+Progress: [█████████░] 94% (9/10 plans)
 
 ## Performance Metrics
 
@@ -52,6 +52,9 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase 39]: 39-02: QuickLaunchModal fetches /api/agents/last-projects lazily on isOpen=true, not at App mount
 - [Phase 39-01]: IdleTimeoutService polls tmux sessions every 60s (not 10s like NotificationPoller) — minute-granularity timeout needs no finer resolution
 - [Phase 39-01]: idleTimeoutMinutes added to RestartPolicy type (same DB table as crash policy) rather than a separate type — consolidated fetch with restart policies
+- [Phase 40-01]: Lifecycle tab placed second in HistoryView tabs array (after Sessions) — lifecycle events are most actionable v3.4 history data
+- [Phase 40-01]: Force-kill lifecycle insert placed inside existing try/catch — logging failure silently skips event log rather than returning 500
+- [Phase 40-01]: NaN guard pattern: rawVal !== undefined && !Number.isNaN(rawVal) ? rawVal : undefined — use for all parseInt query params
 
 ### Research Flags
 
@@ -64,8 +67,8 @@ None
 ### Blockers/Concerns
 
 - NotificationPoller polls stopped sessions (dead capture-pane calls) — pre-existing tech debt from v3.3
-- [quick-2046] force-kill endpoint missing lifecycle event log (TD-4) — fix before Phase 40 lifecycle history UI
-- [quick-2046] NaN not guarded after parseInt in GET /api/lifecycle-events (TD-5) — fix before Phase 40 lifecycle history UI
+- ~~[quick-2046] force-kill endpoint missing lifecycle event log (TD-4)~~ CLOSED in 40-01
+- ~~[quick-2046] NaN not guarded after parseInt in GET /api/lifecycle-events (TD-5)~~ CLOSED in 40-01
 
 ### Quick Tasks Completed
 
@@ -83,5 +86,5 @@ None
 ## Session Continuity
 
 Last session: 2026-03-05
-Stopped at: Completed 39-02-PLAN.md — quick-launch modal (QuickLaunchModal + GET /api/agents/last-projects + projectPath override)
-Next step: Execute Phase 40 plans
+Stopped at: Completed 40-01-PLAN.md — LifecycleEventsView component, Lifecycle tab in HistoryView, TD-4/TD-5 fixes
+Next step: Execute Phase 40 Plan 02 (E2E verification)

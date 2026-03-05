@@ -39,8 +39,8 @@ Requirements for v3.4 Smart Session Lifecycle. Each maps to roadmap phases.
 
 ### Lifecycle History
 
-- [ ] **HIST-01**: Lifecycle events section in History view showing `session_lifecycle_events` (crashes, auto-restarts, idle-timeout stops) with agent, timestamp, event type, and outcome
-- [ ] **HIST-02**: Lifecycle history filterable by agent and event type
+- [x] **HIST-01**: Lifecycle events section in History view showing `session_lifecycle_events` (crashes, auto-restarts, idle-timeout stops) with agent, timestamp, event type, and outcome
+- [x] **HIST-02**: Lifecycle history filterable by agent and event type
 
 ## Future Requirements
 
@@ -103,8 +103,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | LNCH-01 | Phase 39 | Complete |
 | LNCH-02 | Phase 39 | Complete |
 | LNCH-03 | Phase 39 | Complete |
-| HIST-01 | Phase 40 | Pending |
-| HIST-02 | Phase 40 | Pending |
+| HIST-01 | Phase 40 | Complete |
+| HIST-02 | Phase 40 | Complete |
 
 **Coverage:**
 - v3.4 requirements: 20 total
