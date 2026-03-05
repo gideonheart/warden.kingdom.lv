@@ -127,7 +127,15 @@ export interface StorageStats {
   recordingCount: number;
 }
 
-export type LifecycleEventType = 'started' | 'stopped' | 'crashed' | 'idle-timeout';
+export type LifecycleEventType = 'started' | 'stopped' | 'crashed' | 'idle-timeout' | 'auto-restarted';
+
+export type CrashRestartMode = 'none' | 'once' | 'always';
+
+export interface RestartPolicy {
+  agentId: string;
+  crashRestartMode: CrashRestartMode;
+  stormDisabledAt: string | null;
+}
 
 export interface LifecycleEvent {
   id: number;

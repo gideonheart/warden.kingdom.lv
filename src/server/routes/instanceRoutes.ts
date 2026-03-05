@@ -4,6 +4,7 @@ import { instanceTracker } from '../services/InstanceTracker.js';
 import { tmuxSessionManager } from '../services/TmuxSessionManager.js';
 import { database } from '../database/DatabaseConnection.js';
 import { openClawConfigReader } from '../services/OpenClawConfigReader.js';
+import type { CrashRestartMode } from '../../shared/types.js';
 
 const GRACE_PERIOD_MS = 5_000;
 const GRACE_POLL_INTERVAL_MS = 500;
@@ -307,6 +308,41 @@ router.get('/api/lifecycle-events', (request, response) => {
   } catch (error) {
     console.error('[API] Failed to get lifecycle events:', error);
     response.status(500).json({ error: 'Failed to get lifecycle events' });
+  }
+});
+
+// GET /api/restart-policies — list all configured per-agent crash restart policies
+router.get('/api/restart-policies', (_request, response) => {
+  try {
+    const policies = database.getAllRestartPolicies();
+    response.json({ policies });
+  } catch (error) {
+    console.error('[API] Failed to get restart policies:', error);
+    response.status(500).json({ error: 'Failed to get restart policies' });
+  }
+});
+
+const VALID_CRASH_RESTART_MODES: CrashRestartMode[] = ['none', 'once', 'always'];
+
+// PUT /api/restart-policies/:agentId — set crash restart mode for an agent
+router.put('/api/restart-policies/:agentId', (request, response) => {
+  const { agentId } = request.params;
+  const { crashRestartMode } = request.body as { crashRestartMode?: unknown };
+
+  if (!crashRestartMode || !VALID_CRASH_RESTART_MODES.includes(crashRestartMode as CrashRestartMode)) {
+    response.status(400).json({
+      error: `crashRestartMode must be one of: ${VALID_CRASH_RESTART_MODES.join(', ')}`,
+    });
+    return;
+  }
+
+  try {
+    database.setRestartPolicy(agentId, crashRestartMode as CrashRestartMode);
+    const policy = database.getRestartPolicy(agentId);
+    response.json({ policy });
+  } catch (error) {
+    console.error(`[API] Failed to set restart policy for ${agentId}:`, error);
+    response.status(500).json({ error: 'Failed to set restart policy' });
   }
 });
 

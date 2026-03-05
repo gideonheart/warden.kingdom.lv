@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import type { AgentInstance, AgentInstanceCreateParams, AgentInstanceStatus, TokenUsageRow, BurnRateEntry, BudgetConfig, BudgetAlertStatus, BurnWindow, TokenUsageByModelRow, ModelComparisonRow, TokenUsageExportRow, RecordingEntry, AutoRecordConfig, RotationConfig, StorageStats, NotificationConfig, LifecycleEvent, LifecycleEventType } from '../../shared/types.js';
+import type { AgentInstance, AgentInstanceCreateParams, AgentInstanceStatus, TokenUsageRow, BurnRateEntry, BudgetConfig, BudgetAlertStatus, BurnWindow, TokenUsageByModelRow, ModelComparisonRow, TokenUsageExportRow, RecordingEntry, AutoRecordConfig, RotationConfig, StorageStats, NotificationConfig, LifecycleEvent, LifecycleEventType, RestartPolicy, CrashRestartMode } from '../../shared/types.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -580,6 +580,37 @@ class DatabaseConnection {
     return { events, total };
   }
 
+  getRestartPolicy(agentId: string): RestartPolicy {
+    const row = this.db.prepare(`
+      SELECT agent_id AS agentId, crash_restart_mode AS crashRestartMode, storm_disabled_at AS stormDisabledAt
+      FROM session_lifecycle_policy WHERE agent_id = ?
+    `).get(agentId) as { agentId: string; crashRestartMode: CrashRestartMode; stormDisabledAt: string | null } | undefined;
+
+    if (!row) {
+      return { agentId, crashRestartMode: 'none', stormDisabledAt: null };
+    }
+    return row;
+  }
+
+  setRestartPolicy(agentId: string, mode: CrashRestartMode): void {
+    this.db.prepare(`
+      INSERT INTO session_lifecycle_policy (agent_id, crash_restart_mode, storm_disabled_at, updated_at)
+      VALUES (?, ?, NULL, CURRENT_TIMESTAMP)
+      ON CONFLICT(agent_id) DO UPDATE SET
+        crash_restart_mode = excluded.crash_restart_mode,
+        storm_disabled_at = NULL,
+        updated_at = CURRENT_TIMESTAMP
+    `).run(agentId, mode);
+  }
+
+  getAllRestartPolicies(): RestartPolicy[] {
+    return this.db.prepare(`
+      SELECT agent_id AS agentId, crash_restart_mode AS crashRestartMode, storm_disabled_at AS stormDisabledAt
+      FROM session_lifecycle_policy
+      ORDER BY agent_id
+    `).all() as RestartPolicy[];
+  }
+
   close(): void {
     console.log('[Database] Checkpointing WAL before close');
     this.db.pragma('wal_checkpoint(TRUNCATE)');
@@ -770,6 +801,16 @@ class DatabaseConnection {
       CREATE INDEX IF NOT EXISTS idx_lifecycle_events_agent_id ON session_lifecycle_events(agent_id);
       CREATE INDEX IF NOT EXISTS idx_lifecycle_events_event_type ON session_lifecycle_events(event_type);
       CREATE INDEX IF NOT EXISTS idx_lifecycle_events_timestamp ON session_lifecycle_events(timestamp);
+    `);
+
+    // Migration: session_lifecycle_policy table (CRSH-03) — per-agent crash restart configuration
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS session_lifecycle_policy (
+        agent_id TEXT PRIMARY KEY,
+        crash_restart_mode TEXT NOT NULL DEFAULT 'none',
+        storm_disabled_at TEXT,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )
     `);
   }
 
