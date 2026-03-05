@@ -24,6 +24,11 @@ import type { RecordingEntry } from '@shared/types.js';
 
 type AppView = 'terminals' | 'history' | 'plugins' | 'agents' | 'recordings';
 
+interface ToastMessage {
+  id: string;
+  text: string;
+}
+
 function parseHash(): { view: AppView; session: string | null } {
   const hash = window.location.hash.replace(/^#/, '');
   const params = new URLSearchParams(hash);
@@ -48,6 +53,52 @@ function updateHash(view: AppView, session: string | null): void {
 export function App() {
   const { instances, isLoading, error, refetch } = useActiveInstances();
   const { agents, topicMappings, restartPolicies, updateRestartPolicy } = useAgentConfig();
+
+  // --- Auto-restart toast notifications ---
+  // Detects when a new session appears for an agent that already has a stopped session,
+  // which is the signature of an automatic restart by AutoRestartService.
+  const [toastMessages, setToastMessages] = useState<ToastMessage[]>([]);
+  const previousInstanceIdsRef = useRef<Set<number>>(new Set());
+
+  useEffect(() => {
+    const currentIds = new Set(instances.map((instance) => instance.id));
+    const previousIds = previousInstanceIdsRef.current;
+
+    if (previousIds.size > 0) {
+      // Find instances that are genuinely new (not seen in previous poll)
+      const newInstances = instances.filter(
+        (instance) => !previousIds.has(instance.id) && (instance.status === 'starting' || instance.status === 'active'),
+      );
+
+      for (const newInstance of newInstances) {
+        // Check if the same agent also has a stopped session in the current list
+        const hasCrashedSibling = instances.some(
+          (other) =>
+            other.id !== newInstance.id &&
+            other.agentId === newInstance.agentId &&
+            other.status === 'stopped',
+        );
+
+        if (hasCrashedSibling) {
+          const toastId = `${newInstance.agentId}-${newInstance.id}`;
+          const toastText = `${newInstance.agentId} auto-restarted — new session active`;
+
+          setToastMessages((previous) => {
+            // Avoid duplicate toasts for the same event
+            if (previous.some((message) => message.id === toastId)) return previous;
+            return [...previous, { id: toastId, text: toastText }];
+          });
+
+          // Auto-dismiss after 5 seconds
+          setTimeout(() => {
+            setToastMessages((previous) => previous.filter((message) => message.id !== toastId));
+          }, 5000);
+        }
+      }
+    }
+
+    previousInstanceIdsRef.current = currentIds;
+  }, [instances]);
   const { plugins, enabledState, enabledPlugins, togglePlugin } = usePluginRegistry();
   const [sidebarSelectedAgentId, setSidebarSelectedAgentId] = useState<string | null>(null);
   const [showSidebar, setShowSidebar] = useState(() => window.innerWidth >= 1024);
@@ -676,6 +727,20 @@ export function App() {
       {/* Mobile: bottom sheet prompt panel */}
       {currentView === 'terminals' && agents.length > 0 && (
         <MobilePromptSheet agents={agents} selectedAgentId={derivedAgentId} />
+      )}
+
+      {/* Auto-restart toast notifications — fixed bottom-right, non-blocking */}
+      {toastMessages.length > 0 && (
+        <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 pointer-events-none">
+          {toastMessages.map((message) => (
+            <div
+              key={message.id}
+              className="px-3 py-2 bg-warden-panel border border-warden-accent text-warden-text text-xs rounded shadow-lg max-w-xs"
+            >
+              {message.text}
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );
