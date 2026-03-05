@@ -9,12 +9,18 @@ const {
   mockSendToTopic,
   mockIsRunning,
   mockGetTopicMappings,
+  mockGetAllBudgetAlertStates,
+  mockSetBudgetAlertState,
+  mockDeleteBudgetAlertState,
 } = vi.hoisted(() => ({
   mockGetBudgetAlertStatus: vi.fn(),
   mockGetNotificationConfig: vi.fn(),
   mockSendToTopic: vi.fn(),
   mockIsRunning: vi.fn().mockReturnValue(true),
   mockGetTopicMappings: vi.fn(),
+  mockGetAllBudgetAlertStates: vi.fn().mockReturnValue([]),
+  mockSetBudgetAlertState: vi.fn(),
+  mockDeleteBudgetAlertState: vi.fn(),
 }));
 
 // ─── Mock dependencies before importing the module under test ────────────────
@@ -23,6 +29,9 @@ vi.mock('../../src/server/database/DatabaseConnection.js', () => ({
   database: {
     getBudgetAlertStatus: mockGetBudgetAlertStatus,
     getNotificationConfig: mockGetNotificationConfig,
+    getAllBudgetAlertStates: mockGetAllBudgetAlertStates,
+    setBudgetAlertState: mockSetBudgetAlertState,
+    deleteBudgetAlertState: mockDeleteBudgetAlertState,
   },
 }));
 
@@ -260,5 +269,67 @@ describe('BudgetAlertPoller', () => {
 
     // checkAgent runs, sendBudgetAlert runs, but sendToTopic is never called
     expect(mockSendToTopic).not.toHaveBeenCalled();
+  });
+
+  // ─── FIX-05: Persistent state hydration ───────────────────────────────────
+
+  it('hydrates state from database on startPolling — no re-alert within cooldown (FIX-05)', async () => {
+    vi.useFakeTimers();
+    const recentAlertTime = Date.now() - 2 * 60 * 1000; // 2 minutes ago (within 10-min cooldown)
+
+    // Simulate saved state from a previous run: gideon was already in 'warning'
+    mockGetAllBudgetAlertStates.mockReturnValue([
+      { agentId: 'gideon', level: 'warning', lastAlertedAt: recentAlertTime },
+    ]);
+    mockGetNotificationConfig.mockReturnValue(makeDefaultConfig({ budgetCooldownMs: 600_000 }));
+    mockGetBudgetAlertStatus.mockReturnValue([
+      makeStatus({ agentId: 'gideon', budgetPct: 85, alertLevel: 'warning' }),
+    ]);
+
+    // hydratePersistentState is called inside startPolling
+    poller.startPolling();
+    // Wait for the immediate pollBudgets() to settle
+    await Promise.resolve();
+    await Promise.resolve();
+
+    // Should NOT have sent an alert — cooldown not yet expired after hydration
+    expect(mockSendToTopic).not.toHaveBeenCalled();
+
+    poller.stopPolling();
+  });
+
+  it('persists alert state to database when an alert fires (FIX-05)', async () => {
+    mockGetBudgetAlertStatus.mockReturnValue([
+      makeStatus({ agentId: 'gideon', budgetPct: 85, todayCostUsd: 8.5, dailyBudgetUsd: 10, alertLevel: 'warning' }),
+    ]);
+
+    await (poller as any).pollBudgets();
+
+    expect(mockSendToTopic).toHaveBeenCalledTimes(1);
+    // setBudgetAlertState should have been called with agentId, level, and a timestamp
+    expect(mockSetBudgetAlertState).toHaveBeenCalledTimes(1);
+    const [agentId, level, lastAlertedAt] = mockSetBudgetAlertState.mock.calls[0];
+    expect(agentId).toBe('gideon');
+    expect(level).toBe('warning');
+    expect(typeof lastAlertedAt).toBe('number');
+  });
+
+  it("clears persistent state when agent returns to 'ok' (FIX-05)", async () => {
+    // First fire a warning to put agent in records
+    mockGetBudgetAlertStatus.mockReturnValue([
+      makeStatus({ agentId: 'gideon', budgetPct: 85, alertLevel: 'warning' }),
+    ]);
+    await (poller as any).pollBudgets();
+    expect(mockSetBudgetAlertState).toHaveBeenCalledTimes(1);
+
+    // Now return to 'ok'
+    mockGetBudgetAlertStatus.mockReturnValue([
+      makeStatus({ agentId: 'gideon', budgetPct: 30, alertLevel: 'ok' }),
+    ]);
+    await (poller as any).pollBudgets();
+
+    // deleteBudgetAlertState should have been called for cleanup
+    expect(mockDeleteBudgetAlertState).toHaveBeenCalledTimes(1);
+    expect(mockDeleteBudgetAlertState).toHaveBeenCalledWith('gideon');
   });
 });

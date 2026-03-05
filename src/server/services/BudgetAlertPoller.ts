@@ -34,14 +34,35 @@ export class BudgetAlertPoller {
   /**
    * Start polling all agent budget statuses.
    *
+   * Hydrates persistent dedup state from SQLite before the first poll so that
+   * agents already in 'warning' or 'exceeded' within their cooldown window are
+   * not re-alerted immediately after a server restart (FIX-05).
+   *
    * Runs one immediate poll on start, then repeats every POLL_INTERVAL_MS.
    */
   startPolling(): void {
     console.log('[BudgetAlertPoller] Starting budget threshold polling (10s interval)');
+    this.hydratePersistentState();
     void this.pollBudgets();
     this.pollInterval = setInterval(() => {
       void this.pollBudgets();
     }, POLL_INTERVAL_MS);
+  }
+
+  /**
+   * Load persisted budget alert state from SQLite into the in-memory records Map.
+   *
+   * Called once at startup to restore deduplication context from the previous run.
+   */
+  private hydratePersistentState(): void {
+    const states = database.getAllBudgetAlertStates();
+    for (const state of states) {
+      this.records.set(state.agentId, {
+        level: state.level as BudgetLevel,
+        lastAlertedAt: state.lastAlertedAt,
+      });
+    }
+    console.log(`[BudgetAlertPoller] Hydrated ${states.length} persistent alert state(s)`);
   }
 
   /**
@@ -82,6 +103,7 @@ export class BudgetAlertPoller {
     // Return to 'ok' — clear record so next breach fires fresh (BUDG-02)
     if (currentLevel === 'ok') {
       this.records.delete(status.agentId);
+      database.deleteBudgetAlertState(status.agentId);
       return;
     }
 
@@ -103,6 +125,8 @@ export class BudgetAlertPoller {
       level: currentLevel,
       lastAlertedAt: now,
     });
+    // Persist dedup state so server restart does not cause false re-alerts (FIX-05)
+    database.setBudgetAlertState(status.agentId, currentLevel, now);
 
     await this.sendBudgetAlert(
       status.agentId,

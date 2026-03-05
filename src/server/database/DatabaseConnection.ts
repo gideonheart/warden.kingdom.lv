@@ -482,6 +482,35 @@ class DatabaseConnection {
     ).all() as Array<{ id: number; filePath: string }>;
   }
 
+  getBudgetAlertState(agentId: string): { level: string; lastAlertedAt: number | null } | null {
+    return this.db.prepare(`
+      SELECT alert_level AS level, last_alerted_at AS lastAlertedAt
+      FROM budget_alert_state WHERE agent_id = ?
+    `).get(agentId) as { level: string; lastAlertedAt: number | null } | null;
+  }
+
+  setBudgetAlertState(agentId: string, level: string, lastAlertedAt: number | null): void {
+    this.db.prepare(`
+      INSERT INTO budget_alert_state (agent_id, alert_level, last_alerted_at, updated_at)
+      VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+      ON CONFLICT(agent_id) DO UPDATE SET
+        alert_level = excluded.alert_level,
+        last_alerted_at = excluded.last_alerted_at,
+        updated_at = CURRENT_TIMESTAMP
+    `).run(agentId, level, lastAlertedAt);
+  }
+
+  deleteBudgetAlertState(agentId: string): void {
+    this.db.prepare(`DELETE FROM budget_alert_state WHERE agent_id = ?`).run(agentId);
+  }
+
+  getAllBudgetAlertStates(): Array<{ agentId: string; level: string; lastAlertedAt: number | null }> {
+    return this.db.prepare(`
+      SELECT agent_id AS agentId, alert_level AS level, last_alerted_at AS lastAlertedAt
+      FROM budget_alert_state
+    `).all() as Array<{ agentId: string; level: string; lastAlertedAt: number | null }>;
+  }
+
   close(): void {
     console.log('[Database] Checkpointing WAL before close');
     this.db.pragma('wal_checkpoint(TRUNCATE)');
@@ -640,6 +669,16 @@ class DatabaseConnection {
         permission_cooldown_ms INTEGER NOT NULL DEFAULT 120000,
         budget_cooldown_ms INTEGER NOT NULL DEFAULT 600000,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Migration: budget_alert_state table (FIX-05) — persists per-agent dedup state across restarts
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS budget_alert_state (
+        agent_id TEXT PRIMARY KEY,
+        alert_level TEXT NOT NULL DEFAULT 'ok',
+        last_alerted_at INTEGER,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
       )
     `);
   }
