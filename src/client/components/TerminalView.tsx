@@ -6,6 +6,7 @@ import { SearchAddon } from 'xterm-addon-search';
 import { useTerminalSocket } from '../hooks/useTerminalSocket.js';
 import { useRecordingState } from '../hooks/useRecordingState.js';
 import { useRotateSession } from '../hooks/useRotateSession.js';
+import { useHooksPauseState } from '../hooks/useHooksPauseState.js';
 import type { AgentInstanceStatus } from '@shared/types.js';
 import type { AgentContextFill } from '@shared/openclawTypes.js';
 import { TerminalSearchOverlay } from './TerminalSearchOverlay.js';
@@ -237,6 +238,34 @@ function TerminalViewInner({
   const [clickIndicator, setClickIndicator] = useState<{ x: number; y: number } | null>(null);
   const [fontSizeLabel, setFontSizeLabel] = useState<string>(() => getStoredFontSize());
   const { isRotating, result: rotateResult, confirmPending, requestRotate } = useRotateSession(agentId, onRotateComplete);
+
+  // Hooks pause toggle — per-session pause state from gsd-code-skill
+  const { pauseMap } = useHooksPauseState();
+  const serverHooksPaused = pauseMap[tmuxSessionName] ?? false;
+  const [optimisticPaused, setOptimisticPaused] = useState<boolean | null>(null);
+  const effectiveHooksPaused = optimisticPaused ?? serverHooksPaused;
+
+  // Clear optimistic state when server catches up
+  useEffect(() => {
+    if (optimisticPaused !== null && optimisticPaused === serverHooksPaused) {
+      setOptimisticPaused(null);
+    }
+  }, [serverHooksPaused, optimisticPaused]);
+
+  const toggleHooksPaused = useCallback(async () => {
+    const newPaused = !effectiveHooksPaused;
+    setOptimisticPaused(newPaused);
+    try {
+      const response = await fetch(`/api/gsd/sessions/${tmuxSessionName}/hooks-paused`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ paused: newPaused }),
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    } catch {
+      setOptimisticPaused(null);
+    }
+  }, [tmuxSessionName, effectiveHooksPaused]);
 
   const cycleFontSize = useCallback(() => {
     setFontSizeLabel((current) => {
@@ -720,6 +749,17 @@ function TerminalViewInner({
               )}
             </button>
           )}
+          <button
+            onClick={() => { void toggleHooksPaused(); }}
+            className={`px-1.5 py-0.5 text-[10px] rounded transition-colors ${
+              effectiveHooksPaused
+                ? 'text-amber-400 bg-amber-500/10 hover:bg-amber-500/20'
+                : 'text-warden-text-dim hover:text-warden-text bg-warden-border/30'
+            }`}
+            title={effectiveHooksPaused ? 'Hooks paused — click to resume auto-drive' : 'Hooks active — click to pause auto-drive'}
+          >
+            {effectiveHooksPaused ? 'Hooks Paused' : 'Hooks'}
+          </button>
         </div>
         <div className="flex items-center gap-2">
           {/* Bell icon notification toggle — hidden when Notification API is unsupported */}
