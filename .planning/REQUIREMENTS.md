@@ -32,14 +32,14 @@ Requirements for Telegram Operator Awareness milestone. Each maps to roadmap pha
 
 ### Budget Alerts
 
-- [ ] **BUDG-01**: Operator receives Telegram notification when agent reaches budget threshold (amber/red)
-- [ ] **BUDG-02**: Budget notifications suppressed within separate cooldown (default 10 min)
+- [x] **BUDG-01**: Operator receives Telegram notification when agent reaches budget threshold (amber/red)
+- [x] **BUDG-02**: Budget notifications suppressed within separate cooldown (default 10 min)
 
 ### Notification Settings
 
 - [ ] **NSET-01**: Dashboard panel with toggles per notification type (permission prompts, budget alerts)
 - [ ] **NSET-02**: Configurable cooldown windows per notification type in settings panel
-- [ ] **NSET-03**: Notification preferences persisted in SQLite notification_config table
+- [x] **NSET-03**: Notification preferences persisted in SQLite notification_config table
 
 ## Future Requirements
 
@@ -82,11 +82,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | APRV-03 | Phase 34 | Complete |
 | APRV-04 | Phase 34 | Complete |
 | APRV-05 | Phase 34 | Complete |
-| BUDG-01 | Phase 35 | Pending |
-| BUDG-02 | Phase 35 | Pending |
+| BUDG-01 | Phase 35 | Complete |
+| BUDG-02 | Phase 35 | Complete |
 | NSET-01 | Phase 35 | Pending |
 | NSET-02 | Phase 35 | Pending |
-| NSET-03 | Phase 35 | Pending |
+| NSET-03 | Phase 35 | Complete |
 
 **Coverage:**
 - v3.3 requirements: 19 total

@@ -5,24 +5,24 @@
 See: .planning/PROJECT.md (updated 2026-03-04)
 
 **Core value:** Real-time visibility into all active Claude Code agent sessions from a single browser tab
-**Current focus:** v3.3 Telegram Operator Awareness
+**Current focus:** v3.4 Budget Alerts & Notification Settings
 
 ## Current Position
 
-Phase: 34 — One-Tap Approve
-Plan: 02 complete (2/2 plans — Phase 34 complete)
-Status: Phase 34 complete — end-to-end one-tap approve wired; 81 tests pass; APRV-01/02/03/04/05 all covered
-Last activity: 2026-03-04 — 34-02-PLAN.md executed, approve button wired into notification pipeline
+Phase: 35 — Budget Alerts & Notification Settings
+Plan: 01 complete (1/2 plans — Phase 35 in progress)
+Status: Phase 35 plan 01 complete — BudgetAlertPoller, notification_config DB table, NotificationDeduplicator cooldown refactor; 90 tests pass; BUDG-01/02, NSET-03 covered
+Last activity: 2026-03-05 — 35-01-PLAN.md executed, BudgetAlertPoller service built, notification config persistence added
 
 ```
-Progress: [####] 4/4 phases (Phase 32 complete, Phase 33 complete, Phase 34 complete)
-Milestone: v3.3 Telegram Operator Awareness — COMPLETE
+Progress: [#] 1/2 plans (Phase 35 in progress — 35-01 complete)
+Milestone: v3.4 Budget Alerts & Notification Settings — IN PROGRESS
 ```
 
 ## Performance Metrics
 
 **Completed milestones:** v1.0 (6 phases), v1.1 (2), v2.0 (3), v2.1 (3), v2.3 (4), v3.0 (2), v3.1 (6), v3.2 (4), v3.3 (4) = 35 phases shipped
-**Current milestone:** v3.3 Telegram Operator Awareness — COMPLETE (Phase 32, 33, 34 all done)
+**Current milestone:** v3.4 Budget Alerts & Notification Settings — IN PROGRESS (Phase 35, plan 1/2 done)
 
 ## Accumulated Context
 
@@ -57,6 +57,10 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase 34-02]: sendToTopicWithApproveButton is a separate method — cleaner API, sendToTopic remains for non-approval messages
 - [Phase 34-02]: registerCallbackHandler stores handlers in array — supports multiple handlers without coupling
 - [Phase 34-02]: approvalStateTracker.pruneExpired() piggybacked on 10s poll cycle — no extra timer needed
+- [Phase 35-01]: vi.hoisted() required for BudgetAlertPoller tests — vi.mock factories are hoisted before const declarations, so mock fns must be created via vi.hoisted()
+- [Phase 35-01]: NotificationPoller reads permissionCooldownMs from database.getNotificationConfig() on each poll — no restart needed after config change
+- [Phase 35-01]: BudgetAlertPoller updates record BEFORE async sendBudgetAlert — prevents duplicate fire on re-entry during slow Telegram API calls
+- [Phase 35-01]: Budget level escalation uses rank map {ok:0, warning:1, exceeded:2} — clean O(1) comparison
 
 ### Research Flags
 
@@ -83,6 +87,6 @@ None
 
 ## Session Continuity
 
-Last session: 2026-03-04 (Plan 34-02 execution)
-Stopped at: Completed 34-02-PLAN.md — approve button wired end-to-end; 81 tests pass; production build succeeds; v3.3 milestone complete
-Next step: Plan next milestone (v3.4 or new feature area)
+Last session: 2026-03-05 (Plan 35-01 execution)
+Stopped at: Completed 35-01-PLAN.md — BudgetAlertPoller built, notification_config DB table, NotificationDeduplicator cooldown refactor; 90 tests pass; BUDG-01/02/NSET-03 covered
+Next step: Execute 35-02-PLAN.md (notification settings UI + server wiring)
