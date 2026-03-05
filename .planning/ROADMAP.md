@@ -204,11 +204,11 @@ Plans:
   2. Crash events are persisted to the database with session ID, agent ID, event type, timestamp, and outcome — surviving server restarts
   3. Operator receives a Telegram notification within one poll cycle when an agent session crashes, including agent name and session name
   4. Operator-initiated stops (via dashboard Stop button) are never misclassified as crashes
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 37-01: Crash detection in InstanceTracker (graceful stop marker, crash vs stop distinction)
-- [ ] 37-02: Lifecycle events table and Telegram crash notifications
+- [ ] 37-01-PLAN.md — Crash detection in InstanceTracker with 2-poll grace period, session_lifecycle_events table, lifecycle event logging for all transitions (CRSH-01, CRSH-02)
+- [ ] 37-02-PLAN.md — Telegram crash notifications via onCrashDetected callback, GET /api/lifecycle-events endpoint (CRSH-06)
 
 ### Phase 38: Auto-Restart Engine
 **Goal**: Warden can automatically restart crashed sessions based on per-agent policy with safety limits
