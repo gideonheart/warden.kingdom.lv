@@ -366,4 +366,28 @@ router.put('/api/restart-policies/:agentId', (request, response) => {
   }
 });
 
+// PUT /api/idle-timeout/:agentId — set per-agent idle timeout (null = disabled, min 60 minutes).
+router.put('/api/idle-timeout/:agentId', (request, response) => {
+  const agentId = decodeURIComponent(request.params.agentId);
+  const { idleTimeoutMinutes } = request.body as { idleTimeoutMinutes?: unknown };
+
+  // Validate: must be null or an integer >= 60
+  if (idleTimeoutMinutes !== null && idleTimeoutMinutes !== undefined) {
+    if (typeof idleTimeoutMinutes !== 'number' || !Number.isInteger(idleTimeoutMinutes) || idleTimeoutMinutes < 60) {
+      response.status(400).json({ error: 'idleTimeoutMinutes must be null or an integer >= 60' });
+      return;
+    }
+  }
+
+  const minutes = (idleTimeoutMinutes === null || idleTimeoutMinutes === undefined) ? null : (idleTimeoutMinutes as number);
+
+  try {
+    database.setIdleTimeout(agentId, minutes);
+    response.json({ success: true });
+  } catch (error) {
+    console.error(`[API] Failed to set idle timeout for ${agentId}:`, error);
+    response.status(500).json({ error: 'Failed to set idle timeout' });
+  }
+});
+
 export { router as instanceRoutes };

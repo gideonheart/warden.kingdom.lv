@@ -582,12 +582,14 @@ class DatabaseConnection {
 
   getRestartPolicy(agentId: string): RestartPolicy {
     const row = this.db.prepare(`
-      SELECT agent_id AS agentId, crash_restart_mode AS crashRestartMode, storm_disabled_at AS stormDisabledAt
+      SELECT agent_id AS agentId, crash_restart_mode AS crashRestartMode,
+             storm_disabled_at AS stormDisabledAt,
+             idle_timeout_minutes AS idleTimeoutMinutes
       FROM session_lifecycle_policy WHERE agent_id = ?
-    `).get(agentId) as { agentId: string; crashRestartMode: CrashRestartMode; stormDisabledAt: string | null } | undefined;
+    `).get(agentId) as { agentId: string; crashRestartMode: CrashRestartMode; stormDisabledAt: string | null; idleTimeoutMinutes: number | null } | undefined;
 
     if (!row) {
-      return { agentId, crashRestartMode: 'none', stormDisabledAt: null };
+      return { agentId, crashRestartMode: 'none', stormDisabledAt: null, idleTimeoutMinutes: null };
     }
     return row;
   }
@@ -605,7 +607,9 @@ class DatabaseConnection {
 
   getAllRestartPolicies(): RestartPolicy[] {
     return this.db.prepare(`
-      SELECT agent_id AS agentId, crash_restart_mode AS crashRestartMode, storm_disabled_at AS stormDisabledAt
+      SELECT agent_id AS agentId, crash_restart_mode AS crashRestartMode,
+             storm_disabled_at AS stormDisabledAt,
+             idle_timeout_minutes AS idleTimeoutMinutes
       FROM session_lifecycle_policy
       ORDER BY agent_id
     `).all() as RestartPolicy[];
@@ -631,6 +635,34 @@ class DatabaseConnection {
       }
     }
     return result;
+  }
+
+  /**
+   * Set the idle timeout for an agent (null = disabled, minimum 60 minutes).
+   * Uses upsert so a row is created even if the agent has no other policy set.
+   */
+  setIdleTimeout(agentId: string, minutes: number | null): void {
+    if (minutes !== null && minutes < 60) {
+      throw new Error(`Idle timeout must be at least 60 minutes (got ${minutes})`);
+    }
+    this.db.prepare(`
+      INSERT INTO session_lifecycle_policy (agent_id, idle_timeout_minutes, updated_at)
+      VALUES (?, ?, CURRENT_TIMESTAMP)
+      ON CONFLICT(agent_id) DO UPDATE SET
+        idle_timeout_minutes = excluded.idle_timeout_minutes,
+        updated_at = CURRENT_TIMESTAMP
+    `).run(agentId, minutes);
+  }
+
+  /**
+   * Get the idle timeout for an agent. Returns null if no timeout is configured.
+   */
+  getIdleTimeout(agentId: string): number | null {
+    const row = this.db.prepare(`
+      SELECT idle_timeout_minutes AS idleTimeoutMinutes
+      FROM session_lifecycle_policy WHERE agent_id = ?
+    `).get(agentId) as { idleTimeoutMinutes: number | null } | undefined;
+    return row?.idleTimeoutMinutes ?? null;
   }
 
   /**
@@ -850,6 +882,13 @@ class DatabaseConnection {
         updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
       )
     `);
+
+    // Migration: idle_timeout_minutes column on session_lifecycle_policy (IDLE-01)
+    try {
+      this.db.exec('ALTER TABLE session_lifecycle_policy ADD COLUMN idle_timeout_minutes INTEGER DEFAULT NULL');
+    } catch {
+      // Column already exists — safe to ignore
+    }
   }
 
   upsertTokenUsageByModel(row: TokenUsageByModelRow): void {
