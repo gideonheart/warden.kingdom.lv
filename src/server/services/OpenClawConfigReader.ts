@@ -149,8 +149,32 @@ class OpenClawConfigReader {
       if (!group.topics) continue;
       for (const [topicId, topic] of Object.entries(group.topics)) {
         // Extract agent ID from system prompt if present
-        const promptMatch = topic.systemPrompt?.match(/Agent responsible.*?is\s+(\w+)/i);
-        const agentId = promptMatch?.[1]?.toLowerCase() ?? 'unknown';
+        const prompt = topic.systemPrompt ?? '';
+        const patterns = [
+          /\bAgent responsible\b.*?\bis\b\s+([a-z0-9_-]+)/i,
+          /\bSubagent responsible\b.*?\bis\b\s+([a-z0-9_-]+)/i,
+          /\bresponsible\b.*?\bis\b\s+([a-z0-9_-]+)/i,
+        ];
+
+        let agentId = 'unknown';
+        for (const pattern of patterns) {
+          const match = prompt.match(pattern);
+          if (match?.[1]) {
+            agentId = match[1].toLowerCase();
+            break;
+          }
+        }
+
+        if (agentId === 'unknown') {
+          const promptLower = prompt.toLowerCase();
+          for (const knownAgentId of agentMap.keys()) {
+            if (promptLower.includes(knownAgentId.toLowerCase())) {
+              agentId = knownAgentId;
+              break;
+            }
+          }
+        }
+
         const agentName = agentMap.get(agentId) ?? agentId;
 
         mappings.push({

@@ -240,7 +240,10 @@ export function AgentSidebar({
                   <span className="text-xs opacity-50 flex-shrink-0">default</span>
                 )}
                 {agentTopic && (
-                  <span className="text-xs text-warden-text-dim/50 flex-shrink-0 font-mono">
+                  <span
+                    className="text-xs text-warden-text-dim/50 flex-shrink-0 font-mono"
+                    title={`Mapped to Telegram topic #${agentTopic.topicId}`}
+                  >
                     #{agentTopic.topicId}
                   </span>
                 )}
@@ -326,27 +329,6 @@ export function AgentSidebar({
         </div>
       )}
 
-      {topicMappings.length > 0 && (
-        <div className="border-t border-warden-border p-3 mt-auto">
-          <h3 className="text-xs font-semibold text-warden-text uppercase tracking-wider mb-2">Topic Map</h3>
-          <div className="grid grid-cols-2 gap-1">
-            {topicMappings.map((mapping) => (
-              <div
-                key={`${mapping.groupId}-${mapping.topicId}`}
-                className={`px-2 py-1.5 rounded text-xs text-center transition-colors cursor-pointer ${
-                  mapping.agentId === selectedAgentId
-                    ? 'bg-warden-accent/20 text-warden-accent border border-warden-accent/30'
-                    : 'bg-warden-border/30 text-warden-text-dim hover:bg-warden-border/50'
-                }`}
-                onClick={() => onSelectAgent(mapping.agentId)}
-              >
-                <div className="font-medium truncate">{mapping.agentName}</div>
-                <div className="opacity-50">#{mapping.topicId}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import path from 'path';
 import { database } from '../database/DatabaseConnection.js';
 import { tmuxSessionManager } from './TmuxSessionManager.js';
+import { openClawConfigReader } from './OpenClawConfigReader.js';
 import type { AgentInstance, AgentInstanceStatus } from '../../shared/types.js';
 
 const SYNC_INTERVAL_MS = 10_000;
@@ -32,6 +33,19 @@ export class InstanceTracker {
     const tmuxSessions = await tmuxSessionManager.listAgentSessions();
     const activeSessionNames = tmuxSessions.map(session => session.sessionName);
 
+    // Load agent name map from openclaw.json so that sessions discovered via tmux polling
+    // use the same display names as the sidebar (which reads directly from openclaw.json).
+    // Falls back to capitalizing agentId if config is unavailable.
+    let agentNameMap = new Map<string, string>();
+    try {
+      const agentDetails = await openClawConfigReader.getAgents();
+      for (const agent of agentDetails) {
+        agentNameMap.set(agent.id, agent.name);
+      }
+    } catch {
+      // Config unavailable — fallback names are applied per-session below
+    }
+
     // On the first sync, collect existing session names before upserting.
     // We avoid logging 'started' events for pre-existing sessions discovered on startup.
     const preExistingSessionNames = new Set<string>(
@@ -41,9 +55,11 @@ export class InstanceTracker {
     );
 
     for (const session of tmuxSessions) {
+      const agentName = agentNameMap.get(session.agentId)
+        ?? session.agentId.charAt(0).toUpperCase() + session.agentId.slice(1);
       const upserted = database.upsertInstance({
         agentId: session.agentId,
-        agentName: session.agentId.charAt(0).toUpperCase() + session.agentId.slice(1),
+        agentName,
         tmuxSessionName: session.sessionName,
         projectPath: '',
         telegramTopicId: undefined,
