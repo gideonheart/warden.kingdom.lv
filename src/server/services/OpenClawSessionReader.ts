@@ -6,6 +6,7 @@ import type { AgentContextFill } from '../../shared/openclawTypes.js';
 const execFileAsync = promisify(execFile);
 
 const AGENT_REGISTRY_PATH = '/home/forge/.openclaw/workspace/skills/gsd-code-skill/config/agent-registry.json';
+const OPENCLAW_BINARY_PATH = '/home/forge/.local/share/pnpm/openclaw';
 const CACHE_TTL_MS = 30_000;
 
 interface AgentRegistryEntry {
@@ -79,7 +80,7 @@ class OpenClawSessionReader {
     }
 
     try {
-      const { stdout } = await execFileAsync('openclaw', ['sessions', '--all-agents', '--json'], {
+      const { stdout } = await execFileAsync(OPENCLAW_BINARY_PATH, ['sessions', '--all-agents', '--json'], {
         timeout: 10_000,
       });
 
