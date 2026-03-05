@@ -18,6 +18,7 @@ import { recordingRotationService } from './services/RecordingRotationService.js
 import { telegramBotService } from './services/TelegramBotService.js';
 import { notificationPoller } from './services/NotificationPoller.js';
 import { budgetAlertPoller } from './services/BudgetAlertPoller.js';
+import { openClawConfigReader } from './services/OpenClawConfigReader.js';
 import { database } from './database/DatabaseConnection.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -97,6 +98,41 @@ terminalStreamService.setSocketServer(socketServer);
 terminalStreamService.setupSocketNamespace(socketServer);
 
 instanceTracker.startPeriodicSync();
+
+// Wire crash detection to Telegram notifications (CRSH-06)
+instanceTracker.onCrashDetected = async ({ instance, uptimeSecs, projectSlug }) => {
+  try {
+    const mappings = await openClawConfigReader.getTopicMappings();
+    const mapping = mappings.find((m) => m.agentId === instance.agentId);
+
+    if (!mapping) {
+      console.warn(`[CrashNotify] No Telegram topic mapping for agent: ${instance.agentId}`);
+      return;
+    }
+
+    const uptimeDisplay = uptimeSecs < 60
+      ? `${Math.round(uptimeSecs)}s`
+      : uptimeSecs < 3600
+        ? `${Math.floor(uptimeSecs / 60)}m ${Math.round(uptimeSecs % 60)}s`
+        : `${Math.floor(uptimeSecs / 3600)}h ${Math.floor((uptimeSecs % 3600) / 60)}m`;
+
+    const crashTime = new Date().toISOString().replace('T', ' ').slice(0, 19);
+
+    const text =
+      `🔴 *${instance.agentId}* session crashed\n\n` +
+      `Session: \`${instance.tmuxSessionName}\`\n` +
+      `Project: \`${projectSlug}\`\n` +
+      `Uptime: ${uptimeDisplay}\n` +
+      `Crashed at: ${crashTime}`;
+
+    await telegramBotService.sendToTopic(mapping.groupId, mapping.topicId, text);
+    console.log(`[CrashNotify] Sent crash alert for ${instance.agentId} to topic ${mapping.topicId}`);
+  } catch (error) {
+    // Notification failure must never block crash detection
+    console.error(`[CrashNotify] Failed to send crash notification for ${instance.agentId}:`, error);
+  }
+};
+
 sessionUsageReader.startPeriodicScan();
 recordingRotationService.startPeriodicRotation();
 

@@ -294,4 +294,20 @@ router.post('/api/instances/:id/force-kill', async (request, response) => {
   }
 });
 
+// GET /api/lifecycle-events — query session lifecycle events (crashes, stops, starts)
+router.get('/api/lifecycle-events', (request, response) => {
+  try {
+    const agentId = typeof request.query.agentId === 'string' ? request.query.agentId : undefined;
+    const eventType = typeof request.query.eventType === 'string' ? request.query.eventType : undefined;
+    const limit = typeof request.query.limit === 'string' ? parseInt(request.query.limit, 10) : undefined;
+    const offset = typeof request.query.offset === 'string' ? parseInt(request.query.offset, 10) : undefined;
+
+    const result = database.getLifecycleEvents({ agentId, eventType, limit, offset });
+    response.json(result);
+  } catch (error) {
+    console.error('[API] Failed to get lifecycle events:', error);
+    response.status(500).json({ error: 'Failed to get lifecycle events' });
+  }
+});
+
 export { router as instanceRoutes };
