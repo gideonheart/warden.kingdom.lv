@@ -13,6 +13,7 @@ const execFileAsync = promisify(execFile);
 
 const SPAWN_SH_PATH = '/home/forge/.openclaw/workspace/skills/gsd-code-skill/scripts/spawn.sh';
 const MENU_DRIVER_PATH = '/home/forge/.openclaw/workspace/skills/gsd-code-skill/scripts/menu-driver.sh';
+const ROTATE_SESSION_PATH = '/home/forge/.openclaw/workspace/skills/gsd-code-skill/bin/rotate-session.mjs';
 const ALLOWED_ACTIONS = new Set(['snapshot', 'enter', 'esc', 'clear_then', 'choose', 'submit', 'type']);
 const SESSION_NAME_RE = /^[a-zA-Z][a-zA-Z0-9_-]*$/;
 const AGENT_NAME_RE = /^[a-zA-Z][a-zA-Z0-9_-]*$/;
@@ -263,6 +264,56 @@ router.get('/api/gsd/events', async (request, response) => {
   } catch (error) {
     console.error('[GsdRoutes] Failed to get events:', error);
     response.status(500).json({ error: 'Failed to read event logs' });
+  }
+});
+
+// POST /api/gsd/agents/:agentId/rotate-session — rotate the OpenClaw session for an agent
+router.post('/api/gsd/agents/:agentId/rotate-session', async (request, response) => {
+  const agentId = String(request.params.agentId);
+
+  if (!AGENT_NAME_RE.test(agentId)) {
+    response.status(400).json({ error: 'Invalid agentId: must start with a letter and contain only letters, digits, hyphens, underscores' });
+    return;
+  }
+
+  const { label } = (request.body ?? {}) as { label?: unknown };
+
+  if (label !== undefined) {
+    if (typeof label !== 'string' || label.length > 200) {
+      response.status(400).json({ error: 'label must be a string with max 200 characters' });
+      return;
+    }
+  }
+
+  console.log('[GsdRoutes] Rotating session for agent:', agentId);
+
+  try {
+    const args = [ROTATE_SESSION_PATH, agentId];
+    if (typeof label === 'string' && label) {
+      args.push('--label', label);
+    }
+
+    const { stdout, stderr } = await execFileAsync('node', args, { timeout: 30000 });
+
+    // Parse old/new session IDs from log output
+    let oldSessionId: string | undefined;
+    let newSessionId: string | undefined;
+
+    const oldMatch = stdout.match(/Old:\s+(\S+)/);
+    const newMatch = stdout.match(/New:\s+(\S+)/);
+    if (oldMatch) oldSessionId = oldMatch[1];
+    if (newMatch) newSessionId = newMatch[1];
+
+    if (stderr && !oldSessionId && !newSessionId) {
+      console.warn('[GsdRoutes] rotate-session stderr:', stderr);
+    }
+
+    response.json({ rotated: true, agentId, oldSessionId, newSessionId });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const stderr = (error as { stderr?: string }).stderr ?? '';
+    console.error(`[GsdRoutes] Session rotation failed for agent ${agentId}:`, errorMessage);
+    response.status(500).json({ error: 'Session rotation failed', details: stderr || errorMessage });
   }
 });
 
