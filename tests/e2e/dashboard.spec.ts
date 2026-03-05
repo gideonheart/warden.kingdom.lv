@@ -16,7 +16,6 @@ test.describe('Dashboard', () => {
     await page.goto('/');
     await expect(page.getByRole('button', { name: 'Terminals' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'History' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Agents' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Refresh' })).toBeVisible();
   });
 
@@ -51,21 +50,20 @@ test.describe('View Navigation', () => {
 
   test('toggles agent sidebar', async ({ page }) => {
     await page.goto('/');
-    const agentsButton = page.getByRole('button', { name: 'Agents' });
+    const sidebarButton = page.getByRole('button', { name: 'Sidebar' });
     // Click to toggle off
-    await agentsButton.click();
+    await sidebarButton.click();
     // Click to toggle on
-    await agentsButton.click();
+    await sidebarButton.click();
   });
 });
 
 test.describe('History View', () => {
-  test('activity view is default tab', async ({ page }) => {
+  test('sessions tab is default tab', async ({ page }) => {
     await page.goto('/');
     await page.getByRole('button', { name: 'History' }).click();
-    // Activity tab should be active by default — export buttons visible
-    await expect(page.getByRole('button', { name: 'CSV' }).first()).toBeVisible();
-    await expect(page.getByRole('button', { name: 'JSON' }).first()).toBeVisible();
+    // Sessions tab is the default — agent ID filter input is visible
+    await expect(page.locator('input[placeholder="Agent ID"]').first()).toBeVisible();
   });
 
   test('session history displays filter controls', async ({ page }) => {
@@ -81,7 +79,8 @@ test.describe('History View', () => {
     await page.goto('/');
     await page.getByRole('button', { name: 'History' }).click();
     await page.getByRole('button', { name: 'Token Usage' }).click();
-    await expect(page.locator('input[placeholder="Filter by agent ID"]').first()).toBeVisible();
+    // Token Usage view has a "Filter by agent" input (not "Filter by agent ID")
+    await expect(page.locator('input[placeholder="Filter by agent"]').first()).toBeVisible();
   });
 
   test('log viewer loads', async ({ page }) => {

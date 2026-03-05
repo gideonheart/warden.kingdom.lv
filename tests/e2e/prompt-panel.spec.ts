@@ -6,14 +6,15 @@ test.describe('Prompt Panel', () => {
     await page.waitForSelector('.xterm', { state: 'visible', timeout: 10_000 });
 
     // Verify prompt panel elements exist
-    const textarea = page.locator('textarea[placeholder*="prompt"]');
+    // Use .first() — mobile layout duplicates prompt panel in DOM
+    const textarea = page.locator('textarea[placeholder*="prompt"]').first();
     await expect(textarea).toBeVisible();
 
-    const sendButton = page.locator('button:has-text("Send")');
+    const sendButton = page.locator('button:has-text("Send")').first();
     await expect(sendButton).toBeVisible();
 
     // Verify dropdown has at least one agent option
-    const dropdown = page.locator('select');
+    const dropdown = page.locator('select').first();
     const optionCount = await dropdown.locator('option').count();
     expect(optionCount).toBeGreaterThan(0);
   });
@@ -28,7 +29,8 @@ test.describe('Prompt Panel', () => {
 
     if (tabCount > 1) {
       // Get dropdown value before switching
-      const dropdown = page.locator('select');
+      // Use .first() — mobile layout duplicates select in DOM
+      const dropdown = page.locator('select').first();
       const initialAgent = await dropdown.inputValue();
 
       // Click second tab
@@ -49,7 +51,8 @@ test.describe('Prompt Panel', () => {
     await page.goto('/');
     await page.waitForSelector('.xterm', { state: 'visible', timeout: 10_000 });
 
-    const sendButton = page.locator('button:has-text("Send")');
+    // Use .first() — mobile layout duplicates send button in DOM
+    const sendButton = page.locator('button:has-text("Send")').first();
     await expect(sendButton).toBeDisabled();
   });
 
@@ -57,10 +60,11 @@ test.describe('Prompt Panel', () => {
     await page.goto('/');
     await page.waitForSelector('.xterm', { state: 'visible', timeout: 10_000 });
 
-    const textarea = page.locator('textarea[placeholder*="prompt"]');
+    // Use .first() — mobile layout duplicates textarea in DOM
+    const textarea = page.locator('textarea[placeholder*="prompt"]').first();
     await textarea.fill('Test prompt');
 
-    const sendButton = page.locator('button:has-text("Send")');
+    const sendButton = page.locator('button:has-text("Send")').first();
     await expect(sendButton).toBeEnabled();
   });
 
@@ -68,10 +72,11 @@ test.describe('Prompt Panel', () => {
     await page.goto('/');
     await page.waitForSelector('.xterm', { state: 'visible', timeout: 10_000 });
 
-    const textarea = page.locator('textarea[placeholder*="prompt"]');
+    // Use .first() — mobile layout duplicates textarea in DOM
+    const textarea = page.locator('textarea[placeholder*="prompt"]').first();
     await textarea.fill('Test prompt from Playwright');
 
-    const sendButton = page.locator('button:has-text("Send")');
+    const sendButton = page.locator('button:has-text("Send")').first();
     await sendButton.click();
 
     // Button should show "Sending..." briefly
@@ -85,7 +90,8 @@ test.describe('Prompt Panel', () => {
     await page.goto('/');
     await page.waitForSelector('.xterm', { state: 'visible', timeout: 10_000 });
 
-    const textarea = page.locator('textarea[placeholder*="prompt"]');
+    // Use .first() — mobile layout duplicates textarea in DOM
+    const textarea = page.locator('textarea[placeholder*="prompt"]').first();
     await textarea.fill('Ctrl+Enter test prompt');
 
     // Press Ctrl+Enter
