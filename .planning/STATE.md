@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 
 ## Current Position
 
-Phase: 37 of 40 (Crash Detection Backend)
-Plan: 2 of 2 in current phase (phase complete)
-Status: Phase 37 complete — both plans done, ready for Phase 38
-Last activity: 2026-03-05 - Completed quick task 2046: Review phase-37 commits for edge cases and tech debt, confirm v3.4 milestone completion
+Phase: 38 of 40 (Auto-Restart Engine)
+Plan: 1 of 2 in current phase (plan 01 complete)
+Status: Phase 38 in progress — plan 01 done, plan 02 (auto-restart engine) next
+Last activity: 2026-03-05 - Completed 38-01: restart policy configuration layer (DB table + REST API + AgentSidebar dropdown)
 
-Progress: [████░░░░░░] 44% (4/9 plans)
+Progress: [█████░░░░░] 56% (5/9 plans)
 
 ## Performance Metrics
 
@@ -40,6 +40,10 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase 37-02]: onCrashDetected callback assigned after instanceTracker.startPeriodicSync() — ensures wiring in place before first sync fires
 - [Phase 37-02]: Notification failure isolation via try/catch in callback — Telegram errors never propagate into crash detection flow
 - [Phase 37-02]: lifecycle-events endpoint placed in instanceRoutes — logically grouped with instance management routes
+- 38-01: storm_disabled_at cleared on every operator mode change — manual change signals operator awareness, re-arming auto-restart
+- 38-01: Default crashRestartMode is 'none' via DB DEFAULT; getRestartPolicy() returns none for unknown agents without a DB row
+- 38-01: RestartPolicyDropdown lives inside AgentSidebar.tsx (small component, no separate file per plan spec)
+- 38-01: onChangeRestartPolicy is optional prop — sidebar renders without dropdown when not provided
 
 ### Research Flags
 
@@ -71,5 +75,5 @@ None
 ## Session Continuity
 
 Last session: 2026-03-05
-Stopped at: Completed quick-2046 — Phase 37 code review, no blockers found
-Next step: /gsd:discuss-phase 38 — Auto-Restart Engine
+Stopped at: Completed 38-01-PLAN.md — restart policy configuration layer
+Next step: Execute 38-02-PLAN.md — auto-restart engine (crash detection wiring + storm limiter)
