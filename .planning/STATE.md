@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-03-05)
 
 **Core value:** Real-time visibility into all active Claude Code agent sessions from a single browser tab
-**Current focus:** v3.4 Smart Session Lifecycle — ready for Phase 38: Auto-Restart Engine
+**Current focus:** v3.4 Smart Session Lifecycle — Phase 38 complete, Phase 39 next
 
 ## Current Position
 
-Phase: 38 of 40 (Auto-Restart Engine)
-Plan: 1 of 2 in current phase (plan 01 complete)
-Status: Phase 38 in progress — plan 01 done, plan 02 (auto-restart engine) next
-Last activity: 2026-03-05 - Completed 38-01: restart policy configuration layer (DB table + REST API + AgentSidebar dropdown)
+Phase: 38 of 40 (Auto-Restart Engine) — COMPLETE
+Plan: 2 of 2 in current phase (both plans complete)
+Status: Phase 38 complete — both plans done. Next: Phase 39
+Last activity: 2026-03-05 - Completed 38-02: auto-restart engine (AutoRestartService + storm limiter + toast notification)
 
-Progress: [█████░░░░░] 56% (5/9 plans)
+Progress: [██████░░░░] 67% (6/9 plans)
 
 ## Performance Metrics
 
@@ -44,6 +44,9 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - 38-01: Default crashRestartMode is 'none' via DB DEFAULT; getRestartPolicy() returns none for unknown agents without a DB row
 - 38-01: RestartPolicyDropdown lives inside AgentSidebar.tsx (small component, no separate file per plan spec)
 - 38-01: onChangeRestartPolicy is optional prop — sidebar renders without dropdown when not provided
+- [Phase 38]: 38-02: Record restart timestamp after both success and failure — storm limiter counts attempts not just successes
+- [Phase 38]: 38-02: Pre-register instance as 'starting' before spawning so UI tab appears during the 7s delay period
+- [Phase 38]: 38-02: Toast detection uses previousInstanceIdsRef + stopped sibling check — no server-side event stream needed
 
 ### Research Flags
 
@@ -75,5 +78,5 @@ None
 ## Session Continuity
 
 Last session: 2026-03-05
-Stopped at: Completed 38-01-PLAN.md — restart policy configuration layer
-Next step: Execute 38-02-PLAN.md — auto-restart engine (crash detection wiring + storm limiter)
+Stopped at: Completed 38-02-PLAN.md — auto-restart engine (AutoRestartService + storm limiter + toast notification)
+Next step: Execute Phase 39 plans
