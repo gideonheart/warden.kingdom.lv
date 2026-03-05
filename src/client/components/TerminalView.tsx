@@ -232,6 +232,8 @@ function TerminalViewInner({
   const [terminalText, setTerminalText] = useState('');
   const [clickIndicator, setClickIndicator] = useState<{ x: number; y: number } | null>(null);
   const [fontSizeLabel, setFontSizeLabel] = useState<string>(() => getStoredFontSize());
+  const [isRotating, setIsRotating] = useState(false);
+  const [rotateResult, setRotateResult] = useState<{ success: boolean; message: string } | null>(null);
 
   const cycleFontSize = useCallback(() => {
     setFontSizeLabel((current) => {
@@ -262,6 +264,29 @@ function TerminalViewInner({
       return nextLabel;
     });
   }, []);
+
+  const handleRotateSession = useCallback(async () => {
+    if (!agentId || isRotating) return;
+    setIsRotating(true);
+    setRotateResult(null);
+    try {
+      const response = await fetch(`/api/gsd/agents/${encodeURIComponent(agentId)}/rotate-session`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      const data = await response.json();
+      if (response.ok && data.rotated) {
+        setRotateResult({ success: true, message: `Rotated to ${data.newSessionId?.slice(0, 8) ?? 'new'}...` });
+      } else {
+        setRotateResult({ success: false, message: data.error ?? 'Rotation failed' });
+      }
+    } catch {
+      setRotateResult({ success: false, message: 'Network error' });
+    } finally {
+      setIsRotating(false);
+    }
+  }, [agentId, isRotating]);
 
   const handleTerminalOutput = useCallback((data: string) => {
     const filtered = data.replace(MOUSE_TRACKING_ENABLE_PATTERN, '');
@@ -622,6 +647,12 @@ function TerminalViewInner({
     return () => clearTimeout(timer);
   }, [showCopiedToast]);
 
+  useEffect(() => {
+    if (!rotateResult) return;
+    const timer = setTimeout(() => setRotateResult(null), 4000);
+    return () => clearTimeout(timer);
+  }, [rotateResult]);
+
   // Register a focus callback so external callers (Plan 02 keyboard shortcuts) can
   // return keyboard focus to the terminal without holding a ref to the xterm instance.
   useEffect(() => {
@@ -678,6 +709,37 @@ function TerminalViewInner({
             <span className="text-[10px] text-warden-text-dim/50 font-mono truncate max-w-[200px] hidden sm:inline" title={workingDirectory}>
               {workingDirectory}
             </span>
+          )}
+          {agentId && (
+            <button
+              onClick={() => { void handleRotateSession(); }}
+              disabled={isRotating}
+              className={`px-1.5 py-0.5 text-[10px] rounded transition-colors ${
+                isRotating
+                  ? 'text-warden-warning bg-warden-warning/10 cursor-wait'
+                  : rotateResult
+                    ? rotateResult.success
+                      ? 'text-warden-success bg-warden-success/10'
+                      : 'text-warden-error bg-warden-error/10'
+                    : 'text-warden-text-dim hover:text-warden-text bg-warden-border/30'
+              }`}
+              title={
+                isRotating ? 'Rotating session...'
+                  : rotateResult ? rotateResult.message
+                  : 'Rotate OpenClaw session (creates new session ID)'
+              }
+            >
+              {isRotating ? (
+                <span className="flex items-center gap-1">
+                  <span className="w-2 h-2 border border-warden-warning border-t-transparent rounded-full animate-spin" />
+                  Rotating...
+                </span>
+              ) : rotateResult ? (
+                <span>{rotateResult.success ? 'Rotated' : 'Failed'}</span>
+              ) : (
+                'Rotate'
+              )}
+            </button>
           )}
         </div>
         <div className="flex items-center gap-2">
