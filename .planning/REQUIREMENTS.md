@@ -9,12 +9,12 @@ Requirements for v3.4 Smart Session Lifecycle. Each maps to roadmap phases.
 
 ### Telegram Pipeline Pivot & Hardening
 
-- [ ] **FIX-01**: Rewrite `TelegramBotService` to read bot token from `openclaw.json` (`channels.telegram.botToken`) via `OpenClawConfigReader` instead of `WARDEN_TELEGRAM_BOT_TOKEN` env var; send-only mode (no long-polling), using Gideon's bot to deliver notifications to the correct project topic
-- [ ] **FIX-02**: Remove `ApprovalCallbackHandler`, `ApprovalStateTracker`, inline Approve button, `sendToTopicWithApproveButton()`, and `WARDEN_TELEGRAM_OPERATOR_ID` env var — approval now happens via Warden dashboard or Gideon conversation
-- [ ] **FIX-03**: Escape or strip Markdown special characters from tmux pane excerpts in notification messages, preventing `sendMessage` failures on truncated code blocks
-- [ ] **FIX-04**: `TelegramBotService.sendToTopic` validates `topicId` is a finite integer before API calls; log clear diagnostic and return early on invalid
-- [ ] **FIX-05**: `BudgetAlertPoller` persists `lastAlertedAt` per agent to SQLite and hydrates on startup, preventing false re-alerts after server restart
-- [ ] **FIX-06**: Update `NotificationSettingsPanel` UI — replace "Bot connected/disconnected" with "Bot configured/not configured" (no polling status to check), remove references to Approve button
+- [x] **FIX-01**: Rewrite `TelegramBotService` to read bot token from `openclaw.json` (`channels.telegram.botToken`) via `OpenClawConfigReader` instead of `WARDEN_TELEGRAM_BOT_TOKEN` env var; send-only mode (no long-polling), using Gideon's bot to deliver notifications to the correct project topic
+- [x] **FIX-02**: Remove `ApprovalCallbackHandler`, `ApprovalStateTracker`, inline Approve button, `sendToTopicWithApproveButton()`, and `WARDEN_TELEGRAM_OPERATOR_ID` env var — approval now happens via Warden dashboard or Gideon conversation
+- [x] **FIX-03**: Escape or strip Markdown special characters from tmux pane excerpts in notification messages, preventing `sendMessage` failures on truncated code blocks
+- [x] **FIX-04**: `TelegramBotService.sendToTopic` validates `topicId` is a finite integer before API calls; log clear diagnostic and return early on invalid
+- [x] **FIX-05**: `BudgetAlertPoller` persists `lastAlertedAt` per agent to SQLite and hydrates on startup, preventing false re-alerts after server restart
+- [x] **FIX-06**: Update `NotificationSettingsPanel` UI — replace "Bot connected/disconnected" with "Bot configured/not configured" (no polling status to check), remove references to Approve button
 
 ### Crash Detection & Auto-Restart
 
@@ -85,12 +85,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FIX-01 | Phase 36 | Pending |
-| FIX-02 | Phase 36 | Pending |
-| FIX-03 | Phase 36 | Pending |
-| FIX-04 | Phase 36 | Pending |
-| FIX-05 | Phase 36 | Pending |
-| FIX-06 | Phase 36 | Pending |
+| FIX-01 | Phase 36 | Complete |
+| FIX-02 | Phase 36 | Complete |
+| FIX-03 | Phase 36 | Complete |
+| FIX-04 | Phase 36 | Complete |
+| FIX-05 | Phase 36 | Complete |
+| FIX-06 | Phase 36 | Complete |
 | CRSH-01 | Phase 37 | Pending |
 | CRSH-02 | Phase 37 | Pending |
 | CRSH-03 | Phase 38 | Pending |

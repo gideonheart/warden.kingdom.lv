@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 ## Current Position
 
 Phase: 36 of 40 (Telegram Pipeline Hardening)
-Plan: 0 of 1 in current phase
-Status: Ready to plan
-Last activity: 2026-03-05 — Roadmap created for v3.4 (5 phases, 17 requirements)
+Plan: 2 of 2 in current phase (phase complete)
+Status: Phase complete — ready for Phase 37
+Last activity: 2026-03-05 — Completed 36-02: SQLite budget alert state persistence + NotificationSettingsPanel UI update
 
-Progress: [░░░░░░░░░░] 0% (0/9 plans)
+Progress: [██░░░░░░░░] 22% (2/9 plans)
 
 ## Performance Metrics
 
@@ -27,6 +27,13 @@ Progress: [░░░░░░░░░░] 0% (0/9 plans)
 
 See PROJECT.md Key Decisions table for full list with outcomes.
 
+- 36-01: Send-only Telegram using Gideon's bot token from openclaw.json via fetch; no grammy Bot needed
+- 36-01: `botToken` sourced from `openclaw.json channels.telegram.botToken` via OpenClawConfigReader
+- 36-01: `botConnected` renamed to `botConfigured` — reflects send-only mode (no connection state)
+- 36-02: budget_alert_state SQLite table persists per-agent dedup state across server restarts (FIX-05)
+- 36-02: hydratePersistentState() called before first poll — cooldown context survives restart
+- 36-02: NotificationSettingsPanel uses botConfigured with 'Bot configured/not configured' text (FIX-06)
+
 ### Research Flags
 
 None
@@ -38,7 +45,6 @@ None
 ### Blockers/Concerns
 
 - NotificationPoller polls stopped sessions (dead capture-pane calls) — pre-existing tech debt from v3.3
-- WARDEN_TELEGRAM_OPERATOR_ID not validated at startup — pre-existing, may affect CRSH-06 notification delivery
 
 ### Quick Tasks Completed
 
@@ -54,5 +60,5 @@ None
 ## Session Continuity
 
 Last session: 2026-03-05
-Stopped at: Roadmap created for v3.4 Smart Session Lifecycle (Phases 36-40, 17 requirements, 9 plans)
-Next step: /gsd:plan-phase 36
+Stopped at: Completed 36-02-PLAN.md — SQLite budget alert state persistence, NotificationSettingsPanel UI update
+Next step: /gsd:plan-phase 37
