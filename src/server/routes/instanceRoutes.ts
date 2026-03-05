@@ -160,16 +160,43 @@ router.post('/api/instances/:id/stop', async (request, response) => {
   // Set optimistic stopping status for UI
   instanceTracker.updateStatus(instanceId, 'stopping');
 
+  const stopStartedAt = Date.now();
+  const projectSlug = path.basename(instance.projectPath) || instance.agentId;
+
   try {
     const sessionExists = await tmuxSessionManager.sessionExists(instance.tmuxSessionName);
     if (!sessionExists) {
       instanceTracker.updateStatus(instanceId, 'stopped');
+      const uptimeSecs = (stopStartedAt - new Date(instance.createdAt).getTime()) / 1000;
+      database.insertLifecycleEvent({
+        sessionId: instance.id,
+        agentId: instance.agentId,
+        sessionName: instance.tmuxSessionName,
+        eventType: 'stopped',
+        outcome: 'already-gone',
+        uptimeSecs,
+        projectSlug,
+        lastKnownState: instance.status,
+        stopReason: 'operator-stop',
+      });
       response.json({ success: true, instance: instanceTracker.findInstanceById(instanceId), forcedKill: false });
       return;
     }
 
     const exitedGracefully = await gracefulStopSession(instance.tmuxSessionName);
     instanceTracker.updateStatus(instanceId, 'stopped');
+    const uptimeSecs = (Date.now() - new Date(instance.createdAt).getTime()) / 1000;
+    database.insertLifecycleEvent({
+      sessionId: instance.id,
+      agentId: instance.agentId,
+      sessionName: instance.tmuxSessionName,
+      eventType: 'stopped',
+      outcome: exitedGracefully ? 'graceful' : 'force-killed',
+      uptimeSecs,
+      projectSlug,
+      lastKnownState: instance.status,
+      stopReason: 'operator-stop',
+    });
 
     response.json({
       success: true,
