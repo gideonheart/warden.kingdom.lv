@@ -18,8 +18,8 @@ Requirements for v3.4 Smart Session Lifecycle. Each maps to roadmap phases.
 
 ### Crash Detection & Auto-Restart
 
-- [ ] **CRSH-01**: `InstanceTracker` distinguishes operator-initiated stops (session was in `'stopping'` state) from crashes (session was `'active'` or `'idle'` at last poll, tmux session now absent); uses `graceful_stop_marker` flag set atomically by Stop API
-- [ ] **CRSH-02**: Crash events persisted to `session_lifecycle_events` SQLite table with session ID, agent ID, event type, timestamp, and outcome
+- [x] **CRSH-01**: `InstanceTracker` distinguishes operator-initiated stops (session was in `'stopping'` state) from crashes (session was `'active'` or `'idle'` at last poll, tmux session now absent); uses `graceful_stop_marker` flag set atomically by Stop API
+- [x] **CRSH-02**: Crash events persisted to `session_lifecycle_events` SQLite table with session ID, agent ID, event type, timestamp, and outcome
 - [ ] **CRSH-03**: Per-agent crash restart policy stored in `session_lifecycle_policy` SQLite table: `crash_restart_mode` (none/once/always); default `none`; configurable from dashboard
 - [ ] **CRSH-04**: Auto-restart execution calls `TmuxSessionManager.spawnSession()` with saved project path when crash detected and policy allows; logs restart outcome to `session_lifecycle_events`
 - [ ] **CRSH-05**: Restart storm rate limiter enforces maximum 3 restarts per hour per agent; after limit hit, flips `crash_restart_mode` to `none` and sends Telegram alert
@@ -91,8 +91,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | FIX-04 | Phase 36 | Complete |
 | FIX-05 | Phase 36 | Complete |
 | FIX-06 | Phase 36 | Complete |
-| CRSH-01 | Phase 37 | Pending |
-| CRSH-02 | Phase 37 | Pending |
+| CRSH-01 | Phase 37 | Complete |
+| CRSH-02 | Phase 37 | Complete |
 | CRSH-03 | Phase 38 | Pending |
 | CRSH-04 | Phase 38 | Pending |
 | CRSH-05 | Phase 38 | Pending |

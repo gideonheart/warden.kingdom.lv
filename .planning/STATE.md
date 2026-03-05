@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-03-05)
 
 **Core value:** Real-time visibility into all active Claude Code agent sessions from a single browser tab
-**Current focus:** v3.4 Smart Session Lifecycle — Phase 36: Telegram Pipeline Hardening
+**Current focus:** v3.4 Smart Session Lifecycle — Phase 37: Crash Detection Backend
 
 ## Current Position
 
-Phase: 36 of 40 (Telegram Pipeline Hardening)
-Plan: 2 of 2 in current phase (phase complete)
-Status: Phase complete — ready for Phase 37
-Last activity: 2026-03-05 — Completed 36-02: SQLite budget alert state persistence + NotificationSettingsPanel UI update
+Phase: 37 of 40 (Crash Detection Backend)
+Plan: 1 of 2 in current phase (plan complete)
+Status: Plan 37-01 complete — ready for 37-02
+Last activity: 2026-03-05 — Completed 37-01: Crash detection backend — session_lifecycle_events table, LifecycleEvent types, InstanceTracker crash logic
 
-Progress: [██░░░░░░░░] 22% (2/9 plans)
+Progress: [███░░░░░░░] 33% (3/9 plans)
 
 ## Performance Metrics
 
@@ -33,6 +33,10 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - 36-02: budget_alert_state SQLite table persists per-agent dedup state across server restarts (FIX-05)
 - 36-02: hydratePersistentState() called before first poll — cooldown context survives restart
 - 36-02: NotificationSettingsPanel uses botConfigured with 'Bot configured/not configured' text (FIX-06)
+- 37-01: 2-poll grace period (CRASH_GRACE_POLLS=2, ~20s) before declaring crash to prevent false alerts from transient glitches
+- 37-01: initialSyncComplete flag suppresses 'started' events on server restart — pre-existing sessions silently re-discovered
+- 37-01: stopping status sessions skip crash detection path; reconcileTransitionalStates handles them separately
+- 37-01: onCrashDetected callback on InstanceTracker as extension point for Plan 02 Telegram notifications
 
 ### Research Flags
 
@@ -61,5 +65,5 @@ None
 ## Session Continuity
 
 Last session: 2026-03-05
-Stopped at: Completed quick-2045 — inline topic ID label in AgentSidebar
-Next step: /gsd:plan-phase 37
+Stopped at: Completed 37-01-PLAN.md — crash detection backend
+Next step: Execute 37-02 — Telegram crash notification wiring
