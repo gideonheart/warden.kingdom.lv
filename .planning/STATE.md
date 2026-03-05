@@ -5,7 +5,7 @@
 See: .planning/PROJECT.md (updated 2026-03-05)
 
 **Core value:** Real-time visibility into all active Claude Code agent sessions from a single browser tab
-**Current focus:** v3.4 Smart Session Lifecycle — Phase 37: Crash Detection Backend
+**Current focus:** v3.4 Smart Session Lifecycle — ready for Phase 38: Auto-Restart Engine
 
 ## Current Position
 
@@ -52,6 +52,8 @@ None
 ### Blockers/Concerns
 
 - NotificationPoller polls stopped sessions (dead capture-pane calls) — pre-existing tech debt from v3.3
+- [quick-2046] force-kill endpoint missing lifecycle event log (TD-4) — fix before Phase 40 lifecycle history UI
+- [quick-2046] NaN not guarded after parseInt in GET /api/lifecycle-events (TD-5) — fix before Phase 40 lifecycle history UI
 
 ### Quick Tasks Completed
 
@@ -64,9 +66,10 @@ None
 | 2043 | Propose 3 fresh concrete next milestones (v4.1 Health Monitor, v4.2 Fleet View, v4.3 Prompt Workbench) | 2026-03-05 | 11b72ac | [2043-propose-3-concrete-next-milestone-direct](./quick/2043-propose-3-concrete-next-milestone-direct/) |
 | 2044 | Code review of v3.3 milestone + 3 fresh milestone proposals (Analytics, Session Lifecycle, Quality Foundation) | 2026-03-05 | cb0fd37 | [2044-review-recent-commits-for-quality-edge-c](./quick/2044-review-recent-commits-for-quality-edge-c/) |
 | 2045 | Add Telegram topic ID inline label to AgentSidebar agent rows | 2026-03-05 | c9c7083 | [2045-add-telegram-topic-id-to-agent-sidebar-i](./quick/2045-add-telegram-topic-id-to-agent-sidebar-i/) |
+| 2046 | Review Phase 37 commits for edge cases and determine v3.4 milestone status | 2026-03-05 | 9702600 | [2046-review-phase-37-commits-for-edge-cases-a](./quick/2046-review-phase-37-commits-for-edge-cases-a/) |
 
 ## Session Continuity
 
 Last session: 2026-03-05
-Stopped at: Completed 37-02-PLAN.md — Telegram crash notifications + lifecycle-events API (Phase 37 complete)
-Next step: Execute Phase 38 (next phase in v3.4 Smart Session Lifecycle milestone)
+Stopped at: Completed quick-2046 — Phase 37 code review, no blockers found
+Next step: /gsd:discuss-phase 38 — Auto-Restart Engine
