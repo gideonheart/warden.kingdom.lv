@@ -211,7 +211,10 @@ Plans:
   3. Budget threshold stays exceeded for 20 minutes — the operator receives at most 2 messages (one per 10-minute cooldown interval), not one per poll cycle
   4. Operator opens Notification Settings panel in the dashboard and can toggle permission prompt notifications and budget alert notifications independently, set cooldown durations, and see the bot connection status (green/red indicator)
   5. Settings saved in the panel take effect on the next notification event without restarting the server
-**Plans**: TBD
+**Plans:** 2 plans
+Plans:
+- [ ] 35-01-PLAN.md — BudgetAlertPoller service + notification_config DB + NotificationDeduplicator cooldown refactor (BUDG-01, BUDG-02, NSET-03)
+- [ ] 35-02-PLAN.md — Notification API routes + settings panel UI + server lifecycle wiring (NSET-01, NSET-02, NSET-03)
 
 ## Progress
 
