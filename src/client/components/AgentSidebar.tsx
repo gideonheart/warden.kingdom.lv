@@ -12,6 +12,7 @@ interface AgentSidebarProps {
   activeAgentIds?: Set<string>;
   restartPolicies?: RestartPolicy[];
   onChangeRestartPolicy?: (agentId: string, mode: CrashRestartMode) => void;
+  onChangeIdleTimeout?: (agentId: string, minutes: number | null) => void;
 }
 
 function formatBytes(bytes: number | null | undefined): string {
@@ -136,6 +137,55 @@ function RestartPolicyDropdown({
   );
 }
 
+const IDLE_TIMEOUT_OPTIONS: { label: string; value: number | null }[] = [
+  { label: 'Disabled', value: null },
+  { label: '1 hour', value: 60 },
+  { label: '2 hours', value: 120 },
+  { label: '4 hours', value: 240 },
+  { label: '8 hours', value: 480 },
+];
+
+function IdleTimeoutDropdown({
+  agentId,
+  currentMinutes,
+  onChangeTimeout,
+}: {
+  agentId: string;
+  currentMinutes: number | null;
+  onChangeTimeout: (agentId: string, minutes: number | null) => void;
+}) {
+  const handleChange = useCallback(
+    (event: React.ChangeEvent<HTMLSelectElement>) => {
+      event.stopPropagation();
+      const rawValue = event.target.value;
+      const minutes = rawValue === 'null' ? null : parseInt(rawValue, 10);
+      onChangeTimeout(agentId, minutes);
+    },
+    [agentId, onChangeTimeout],
+  );
+
+  return (
+    <div
+      className="flex items-center gap-1 px-2 py-1"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <span className="text-xs text-warden-text-dim flex-shrink-0">Idle:</span>
+      <select
+        value={currentMinutes === null ? 'null' : String(currentMinutes)}
+        onChange={handleChange}
+        className="text-xs bg-warden-bg border border-warden-border rounded px-1 py-0.5 text-warden-text-dim hover:text-warden-text focus:outline-none focus:border-warden-accent transition-colors cursor-pointer"
+        title={`Idle timeout policy for ${agentId}`}
+      >
+        {IDLE_TIMEOUT_OPTIONS.map((option) => (
+          <option key={String(option.value)} value={option.value === null ? 'null' : String(option.value)}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
 export function AgentSidebar({
   agents,
   topicMappings,
@@ -146,6 +196,7 @@ export function AgentSidebar({
   activeAgentIds,
   restartPolicies,
   onChangeRestartPolicy,
+  onChangeIdleTimeout,
 }: AgentSidebarProps) {
   const selectedAgent = agents.find((a) => a.id === selectedAgentId);
   const agentTopics = topicMappings.filter((t) => t.agentId === selectedAgentId);
@@ -208,6 +259,13 @@ export function AgentSidebar({
                 currentMode={agentPolicy?.crashRestartMode ?? 'none'}
                 stormDisabledAt={agentPolicy?.stormDisabledAt ?? null}
                 onChangeMode={onChangeRestartPolicy}
+              />
+            )}
+            {onChangeIdleTimeout && (
+              <IdleTimeoutDropdown
+                agentId={agent.id}
+                currentMinutes={agentPolicy?.idleTimeoutMinutes ?? null}
+                onChangeTimeout={onChangeIdleTimeout}
               />
             )}
           </div>

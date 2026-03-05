@@ -135,6 +135,7 @@ export interface RestartPolicy {
   agentId: string;
   crashRestartMode: CrashRestartMode;
   stormDisabledAt: string | null;
+  idleTimeoutMinutes: number | null;
 }
 
 export interface LifecycleEvent {

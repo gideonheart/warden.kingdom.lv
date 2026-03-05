@@ -19,6 +19,7 @@ import { recordingRotationService } from './services/RecordingRotationService.js
 import { telegramBotService } from './services/TelegramBotService.js';
 import { notificationPoller } from './services/NotificationPoller.js';
 import { budgetAlertPoller } from './services/BudgetAlertPoller.js';
+import { idleTimeoutService } from './services/IdleTimeoutService.js';
 import { openClawConfigReader } from './services/OpenClawConfigReader.js';
 import { database } from './database/DatabaseConnection.js';
 
@@ -143,6 +144,7 @@ recordingRotationService.startPeriodicRotation();
 void telegramBotService.initialize();   // Telegram bot token load (send-only mode, no polling)
 notificationPoller.startPolling();   // Permission prompt detection (depends on telegramBotService)
 budgetAlertPoller.startPolling();    // Budget threshold monitoring (depends on telegramBotService)
+idleTimeoutService.startPolling();  // Idle session auto-stop (IDLE-01)
 
 httpServer.listen(PORT, HOST, () => {
   console.log(`[Warden] Server running at http://${HOST}:${PORT}`);
@@ -161,6 +163,7 @@ async function handleShutdown(signal: string): Promise<void> {
   recordingRotationService.stopPeriodicRotation();
   sessionUsageReader.stopPeriodicScan();
   instanceTracker.stopPeriodicSync();
+  idleTimeoutService.stopPolling();    // Stop idle timeout checking before closing HTTP server
   notificationPoller.stopPolling();    // Stop polling before closing HTTP server
   budgetAlertPoller.stopPolling();     // Stop budget monitoring before closing HTTP server
   // TelegramBotService is send-only — no shutdown needed

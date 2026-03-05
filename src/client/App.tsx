@@ -53,7 +53,7 @@ function updateHash(view: AppView, session: string | null): void {
 
 export function App() {
   const { instances, isLoading, error, refetch } = useActiveInstances();
-  const { agents, topicMappings, restartPolicies, updateRestartPolicy } = useAgentConfig();
+  const { agents, topicMappings, restartPolicies, updateRestartPolicy, updateIdleTimeout } = useAgentConfig();
 
   // --- Auto-restart toast notifications ---
   // Detects when a new session appears for an agent that already has a stopped session,
@@ -713,6 +713,7 @@ export function App() {
               activeAgentIds={activeAgentIds}
               restartPolicies={restartPolicies}
               onChangeRestartPolicy={updateRestartPolicy}
+              onChangeIdleTimeout={updateIdleTimeout}
             />
             {currentView === 'terminals' && (
               <PromptPanel agents={agents} selectedAgentId={derivedAgentId} />
@@ -744,6 +745,7 @@ export function App() {
                 activeAgentIds={activeAgentIds}
                 restartPolicies={restartPolicies}
                 onChangeRestartPolicy={updateRestartPolicy}
+                onChangeIdleTimeout={updateIdleTimeout}
               />
               {currentView === 'terminals' && (
                 <PromptPanel agents={agents} selectedAgentId={derivedAgentId} />
