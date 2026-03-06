@@ -433,6 +433,24 @@ function TerminalViewInner({
     terminal.open(terminalContainerRef.current);
     terminal.focus();
 
+    // Suppress mouse tracking enable sequences at the parser level.
+    // This handles sequences split across WebSocket data chunks (which the
+    // regex filter in handleTerminalOutput cannot catch). The parser handler
+    // operates inside xterm.js's state machine, so partial sequences are
+    // reassembled correctly before the handler is invoked.
+    const MOUSE_TRACKING_MODES = new Set([1000, 1002, 1003, 1006]);
+    const disposeMouseHandler = terminal.parser.registerCsiHandler(
+      { final: 'h', prefix: '?' },
+      (params) => {
+        for (let i = 0; i < params.length; i++) {
+          if (MOUSE_TRACKING_MODES.has(params[i])) {
+            return true; // handled — suppress default processing
+          }
+        }
+        return false; // not handled — let xterm.js process normally
+      }
+    );
+
     // Suppress shortcut keys from being forwarded to the PTY.
     // The global useGlobalHotkeys handler (capture phase) handles these keys
     // at the document level. Without this guard, xterm.js also processes the
@@ -526,9 +544,8 @@ function TerminalViewInner({
     };
     container.addEventListener('click', handleAltClick);
 
-    // Scroll forwarding: send mouse wheel escape sequences to tmux.
-    // We stripped mouse-tracking enable sequences so xterm.js doesn't
-    // intercept mouse events, but tmux still expects them. SGR format:
+    // Mobile scroll forwarding: send mouse wheel escape sequences to tmux.
+    // Used by touch scroll handlers below. SGR format:
     //   scroll up:   \x1b[<64;col;rowM
     //   scroll down: \x1b[<65;col;rowM
     const sendScrollToTmux = (linesUp: number) => {
@@ -540,15 +557,9 @@ function TerminalViewInner({
       }
     };
 
-    // Desktop: forward mouse wheel to tmux
-    const handleWheel = (event: WheelEvent) => {
-      event.preventDefault();
-      const lines = Math.sign(event.deltaY) * Math.max(1, Math.ceil(Math.abs(event.deltaY) / 40));
-      // deltaY positive = scroll down = tmux scroll down (button 65)
-      // deltaY negative = scroll up = tmux scroll up (button 64)
-      sendScrollToTmux(lines > 0 ? -Math.abs(lines) : Math.abs(lines));
-    };
-    container.addEventListener('wheel', handleWheel, { passive: false });
+    // Desktop: mouse wheel scrolls xterm.js native scrollback buffer (5000 lines).
+    // No wheel listener needed — xterm.js handles wheel events natively when mouse
+    // tracking modes are suppressed (via the parser handler above).
 
     // Mobile: touch scroll (copy mode is toggled via toolbar button, not long-press)
     let touchStartY = 0;
@@ -637,7 +648,7 @@ function TerminalViewInner({
         visualViewport.removeEventListener('resize', refitTerminal);
       }
       container.removeEventListener('click', handleAltClick);
-      container.removeEventListener('wheel', handleWheel);
+      disposeMouseHandler.dispose();
       if (IS_TOUCH_DEVICE) {
         container.removeEventListener('touchstart', handleTouchStart);
         container.removeEventListener('touchmove', handleTouchMove);
