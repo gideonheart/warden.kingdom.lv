@@ -11,7 +11,7 @@ See: .planning/PROJECT.md (updated 2026-03-06)
 
 Phase: None — between milestones
 Status: v3.4 Smart Session Lifecycle shipped 2026-03-06. Ready for next milestone.
-Last activity: 2026-03-06 - Completed v3.4 milestone (5 phases, 10 plans, 20/20 requirements)
+Last activity: 2026-03-06 - Completed quick task 2052: Fix xterm scroll wheel losing terminal buffer scrollback
 
 Progress: All milestones through v3.4 complete.
 
