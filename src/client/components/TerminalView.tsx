@@ -557,9 +557,23 @@ function TerminalViewInner({
       }
     };
 
-    // Desktop: mouse wheel scrolls xterm.js native scrollback buffer (5000 lines).
-    // No wheel listener needed — xterm.js handles wheel events natively when mouse
-    // tracking modes are suppressed (via the parser handler above).
+    // Desktop: smart scroll based on terminal buffer type.
+    // - Normal buffer (shell prompt): send SGR scroll to tmux → enters copy mode
+    //   with full tmux scrollback history (much larger than xterm.js buffer).
+    // - Alternate buffer (TUI app like Claude Code): use xterm.js viewport scroll.
+    //   Sending SGR to tmux when a TUI has mouse mode would cause tmux to forward
+    //   the events to the app, resulting in unexpected behavior (e.g. input history
+    //   navigation instead of scrollback).
+    const handleWheel = (event: WheelEvent) => {
+      event.preventDefault();
+      if (terminal.buffer.active.type === 'alternate') {
+        terminal.scrollLines(event.deltaY > 0 ? 3 : -3);
+        return;
+      }
+      const lines = Math.sign(event.deltaY) * Math.max(1, Math.ceil(Math.abs(event.deltaY) / 40));
+      sendScrollToTmux(lines > 0 ? -Math.abs(lines) : Math.abs(lines));
+    };
+    container.addEventListener('wheel', handleWheel, { passive: false });
 
     // Mobile: touch scroll (copy mode is toggled via toolbar button, not long-press)
     let touchStartY = 0;
@@ -648,6 +662,7 @@ function TerminalViewInner({
         visualViewport.removeEventListener('resize', refitTerminal);
       }
       container.removeEventListener('click', handleAltClick);
+      container.removeEventListener('wheel', handleWheel);
       disposeMouseHandler.dispose();
       if (IS_TOUCH_DEVICE) {
         container.removeEventListener('touchstart', handleTouchStart);
