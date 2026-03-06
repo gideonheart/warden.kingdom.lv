@@ -4,6 +4,7 @@ import { instanceTracker } from '../services/InstanceTracker.js';
 import { tmuxSessionManager } from '../services/TmuxSessionManager.js';
 import { database } from '../database/DatabaseConnection.js';
 import { openClawConfigReader } from '../services/OpenClawConfigReader.js';
+import { gsdRegistryService } from '../services/GsdRegistryService.js';
 import type { CrashRestartMode } from '../../shared/types.js';
 
 const GRACE_PERIOD_MS = 5_000;
@@ -114,11 +115,24 @@ router.post('/api/instances/start', async (request, response) => {
       // Operator-supplied project path override (from quick-launch modal)
       projectPath = overridePath.trim();
     } else {
-      // Default: derive project path from agent's configured workspace
-      const rawWorkspace = agentConfig.workspace;
-      projectPath = path.isAbsolute(rawWorkspace)
-        ? rawWorkspace
-        : path.join(process.env.HOME ?? '/home/forge', '.openclaw', rawWorkspace);
+      // Prefer working_directory from agent-registry (the actual project repo)
+      // over workspace from openclaw.json (the OpenClaw workspace directory).
+      let registryDir: string | undefined;
+      try {
+        const registryAgent = await gsdRegistryService.getAgent(trimmedAgentId);
+        registryDir = registryAgent?.working_directory;
+      } catch {
+        // Registry unavailable — fall through to openclaw.json workspace
+      }
+
+      if (registryDir) {
+        projectPath = registryDir;
+      } else {
+        const rawWorkspace = agentConfig.workspace;
+        projectPath = path.isAbsolute(rawWorkspace)
+          ? rawWorkspace
+          : path.join(process.env.HOME ?? '/home/forge', '.openclaw', rawWorkspace);
+      }
     }
   } catch (error) {
     console.error(`[API] Failed to read agent config for ${trimmedAgentId}:`, error);
@@ -146,7 +160,7 @@ router.post('/api/instances/start', async (request, response) => {
   // Fire-and-forget the actual tmux+claude creation.
   // Using promise chain (not spawn) since tmux commands are fast (< 1s).
   const spawnLogPath = path.join(START_LOG_DIR, `warden-start-${trimmedAgentId}.log`);
-  tmuxSessionManager.createSessionWithClaude(trimmedAgentId, projectSlug, projectPath)
+  tmuxSessionManager.createSessionWithClaude(tmuxSessionName, projectPath)
     .then(() => {
       database.updateInstanceStatus(newInstance.id, 'active');
       console.log(`[API] Session started: ${tmuxSessionName}`);
@@ -274,7 +288,7 @@ router.post('/api/instances/:id/restart', async (request, response) => {
   const startingInstance = instanceTracker.findInstanceById(newInstance.id)!;
 
   // Fire-and-forget start
-  tmuxSessionManager.createSessionWithClaude(agentId, projectSlug, projectPath)
+  tmuxSessionManager.createSessionWithClaude(tmuxSessionName, projectPath)
     .then(() => {
       database.updateInstanceStatus(newInstance.id, 'active');
       console.log(`[API] Restarted session: ${tmuxSessionName}`);
