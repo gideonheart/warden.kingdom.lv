@@ -195,3 +195,40 @@ See `.planning/milestones/v3.3-ROADMAP.md` for full phase details.
 
 ---
 
+
+## v3.4 Smart Session Lifecycle (Shipped: 2026-03-06)
+
+**Phases:** 5 (Phases 36-40) | **Plans:** 10 | **Tasks:** 18 | **Commits:** 19 | **LOC:** 14,074 TypeScript (net +1,822)
+**Timeline:** 1 day (2026-03-05)
+**Git range:** `4eea5ed..344a9e2`
+**Tests:** 31 Playwright E2E (29 passed, 1 skipped, 2 pre-existing flakes) + unit tests
+
+**Delivered:** Autonomous session management — crash detection with 2-poll grace period, configurable auto-restart with storm rate limiting, idle timeout enforcement, one-click session launch from dashboard, lifecycle event history with filters and pagination, and Telegram pipeline pivot to send-only mode using Gideon's bot token.
+
+**Key accomplishments:**
+1. Telegram pipeline pivot — rewrote to send-only fetch using Gideon's bot token from openclaw.json, deleted approval infrastructure, fixed Markdown escaping, persisted budget alert state to SQLite
+2. Crash detection backend — 2-poll grace period, lifecycle event sourcing to SQLite, Telegram crash notifications with failure isolation
+3. Auto-restart engine — per-agent policy (none/once/always), 7s delayed spawn, sliding-window storm limiter (3/hr), pre-register instance for instant UI feedback, operator toast notifications
+4. Idle timeout & quick-launch — per-agent idle timeout with 60s polling, auto-stop with lifecycle logging; QuickLaunchModal with agent picker and last-used project path pre-fill
+5. Lifecycle history UI — LifecycleEventsView with agent/event-type filters, color-coded badges, pagination; fixed all pre-existing E2E test failures
+6. 20/20 requirements satisfied across all 5 phases
+
+**Phases:**
+- Phase 36: Telegram Pipeline Pivot & Hardening (2/2 plans) — `c1560a6`
+- Phase 37: Crash Detection Backend (2/2 plans) — `6e1d4bb`
+- Phase 38: Auto-Restart Engine (2/2 plans) — `1defb42`
+- Phase 39: Idle Timeout & Quick-Launch (2/2 plans) — `0d778b3`
+- Phase 40: Lifecycle History & E2E Verification (2/2 plans) — `881b9b4`
+
+**Quick tasks shipped during milestone:** 2045-2051 (agent sidebar enhancements, rotate session, hooks pause toggle)
+
+**Tech debt accepted:**
+- 37-01-SUMMARY.md missing requirements-completed frontmatter field (documentation gap only)
+- 'once' restart mode functionally identical to 'always' (both restart up to storm limit) — UI lacks tooltip explaining semantics
+- NotificationPoller polls stopped sessions (pre-existing from v3.3)
+- Playwright runs against production server (port 3001) due to host ENOSPC inotify limit
+
+See `.planning/milestones/v3.4-ROADMAP.md` for full phase details.
+
+---
+

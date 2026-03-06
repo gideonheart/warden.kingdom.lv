@@ -73,18 +73,19 @@ Real-time visibility into all active Claude Code agent sessions from a single br
 - ✓ Duplicate suppression with configurable cooldown — v3.3
 - ✓ Notification settings UI (toggle per alert type, cooldown config, bot status) — v3.3
 
+- ✓ Send-only Telegram via Gideon's bot token from openclaw.json (no standalone bot) — v3.4
+- ✓ Budget alert state persists to SQLite (no false re-alerts after restart) — v3.4
+- ✓ Crash detection with 2-poll grace period and lifecycle event sourcing — v3.4
+- ✓ Telegram crash notifications with failure isolation — v3.4
+- ✓ Per-agent restart policy (none/once/always) with storm rate limiter (3/hr) — v3.4
+- ✓ Auto-restart engine with 7s delayed spawn and pre-registered instance — v3.4
+- ✓ Per-agent idle timeout enforcement with auto-stop and lifecycle logging — v3.4
+- ✓ Quick-launch modal with agent picker and last-used project path pre-fill — v3.4
+- ✓ Lifecycle events history tab with agent/event-type filters and pagination — v3.4
+
 ### Active
 
-#### Current Milestone: v3.4 Smart Session Lifecycle
-
-**Goal:** Transform Warden from passive monitoring to autonomous session management — crash recovery, idle timeout cleanup, and one-click session launch.
-
-**Target features:**
-- Telegram pipeline hardening (EC-02/03/04 bug fixes)
-- Crash detection and auto-restart with configurable per-agent policy
-- Idle timeout enforcement to clean up completed sessions
-- Session templates with one-click launch from dashboard
-- Lifecycle event history for audit trail
+(No active milestone — ready for `/gsd:new-milestone`)
 
 ### Deferred
 
@@ -96,10 +97,10 @@ Real-time visibility into all active Claude Code agent sessions from a single br
 
 ## Current State
 
-**Latest milestone:** v3.3 Telegram Operator Awareness (shipped 2026-03-05)
-**Current milestone:** v3.4 Smart Session Lifecycle (in progress)
+**Latest milestone:** v3.4 Smart Session Lifecycle (shipped 2026-03-06)
+**Current milestone:** None — ready for next milestone planning
 
-Warden is a complete operations platform with Telegram integration. The operator can manage agent sessions from desktop or phone; record sessions automatically with per-agent toggles; cap and rotate recording storage; navigate history rows directly to live terminals or recording replays; monitor cost velocity with budget alerts; receive Telegram notifications when agents stall on permission prompts; approve stalled agents with a single tap in Telegram; get budget alert notifications at amber/red thresholds; configure all notification preferences from the dashboard; and access all features from a mobile browser with keyboard persistence.
+Warden is a complete autonomous operations platform. The operator can manage agent sessions from desktop or phone; crash detection automatically identifies disappeared sessions with a 2-poll grace period; per-agent restart policies (none/once/always) enable automatic crash recovery with storm rate limiting; idle timeout enforcement auto-stops inactive sessions; one-click session launch from the dashboard header with agent picker and last-used project path; lifecycle event history provides full audit trail of crashes, restarts, and timeouts; Telegram notifications (via Gideon's bot) deliver crash alerts and budget warnings; session recording with auto-record and storage rotation; cost velocity tracking with budget alerts; and all features accessible from mobile with keyboard persistence.
 
 ### Out of Scope
 
@@ -115,13 +116,13 @@ Warden is a complete operations platform with Telegram integration. The operator
 
 ## Context
 
-Shipped v3.3 with 12,252 LOC TypeScript (src/). Net +1,023 LOC from v3.2.
-Tech stack: Express 5, Socket.IO 4, React 19, xterm.js 5, node-pty, SQLite (better-sqlite3), Tailwind CSS 4, Vite 6, Vitest, grammy (Telegram bot).
-Features: live terminal streaming, agent lifecycle control (start/stop/restart), token burn rate with budget alerts, model cost comparison, CSV export, session recording (asciicast v2) with auto-record and storage rotation, variable-speed replay, mobile toolbar with keyboard persistence, clickable session navigation, terminal search, browser notifications, keyboard navigation, GSD Manager plugin, activity timeline, Telegram bot with permission prompt notifications, one-tap approve, budget alert forwarding, and notification settings panel.
+Shipped v3.4 with 14,074 LOC TypeScript (src/). Net +1,822 LOC from v3.3.
+Tech stack: Express 5, Socket.IO 4, React 19, xterm.js 5, node-pty, SQLite (better-sqlite3), Tailwind CSS 4, Vite 6, Vitest.
+Features: live terminal streaming, agent lifecycle control (start/stop/restart), crash detection with auto-restart, idle timeout enforcement, quick-launch modal, lifecycle event history, token burn rate with budget alerts, model cost comparison, CSV export, session recording (asciicast v2) with auto-record and storage rotation, variable-speed replay, mobile toolbar with keyboard persistence, clickable session navigation, terminal search, browser notifications, keyboard navigation, GSD Manager plugin, activity timeline, Telegram notifications (send-only via Gideon's bot) for crashes and budget alerts, and notification settings panel.
 Runs on Ubuntu 24 server (Laravel Forge managed), same host as gideons.kingdom.lv.
-20 Playwright E2E tests + 90 Vitest unit tests. Production Nginx config with SSL + IP whitelist + WebSocket.
+31 Playwright E2E tests + 90 Vitest unit tests. Production Nginx config with SSL + IP whitelist + WebSocket.
 tmux configured with mouse mode and 50,000-line scrollback buffer for monitoring workflows.
-Known tech debt: detectAgentState() regex heuristics fragile but functional; NAVIGABLE_STATUSES Set recreates per render (info-level); recordings fetched once on mount (no polling); WARDEN_TELEGRAM_OPERATOR_ID not validated at startup; NotificationPoller polls stopped sessions (dead capture-pane calls).
+Known tech debt: detectAgentState() regex heuristics fragile but functional; NotificationPoller polls stopped sessions (dead capture-pane calls); 'once' restart mode semantically identical to 'always' (both restart up to storm limit); Playwright runs against production server due to host ENOSPC inotify limit.
 
 ## Constraints
 
@@ -180,8 +181,12 @@ Known tech debt: detectAgentState() regex heuristics fragile but functional; NAV
 | Singleton-row notification_config table | Same pattern as budget_config and rotation_config (CHECK id=1) | ✓ Good — simple upsert, consistent across DB |
 | ANSI stripping before state detection | strip-ansi applied before detectAgentState() in NotificationPoller | ✓ Good — prevents cursor escape codes breaking regex |
 | onBlur save for cooldown inputs | Prevents rapid PUT calls while typing; key={value} resets on server data | ✓ Good — clean UX, minimal API calls |
-| Route notifications through Gideon's bot | Warden can't run its own polling loop without conflicting with Gideon's bot; send-only mode uses Gideon's token from openclaw.json | — Pending |
-| Drop one-tap Approve inline button | Requires separate bot polling; operator approves via Warden dashboard or Gideon conversation instead | — Pending |
+| Route notifications through Gideon's bot | Warden can't run its own polling loop without conflicting with Gideon's bot; send-only mode uses Gideon's token from openclaw.json | ✓ Good — v3.4, eliminated grammy dependency |
+| Drop one-tap Approve inline button | Requires separate bot polling; operator approves via Warden dashboard or Gideon conversation instead | ✓ Good — simplified architecture |
+| 2-poll crash grace period | Prevent false alerts from transient tmux glitches (~20s before declaring crash) | ✓ Good — no false positives observed |
+| Sliding-window storm limiter (3/hr) | Prevent restart loops from consuming resources | ✓ Good — flips policy to 'none' and alerts operator |
+| Pre-register instance before spawn | UI tab appears during 7s restart delay for immediate operator feedback | ✓ Good — smooth UX |
+| Send-only Telegram via fetch | No bot framework needed; eliminates long-polling conflict with Gideon | ✓ Good — removed grammy entirely |
 
 ---
-*Last updated: 2026-03-05 after v3.4 milestone started*
+*Last updated: 2026-03-06 after v3.4 milestone*
