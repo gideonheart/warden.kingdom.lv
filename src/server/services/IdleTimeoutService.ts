@@ -128,6 +128,14 @@ export class IdleTimeoutService {
       stopReason: 'idle-timeout',
     });
     console.log(`[IdleTimeoutService] Session ${instance.tmuxSessionName} stopped due to idle timeout`);
+
+    // Fire session-stopped notification so Telegram + browser notifications fire
+    instanceTracker.onSessionStopped?.({
+      instance: instance as import('../../shared/types.js').AgentInstance,
+      uptimeSecs,
+      projectSlug,
+      stopReason: 'idle-timeout',
+    });
   }
 }
 

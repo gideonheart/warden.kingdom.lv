@@ -245,13 +245,16 @@ export function App() {
     onOpenSearch: handleOpenSearch,
   });
 
-  // Budget alert level — disabled on terminals view to avoid background re-renders.
-  const budgetAlertLevel = useBudgetAlerts(!isTerminalsView);
+  // Budget alert level — always enabled so browser notifications fire on any view.
+  // The hook uses a ref-based dedup to avoid unnecessary re-renders when level is unchanged.
+  const budgetAlertLevel = useBudgetAlerts();
 
-  // Browser notification opt-in — fires when budget thresholds are crossed.
-  // Permission prompt notifications are handled server-side by NotificationPoller (Telegram).
+  // Browser notification opt-in — fires when budget thresholds are crossed or
+  // session lifecycle changes (active -> stopped/error). Permission prompt
+  // notifications are handled server-side by NotificationPoller (Telegram).
   const { notificationsEnabled, toggleNotifications, notificationPermission } = useBrowserNotifications({
     budgetAlertLevel,
+    instances,
   });
 
   const [isQuickLaunchOpen, setIsQuickLaunchOpen] = useState(false);

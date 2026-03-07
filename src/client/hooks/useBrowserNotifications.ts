@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import type { AgentInstance } from '@shared/types.js';
 
 const NOTIFICATION_STORAGE_KEY = 'warden:notifications-enabled';
 
@@ -6,6 +7,7 @@ type BudgetAlertLevel = 'ok' | 'warning' | 'exceeded';
 
 interface UseBrowserNotificationsParams {
   budgetAlertLevel: BudgetAlertLevel;
+  instances: AgentInstance[];
 }
 
 interface UseBrowserNotificationsResult {
@@ -14,11 +16,15 @@ interface UseBrowserNotificationsResult {
   notificationPermission: NotificationPermission | 'unsupported';
 }
 
-/** Browser notification opt-in for budget alerts.
+/** Browser notification opt-in for budget alerts and session lifecycle events.
  *
  *  Budget alerts: fires a notification when budgetAlertLevel transitions into
  *  'warning' or 'exceeded'. Uses a ref to detect transitions so notifications
  *  are not repeated on every poll cycle.
+ *
+ *  Session lifecycle: fires a notification when a session transitions from
+ *  active/idle/starting/stopping to stopped/error. Detects transitions by
+ *  comparing current instance statuses against previously known statuses.
  *
  *  Permission prompt notifications are handled server-side by NotificationPoller
  *  which sends Telegram messages directly.
@@ -29,6 +35,7 @@ interface UseBrowserNotificationsResult {
  *  with the same tag, providing a second layer of dedup beyond the ref-based check. */
 export function useBrowserNotifications({
   budgetAlertLevel,
+  instances,
 }: UseBrowserNotificationsParams): UseBrowserNotificationsResult {
   // Feature detection — guard SSR and older browsers
   const isSupported = typeof Notification !== 'undefined';
@@ -49,8 +56,13 @@ export function useBrowserNotifications({
     return Notification.permission;
   });
 
-  // Track previous budget alert level to detect transitions (ok→warning, ok→exceeded, etc.)
+  // Track previous budget alert level to detect transitions (ok->warning, ok->exceeded, etc.)
   const previousBudgetLevelRef = useRef<BudgetAlertLevel>('ok');
+
+  // Track previous instance statuses for session lifecycle detection
+  // Map of instanceId -> status. Initialized as null to skip the first render
+  // (avoids firing notifications for all already-stopped sessions on page load).
+  const previousInstanceStatusesRef = useRef<Map<number, string> | null>(null);
 
   // Budget alert effect — fires a notification when the budget level transitions
   // into 'warning' or 'exceeded'. Does not fire when returning to 'ok'.
@@ -78,6 +90,52 @@ export function useBrowserNotifications({
       },
     );
   }, [budgetAlertLevel, notificationsEnabled, isSupported]);
+
+  // Session lifecycle effect — fires a notification when a session transitions
+  // from an active state (active/idle/starting/stopping) to a terminal state
+  // (stopped/error). Skips on first render to avoid notifying for pre-existing
+  // stopped sessions.
+  useEffect(() => {
+    const currentMap = new Map(instances.map((inst) => [inst.id, inst.status]));
+
+    if (previousInstanceStatusesRef.current === null) {
+      // First render — seed the map without firing notifications
+      previousInstanceStatusesRef.current = currentMap;
+      return;
+    }
+
+    if (!notificationsEnabled || !isSupported || Notification.permission !== 'granted') {
+      previousInstanceStatusesRef.current = currentMap;
+      return;
+    }
+
+    const previousMap = previousInstanceStatusesRef.current;
+    const activeStatuses = new Set(['active', 'idle', 'starting', 'stopping']);
+
+    for (const instance of instances) {
+      const previousStatus = previousMap.get(instance.id);
+      if (!previousStatus) continue; // New instance — don't notify
+
+      const wasActive = activeStatuses.has(previousStatus);
+      const isNowStopped = instance.status === 'stopped' || instance.status === 'error';
+
+      if (wasActive && isNowStopped) {
+        const title = instance.status === 'error'
+          ? `Warden — ${instance.agentId} Error`
+          : `Warden — ${instance.agentId} Stopped`;
+        const body = instance.status === 'error'
+          ? `Session ${instance.tmuxSessionName} encountered an error.`
+          : `Session ${instance.tmuxSessionName} has stopped.`;
+
+        new Notification(title, {
+          body,
+          tag: `warden-session-${instance.id}-${instance.status}`,
+        });
+      }
+    }
+
+    previousInstanceStatusesRef.current = currentMap;
+  }, [instances, notificationsEnabled, isSupported]);
 
   // Toggle callback — must be triggered by a user gesture (button click).
   // Browser silently blocks Notification.requestPermission() outside user gesture context.

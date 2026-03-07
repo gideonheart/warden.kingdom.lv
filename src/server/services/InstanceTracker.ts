@@ -17,6 +17,13 @@ export class InstanceTracker {
 
   public onCrashDetected: ((event: { instance: AgentInstance; uptimeSecs: number; projectSlug: string }) => void) | null = null;
 
+  /**
+   * Called when a session transitions to 'stopped' for any reason (operator stop,
+   * graceful exit, idle timeout, force kill). Does NOT fire for crashes — those
+   * go through onCrashDetected instead.
+   */
+  public onSessionStopped: ((event: { instance: AgentInstance; uptimeSecs: number; projectSlug: string; stopReason: string }) => void) | null = null;
+
   startPeriodicSync(): void {
     this.syncWithTmux();
     this.syncInterval = setInterval(() => this.syncWithTmux(), SYNC_INTERVAL_MS);
@@ -212,6 +219,7 @@ export class InstanceTracker {
             lastKnownState: 'stopping',
             stopReason: 'operator-stop',
           });
+          this.onSessionStopped?.({ instance, uptimeSecs, projectSlug, stopReason: 'operator-stop' });
         } else if (ageMs > STOPPING_FORCE_KILL_THRESHOLD_MS) {
           // Grace period expired — force kill
           console.warn(`[InstanceTracker] Stopping session ${instance.tmuxSessionName} did not exit, force killing`);
@@ -232,6 +240,7 @@ export class InstanceTracker {
             lastKnownState: 'stopping',
             stopReason: 'operator-stop',
           });
+          this.onSessionStopped?.({ instance, uptimeSecs, projectSlug, stopReason: 'operator-stop' });
         }
       }
     }

@@ -153,10 +153,63 @@ instanceTracker.onCrashDetected = async ({ instance, uptimeSecs, projectSlug }) 
   void autoRestartService.attemptRestart(instance, uptimeSecs, projectSlug);
 };
 
+// Wire session stopped detection to Telegram notifications
+instanceTracker.onSessionStopped = async ({ instance, uptimeSecs, projectSlug, stopReason }) => {
+  try {
+    const config = database.getNotificationConfig();
+    if (!config.permissionAlertsEnabled && !config.budgetAlertsEnabled) {
+      // If all notification types are disabled, skip lifecycle notifications too.
+      // (Session lifecycle notifications piggyback on the notification system being enabled.)
+      return;
+    }
+
+    const mappings = await openClawConfigReader.getTopicMappings();
+    const mapping = mappings.find((m) => m.agentId === instance.agentId);
+
+    if (!mapping) {
+      console.warn(`[StopNotify] No Telegram topic mapping for agent: ${instance.agentId}`);
+      return;
+    }
+
+    const uptimeDisplay = uptimeSecs < 60
+      ? `${Math.round(uptimeSecs)}s`
+      : uptimeSecs < 3600
+        ? `${Math.floor(uptimeSecs / 60)}m ${Math.round(uptimeSecs % 60)}s`
+        : `${Math.floor(uptimeSecs / 3600)}h ${Math.floor((uptimeSecs % 3600) / 60)}m`;
+
+    const stopTime = new Date().toISOString().replace('T', ' ').slice(0, 19);
+
+    const reasonLabels: Record<string, string> = {
+      'operator-stop': 'Operator stop',
+      'idle-timeout': 'Idle timeout',
+      'start-failed': 'Start failed',
+    };
+    const reasonDisplay = reasonLabels[stopReason] ?? stopReason;
+
+    const text =
+      `\u26AA *${instance.agentId}* session stopped\n\n` +
+      `Session: \`${instance.tmuxSessionName}\`\n` +
+      `Project: \`${projectSlug}\`\n` +
+      `Uptime: ${uptimeDisplay}\n` +
+      `Reason: ${reasonDisplay}\n` +
+      `Stopped at: ${stopTime}`;
+
+    await telegramBotService.sendToTopic(mapping.groupId, mapping.topicId, text);
+    console.log(`[StopNotify] Sent stop notification for ${instance.agentId} to topic ${mapping.topicId}`);
+  } catch (error) {
+    // Notification failure must never block session management
+    console.error(`[StopNotify] Failed to send stop notification for ${instance.agentId}:`, error);
+  }
+};
+
 sessionUsageReader.startPeriodicScan();
 recordingRotationService.startPeriodicRotation();
 
-void telegramBotService.initialize();   // Telegram bot token load (send-only mode, no polling)
+// Await Telegram bot token load before starting pollers that depend on it.
+// Previously this was fire-and-forget (`void`), which caused a race condition:
+// the first poll cycle would run before the bot token was loaded, silently
+// dropping any notification that should have fired immediately after server start.
+await telegramBotService.initialize();   // Telegram bot token load (send-only mode, no polling)
 notificationPoller.startPolling();   // Permission prompt detection (depends on telegramBotService)
 budgetAlertPoller.startPolling();    // Budget threshold monitoring (depends on telegramBotService)
 idleTimeoutService.startPolling();  // Idle session auto-stop (IDLE-01)
