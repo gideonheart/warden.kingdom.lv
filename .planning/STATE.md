@@ -11,7 +11,7 @@ See: .planning/PROJECT.md (updated 2026-03-06)
 
 Phase: None — between milestones
 Status: v3.4 Smart Session Lifecycle shipped 2026-03-06. Ready for next milestone.
-Last activity: 2026-03-06 - Completed quick task 2052: Fix xterm scroll wheel losing terminal buffer scrollback
+Last activity: 2026-03-07 - Completed quick task 2053: Simplify tab bar, move Stop to terminal header
 
 Progress: All milestones through v3.4 complete.
 
@@ -56,9 +56,10 @@ None
 | 2050 | Refactor rotate session: extract hook, centralize paths, add confirmation UX | 2026-03-05 | a62011d | [2050-refactor-rotate-session-extract-hook-fix](./quick/2050-refactor-rotate-session-extract-hook-fix/) |
 | 2051 | Add per-session hooks pause toggle to AgentsTab | 2026-03-05 | b452da7 | [2051-add-per-session-hooks-pause-toggle-to-wa](./quick/2051-add-per-session-hooks-pause-toggle-to-wa/) |
 | 2052 | Fix xterm scroll wheel losing terminal buffer scrollback | 2026-03-06 | 0cf325b | [2052-fix-xterm-scroll-wheel-losing-terminal-b](./quick/2052-fix-xterm-scroll-wheel-losing-terminal-b/) |
+| 2053 | Simplify tab bar: show only agent name, move Stop to terminal header | 2026-03-07 | 37884a3 | [2053-simplify-tab-bar-show-only-agent-name-st](./quick/2053-simplify-tab-bar-show-only-agent-name-st/) |
 
 ## Session Continuity
 
-Last session: 2026-03-06
-Stopped at: Completed quick-2052
+Last session: 2026-03-07
+Stopped at: Completed quick-2053
 Next step: /gsd:new-milestone to plan next milestone
