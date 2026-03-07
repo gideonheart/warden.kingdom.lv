@@ -47,6 +47,8 @@ interface TerminalViewProps {
   onStop?: () => void;
   /** Callback to force-kill a stopping session. */
   onForceKill?: () => void;
+  /** Callback to spawn an additional session for the same agent. */
+  onSpawnSession?: () => void;
 }
 
 // Strip mouse-tracking enable sequences so xterm.js uses native selection
@@ -231,6 +233,7 @@ function TerminalViewInner({
   onRotateComplete,
   onStop,
   onForceKill,
+  onSpawnSession,
 }: TerminalViewProps) {
   const terminalContainerRef = useRef<HTMLDivElement>(null);
   const terminalInstanceRef = useRef<Terminal | null>(null);
@@ -851,6 +854,15 @@ function TerminalViewInner({
           </button>
           <span className="text-[10px] text-warden-text-dim/40 hidden sm:inline">Alt+click to position cursor</span>
           {/* Session lifecycle actions */}
+          {(instanceStatus === 'active' || instanceStatus === 'idle') && onSpawnSession && (
+            <button
+              onClick={onSpawnSession}
+              className="px-1.5 py-0.5 text-[10px] text-warden-text-dim hover:text-warden-text bg-warden-border/30 rounded hover:bg-warden-accent/20 transition-colors"
+              title="Spawn new session for this agent"
+            >
+              + New
+            </button>
+          )}
           {(instanceStatus === 'active' || instanceStatus === 'idle') && onStop && (
             <button
               onClick={onStop}

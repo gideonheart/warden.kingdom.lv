@@ -396,6 +396,24 @@ export function App() {
     }
   }, [refetch]);
 
+  const handleSpawnSession = useCallback(async () => {
+    const instance = selectedInstanceRef.current;
+    if (!instance) return;
+    try {
+      const response = await fetch('/api/instances/spawn', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ agentId: instance.agentId, projectPath: instance.projectPath }),
+      });
+      if (!response.ok) {
+        console.error(`Spawn failed: ${response.statusText}`);
+      }
+      refetch();
+    } catch (error) {
+      console.error('Error spawning session:', error);
+    }
+  }, [refetch]);
+
   // Listen for external hash changes (back/forward navigation)
   useEffect(() => {
     const handleHashChange = () => {
@@ -603,6 +621,7 @@ export function App() {
                     onRestart={selectedInstance ? handleRestartSelectedInstance : undefined}
                     onStop={selectedInstance ? handleStopSelectedInstance : undefined}
                     onForceKill={selectedInstance ? handleForceKillSelectedInstance : undefined}
+                    onSpawnSession={selectedInstance ? handleSpawnSession : undefined}
                     agentId={selectedInstance?.agentId}
                     projectPath={selectedInstance?.projectPath}
                     onRecordingComplete={handleRecordingComplete}
