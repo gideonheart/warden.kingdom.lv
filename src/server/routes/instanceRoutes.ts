@@ -177,6 +177,94 @@ router.post('/api/instances/start', async (request, response) => {
   });
 });
 
+// POST /api/instances/spawn — spawn an additional tmux session for an agent that may already have active sessions.
+// Unlike /start, this intentionally skips the duplicate-session guard — running parallel sessions is the purpose.
+// Returns 202 immediately; the new session is auto-discovered by InstanceTracker within 10s.
+router.post('/api/instances/spawn', async (request, response) => {
+  const { agentId, projectPath: overridePath } = request.body as { agentId?: unknown; projectPath?: unknown };
+
+  if (typeof agentId !== 'string' || !agentId.trim()) {
+    response.status(400).json({ error: 'agentId is required and must be a non-empty string' });
+    return;
+  }
+
+  const trimmedAgentId = agentId.trim();
+
+  // Look up agent config to obtain agent name (always required) and workspace path (used when no override)
+  let projectPath: string;
+  let agentName: string;
+  try {
+    const agents = await openClawConfigReader.getAgents();
+    const agentConfig = agents.find(agent => agent.id === trimmedAgentId);
+    if (!agentConfig) {
+      response.status(404).json({ error: 'Agent not found in openclaw.json' });
+      return;
+    }
+    agentName = agentConfig.name;
+
+    if (typeof overridePath === 'string' && overridePath.trim()) {
+      projectPath = overridePath.trim();
+    } else {
+      // Prefer working_directory from agent-registry (the actual project repo)
+      // over workspace from openclaw.json (the OpenClaw workspace directory).
+      let registryDir: string | undefined;
+      try {
+        const registryAgent = await gsdRegistryService.getAgent(trimmedAgentId);
+        registryDir = registryAgent?.working_directory;
+      } catch {
+        // Registry unavailable — fall through to openclaw.json workspace
+      }
+
+      if (registryDir) {
+        projectPath = registryDir;
+      } else {
+        const rawWorkspace = agentConfig.workspace;
+        projectPath = path.isAbsolute(rawWorkspace)
+          ? rawWorkspace
+          : path.join(process.env.HOME ?? '/home/forge', '.openclaw', rawWorkspace);
+      }
+    }
+  } catch (error) {
+    console.error(`[API] Failed to read agent config for ${trimmedAgentId}:`, error);
+    response.status(500).json({ error: 'Failed to read agent configuration' });
+    return;
+  }
+
+  // Derive projectSlug from last path segment
+  const projectSlug = path.basename(projectPath) || trimmedAgentId;
+
+  // Build session name — includes a random 4-char UUID, so it will NOT collide with existing sessions
+  const tmuxSessionName = tmuxSessionManager.buildSessionName(trimmedAgentId, projectSlug);
+
+  // Pre-register instance with 'starting' status for immediate UI visibility
+  const newInstance = database.upsertInstance({
+    agentId: trimmedAgentId,
+    agentName,
+    tmuxSessionName,
+    projectPath,
+    telegramTopicId: undefined,
+  });
+  database.updateInstanceStatus(newInstance.id, 'starting');
+  const startingInstance = instanceTracker.findInstanceById(newInstance.id)!;
+
+  // Fire-and-forget the actual tmux+claude creation
+  tmuxSessionManager.createSessionWithClaude(tmuxSessionName, projectPath)
+    .then(() => {
+      database.updateInstanceStatus(newInstance.id, 'active');
+      console.log(`[API] Spawned additional session: ${tmuxSessionName}`);
+    })
+    .catch((error: unknown) => {
+      database.updateInstanceStatus(newInstance.id, 'error');
+      console.error(`[API] Failed to spawn session for ${trimmedAgentId}:`, error);
+    });
+
+  console.log(`[API] Spawning additional session: agentId=${trimmedAgentId} session=${tmuxSessionName}`);
+  response.status(202).json({
+    message: 'Spawning additional session',
+    instance: startingInstance,
+  });
+});
+
 // POST /api/instances/:id/stop — graceful shutdown: sends Ctrl+C, waits up to 5s, then kills.
 router.post('/api/instances/:id/stop', async (request, response) => {
   const instanceId = parseInt(request.params.id, 10);
