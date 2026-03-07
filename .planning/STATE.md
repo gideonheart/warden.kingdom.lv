@@ -11,7 +11,7 @@ See: .planning/PROJECT.md (updated 2026-03-06)
 
 Phase: None — between milestones
 Status: v3.4 Smart Session Lifecycle shipped 2026-03-06. Ready for next milestone.
-Last activity: 2026-03-07 - Completed quick task 2054: Investigate notification system
+Last activity: 2026-03-07 - Completed quick task 2055: Add New Session button next to Stop in terminal header
 
 Progress: All milestones through v3.4 complete.
 
@@ -58,9 +58,10 @@ None
 | 2052 | Fix xterm scroll wheel losing terminal buffer scrollback | 2026-03-06 | 0cf325b | [2052-fix-xterm-scroll-wheel-losing-terminal-b](./quick/2052-fix-xterm-scroll-wheel-losing-terminal-b/) |
 | 2053 | Simplify tab bar: show only agent name, move Stop to terminal header | 2026-03-07 | 37884a3 | [2053-simplify-tab-bar-show-only-agent-name-st](./quick/2053-simplify-tab-bar-show-only-agent-name-st/) |
 | 2054 | Investigate notification system - understand existing browser/Telegram notification flow and what's needed for native OS/phone notifications | 2026-03-07 | 298416b | [2054-investigate-notification-system-understa](./quick/2054-investigate-notification-system-understa/) |
+| 2055 | Add New Session button next to Stop in terminal header + spawn endpoint | 2026-03-07 | c5f46d8 | [2055-add-new-session-button-next-to-stop-in-t](./quick/2055-add-new-session-button-next-to-stop-in-t/) |
 
 ## Session Continuity
 
 Last session: 2026-03-07
-Stopped at: Completed quick-2054
+Stopped at: Completed quick-2055
 Next step: /gsd:new-milestone to plan next milestone
