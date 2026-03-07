@@ -303,13 +303,6 @@ export function App() {
     setSidebarSelectedAgentId(agentId);
   }, []);
 
-  const handleSessionStopped = useCallback(
-    (_sessionName: string) => {
-      refetch();
-    },
-    [refetch]
-  );
-
   const handleStartAgent = useCallback(
     async (agentId: string) => {
       const response = await fetch('/api/instances/start', {
@@ -339,21 +332,6 @@ export function App() {
         refetch();
       } catch (error) {
         console.error('Error restarting instance:', error);
-      }
-    },
-    [refetch],
-  );
-
-  const handleForceKillInstance = useCallback(
-    async (instanceId: number) => {
-      try {
-        const response = await fetch(`/api/instances/${instanceId}/force-kill`, { method: 'POST' });
-        if (!response.ok) {
-          console.error(`Force kill failed: ${response.statusText}`);
-        }
-        refetch();
-      } catch (error) {
-        console.error('Error force killing instance:', error);
       }
     },
     [refetch],
@@ -390,6 +368,30 @@ export function App() {
       void handleRestartInstance(instance.id);
     }
   }, [handleRestartInstance]);
+
+  const handleStopSelectedInstance = useCallback(async () => {
+    const instance = selectedInstanceRef.current;
+    if (!instance) return;
+    try {
+      const response = await fetch(`/api/instances/${instance.id}/stop`, { method: 'POST' });
+      if (!response.ok) console.error(`Stop failed: ${response.statusText}`);
+      refetch();
+    } catch (error) {
+      console.error('Error stopping instance:', error);
+    }
+  }, [refetch]);
+
+  const handleForceKillSelectedInstance = useCallback(async () => {
+    const instance = selectedInstanceRef.current;
+    if (!instance) return;
+    try {
+      const response = await fetch(`/api/instances/${instance.id}/force-kill`, { method: 'POST' });
+      if (!response.ok) console.error(`Force kill failed: ${response.statusText}`);
+      refetch();
+    } catch (error) {
+      console.error('Error force killing instance:', error);
+    }
+  }, [refetch]);
 
   // Listen for external hash changes (back/forward navigation)
   useEffect(() => {
@@ -568,9 +570,6 @@ export function App() {
           instances={activeInstances}
           selectedSessionName={selectedSessionName}
           onSelectSession={handleSelectSession}
-          onSessionStopped={handleSessionStopped}
-          onRestart={handleRestartInstance}
-          onForceKill={handleForceKillInstance}
           onDismiss={handleDismissInstance}
         />
       )}
@@ -599,6 +598,8 @@ export function App() {
                     instanceStatus={selectedInstance?.status}
                     agentName={selectedInstance?.agentName}
                     onRestart={selectedInstance ? handleRestartSelectedInstance : undefined}
+                    onStop={selectedInstance ? handleStopSelectedInstance : undefined}
+                    onForceKill={selectedInstance ? handleForceKillSelectedInstance : undefined}
                     agentId={selectedInstance?.agentId}
                     projectPath={selectedInstance?.projectPath}
                     onRecordingComplete={handleRecordingComplete}

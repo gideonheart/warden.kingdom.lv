@@ -43,6 +43,10 @@ interface TerminalViewProps {
   workingDirectory?: string | null;
   /** Callback triggered after successful session rotation — e.g. to refetch agent config. */
   onRotateComplete?: () => void;
+  /** Callback to stop the current session. */
+  onStop?: () => void;
+  /** Callback to force-kill a stopping session. */
+  onForceKill?: () => void;
 }
 
 // Strip mouse-tracking enable sequences so xterm.js uses native selection
@@ -225,6 +229,8 @@ function TerminalViewInner({
   contextFill,
   workingDirectory,
   onRotateComplete,
+  onStop,
+  onForceKill,
 }: TerminalViewProps) {
   const terminalContainerRef = useRef<HTMLDivElement>(null);
   const terminalInstanceRef = useRef<Terminal | null>(null);
@@ -844,6 +850,25 @@ function TerminalViewInner({
             Aa {FONT_SIZE_DISPLAY[fontSizeLabel]}
           </button>
           <span className="text-[10px] text-warden-text-dim/40 hidden sm:inline">Alt+click to position cursor</span>
+          {/* Session lifecycle actions */}
+          {(instanceStatus === 'active' || instanceStatus === 'idle') && onStop && (
+            <button
+              onClick={onStop}
+              className="px-1.5 py-0.5 text-[10px] bg-warden-error/20 text-warden-error rounded hover:bg-warden-error/30 transition-colors"
+              title="Stop session"
+            >
+              Stop
+            </button>
+          )}
+          {instanceStatus === 'stopping' && onForceKill && (
+            <button
+              onClick={onForceKill}
+              className="px-1.5 py-0.5 text-[10px] bg-warden-error/30 text-warden-error rounded hover:bg-warden-error/50 transition-colors font-medium"
+              title="Force kill immediately"
+            >
+              Force Kill
+            </button>
+          )}
         </div>
       </div>
 
