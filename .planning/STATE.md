@@ -11,7 +11,7 @@ See: .planning/PROJECT.md (updated 2026-03-06)
 
 Phase: None — between milestones
 Status: v3.4 Smart Session Lifecycle shipped 2026-03-06. Ready for next milestone.
-Last activity: 2026-03-07 - Completed quick task 2054: Investigate notification system architecture and native push options
+Last activity: 2026-03-07 - Completed quick task 2054: Investigate notification system
 
 Progress: All milestones through v3.4 complete.
 
@@ -57,7 +57,7 @@ None
 | 2051 | Add per-session hooks pause toggle to AgentsTab | 2026-03-05 | b452da7 | [2051-add-per-session-hooks-pause-toggle-to-wa](./quick/2051-add-per-session-hooks-pause-toggle-to-wa/) |
 | 2052 | Fix xterm scroll wheel losing terminal buffer scrollback | 2026-03-06 | 0cf325b | [2052-fix-xterm-scroll-wheel-losing-terminal-b](./quick/2052-fix-xterm-scroll-wheel-losing-terminal-b/) |
 | 2053 | Simplify tab bar: show only agent name, move Stop to terminal header | 2026-03-07 | 37884a3 | [2053-simplify-tab-bar-show-only-agent-name-st](./quick/2053-simplify-tab-bar-show-only-agent-name-st/) |
-| 2054 | Investigate notification system architecture and native push options | 2026-03-07 | e42abfb | [2054-investigate-notification-system-understa](./quick/2054-investigate-notification-system-understa/) |
+| 2054 | Investigate notification system - understand existing browser/Telegram notification flow and what's needed for native OS/phone notifications | 2026-03-07 | 298416b | [2054-investigate-notification-system-understa](./quick/2054-investigate-notification-system-understa/) |
 
 ## Session Continuity
 
