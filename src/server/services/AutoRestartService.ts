@@ -3,6 +3,7 @@ import { database } from '../database/DatabaseConnection.js';
 import { tmuxSessionManager } from './TmuxSessionManager.js';
 import { telegramBotService } from './TelegramBotService.js';
 import { openClawConfigReader } from './OpenClawConfigReader.js';
+import { gsdRegistryService } from './GsdRegistryService.js';
 import type { AgentInstance } from '../../shared/types.js';
 
 const RESTART_DELAY_MS = 7_000;       // 7 seconds before spawning — gives crash detection time to settle
@@ -52,8 +53,19 @@ export class AutoRestartService {
     console.log(`[AutoRestart] Waiting ${RESTART_DELAY_MS}ms before restarting ${agentId}...`);
     await new Promise<void>((resolve) => setTimeout(resolve, RESTART_DELAY_MS));
 
-    // Step 4: derive project info and build new session name
-    const projectPath = crashedInstance.projectPath;
+    // Step 4: derive project info and build new session name.
+    // If the crashed instance has no projectPath (e.g. it was discovered via tmux polling
+    // before the InstanceTracker fix that resolves working directories), look it up from
+    // the GSD agent-registry or openclaw.json as a defensive fallback.
+    let projectPath = crashedInstance.projectPath;
+    if (!projectPath) {
+      projectPath = await this.resolveWorkingDirectory(agentId);
+      if (projectPath) {
+        console.log(`[AutoRestart] Resolved working directory for ${agentId}: ${projectPath}`);
+      } else {
+        console.warn(`[AutoRestart] No working directory found for ${agentId} — will use server cwd`);
+      }
+    }
     const derivedProjectSlug = path.basename(projectPath) || projectSlug || agentId;
     const newSessionName = tmuxSessionManager.buildSessionName(agentId, derivedProjectSlug);
 
@@ -71,7 +83,7 @@ export class AutoRestartService {
     database.updateInstanceStatus(newInstance.id, 'starting');
 
     try {
-      await tmuxSessionManager.createSessionWithClaude(agentId, derivedProjectSlug, projectPath);
+      await tmuxSessionManager.createSessionWithClaude(newSessionName, projectPath);
 
       // Spawn succeeded — promote to active and log lifecycle event
       database.updateInstanceStatus(newInstance.id, 'active');
@@ -132,6 +144,38 @@ export class AutoRestartService {
     // Prune old entries
     const pruned = timestamps.filter((timestamp) => now - timestamp < STORM_WINDOW_MS);
     this.restartTimestamps.set(agentId, pruned);
+  }
+
+  /**
+   * Resolve the working directory for an agent from config sources.
+   * Prefers GSD agent-registry working_directory, falls back to openclaw.json workspace.
+   * Returns empty string if no directory can be resolved.
+   */
+  private async resolveWorkingDirectory(agentId: string): Promise<string> {
+    // Try GSD agent-registry first (has the actual project repo path)
+    try {
+      const registryAgent = await gsdRegistryService.getAgent(agentId);
+      if (registryAgent?.working_directory) {
+        return registryAgent.working_directory;
+      }
+    } catch {
+      // Registry unavailable — fall through
+    }
+
+    // Fall back to openclaw.json workspace
+    try {
+      const agents = await openClawConfigReader.getAgents();
+      const agentConfig = agents.find((a) => a.id === agentId);
+      if (agentConfig?.workspace) {
+        return path.isAbsolute(agentConfig.workspace)
+          ? agentConfig.workspace
+          : path.join(process.env.HOME ?? '/home/forge', '.openclaw', agentConfig.workspace);
+      }
+    } catch {
+      // Config unavailable — fall through
+    }
+
+    return '';
   }
 
   /**

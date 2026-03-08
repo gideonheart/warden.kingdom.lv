@@ -2,6 +2,7 @@ import path from 'path';
 import { database } from '../database/DatabaseConnection.js';
 import { tmuxSessionManager } from './TmuxSessionManager.js';
 import { openClawConfigReader } from './OpenClawConfigReader.js';
+import { gsdRegistryService } from './GsdRegistryService.js';
 import type { AgentInstance, AgentInstanceStatus } from '../../shared/types.js';
 
 const SYNC_INTERVAL_MS = 10_000;
@@ -40,17 +41,38 @@ export class InstanceTracker {
     const tmuxSessions = await tmuxSessionManager.listAgentSessions();
     const activeSessionNames = tmuxSessions.map(session => session.sessionName);
 
-    // Load agent name map from openclaw.json so that sessions discovered via tmux polling
-    // use the same display names as the sidebar (which reads directly from openclaw.json).
-    // Falls back to capitalizing agentId if config is unavailable.
+    // Load agent name map and workspace map from openclaw.json so that sessions discovered
+    // via tmux polling use the same display names and working directories as sessions
+    // started through the API. Falls back to capitalizing agentId if config is unavailable.
     let agentNameMap = new Map<string, string>();
+    let agentWorkspaceMap = new Map<string, string>();
     try {
       const agentDetails = await openClawConfigReader.getAgents();
       for (const agent of agentDetails) {
         agentNameMap.set(agent.id, agent.name);
+        if (agent.workspace) {
+          agentWorkspaceMap.set(
+            agent.id,
+            path.isAbsolute(agent.workspace)
+              ? agent.workspace
+              : path.join(process.env.HOME ?? '/home/forge', '.openclaw', agent.workspace),
+          );
+        }
       }
     } catch {
       // Config unavailable — fallback names are applied per-session below
+    }
+
+    // Prefer working_directory from GSD agent-registry (the actual project repo)
+    // over workspace from openclaw.json (the OpenClaw workspace directory).
+    // This mirrors the resolution logic in instanceRoutes /api/instances/start.
+    try {
+      const registryDirs = await gsdRegistryService.getWorkingDirectories();
+      for (const [agentId, workDir] of registryDirs) {
+        agentWorkspaceMap.set(agentId, workDir);
+      }
+    } catch {
+      // Registry unavailable — fall through to openclaw.json workspace values
     }
 
     // On the first sync, collect existing session names before upserting.
@@ -64,11 +86,12 @@ export class InstanceTracker {
     for (const session of tmuxSessions) {
       const agentName = agentNameMap.get(session.agentId)
         ?? session.agentId.charAt(0).toUpperCase() + session.agentId.slice(1);
+      const resolvedProjectPath = agentWorkspaceMap.get(session.agentId) ?? '';
       const upserted = database.upsertInstance({
         agentId: session.agentId,
         agentName,
         tmuxSessionName: session.sessionName,
-        projectPath: '',
+        projectPath: resolvedProjectPath,
         telegramTopicId: undefined,
       });
 

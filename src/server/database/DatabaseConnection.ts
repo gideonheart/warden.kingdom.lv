@@ -117,9 +117,19 @@ class DatabaseConnection {
   upsertInstance(params: AgentInstanceCreateParams): AgentInstance {
     const existing = this.findInstanceBySessionName(params.tmuxSessionName);
     if (existing) {
-      this.db.prepare(
-        "UPDATE instances SET status = 'active', agent_id = ?, agent_name = ?, last_active_at = CURRENT_TIMESTAMP WHERE id = ?"
-      ).run(params.agentId, params.agentName, existing.id);
+      // Backfill project_path if the existing record has an empty one and the caller
+      // provides a non-empty value. This ensures sessions discovered by tmux polling
+      // eventually get their correct working directory populated (needed for auto-restart).
+      const shouldBackfillPath = !existing.projectPath && params.projectPath;
+      if (shouldBackfillPath) {
+        this.db.prepare(
+          "UPDATE instances SET status = 'active', agent_id = ?, agent_name = ?, project_path = ?, last_active_at = CURRENT_TIMESTAMP WHERE id = ?"
+        ).run(params.agentId, params.agentName, params.projectPath, existing.id);
+      } else {
+        this.db.prepare(
+          "UPDATE instances SET status = 'active', agent_id = ?, agent_name = ?, last_active_at = CURRENT_TIMESTAMP WHERE id = ?"
+        ).run(params.agentId, params.agentName, existing.id);
+      }
       return this.findInstanceById(existing.id)!;
     }
     return this.insertInstance(params);
