@@ -634,8 +634,12 @@ function TerminalViewInner({
       container.addEventListener('touchend', handleTouchEnd, { passive: true });
     }
 
-    // Resize handler — refit terminal on window resize AND visualViewport resize
-    // (iOS Safari fires visualViewport.resize when keyboard opens, not window.resize).
+    // ResizeObserver-based refit: fires whenever the container element's dimensions
+    // change, including the critical first layout after React mounts the component.
+    // This replaces the window 'resize' listener as the primary refit trigger, fixing
+    // the blank-terminal-on-tab-switch bug where fit() ran before the container had
+    // real dimensions and no subsequent trigger would ever refit.
+    //
     // Guard against zero-dimension containers: if the container has been collapsed
     // (e.g. keyboard-open layout transition in progress), skip the fit to avoid
     // sending a degenerate resize to the PTY that corrupts tmux layout.
@@ -658,7 +662,12 @@ function TerminalViewInner({
         });
       }, 100);
     };
-    window.addEventListener('resize', refitTerminal);
+
+    const resizeObserver = new ResizeObserver(refitTerminal);
+    resizeObserver.observe(container);
+
+    // iOS Safari fires visualViewport.resize when keyboard opens, not container resize.
+    // Keep this listener alongside ResizeObserver for mobile keyboard handling.
     const visualViewport = window.visualViewport;
     if (visualViewport) {
       visualViewport.addEventListener('resize', refitTerminal);
@@ -666,7 +675,7 @@ function TerminalViewInner({
 
     return () => {
       if (resizeDebounceTimer) clearTimeout(resizeDebounceTimer);
-      window.removeEventListener('resize', refitTerminal);
+      resizeObserver.disconnect();
       if (visualViewport) {
         visualViewport.removeEventListener('resize', refitTerminal);
       }
