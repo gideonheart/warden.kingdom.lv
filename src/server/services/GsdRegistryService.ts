@@ -41,6 +41,17 @@ class GsdRegistryService {
     return registry.agents.find((agent) => agent.agent_id === agentId);
   }
 
+  async getWorkingDirectories(): Promise<Map<string, string>> {
+    const registry = await this.getRegistry();
+    const directoryMap = new Map<string, string>();
+    for (const entry of registry.agents) {
+      if (entry.agent_id && entry.working_directory) {
+        directoryMap.set(entry.agent_id, entry.working_directory);
+      }
+    }
+    return directoryMap;
+  }
+
   async patchAgent(
     agentId: string,
     patch: Partial<Pick<RegistryAgent, 'enabled'>>,

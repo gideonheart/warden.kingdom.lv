@@ -76,8 +76,7 @@ export class TmuxSessionManager {
     return sessionName;
   }
 
-  async createSessionWithClaude(agentId: string, projectSlug: string, projectPath: string): Promise<string> {
-    const sessionName = this.buildSessionName(agentId, projectSlug);
+  async createSessionWithClaude(sessionName: string, projectPath: string): Promise<string> {
     await this.executeTmuxCommand('new-session', ['-d', '-s', sessionName, '-c', projectPath]);
     await this.executeTmuxCommand('send-keys', ['-t', `${sessionName}:0.0`, 'claude --dangerously-skip-permissions', 'Enter']);
     return sessionName;

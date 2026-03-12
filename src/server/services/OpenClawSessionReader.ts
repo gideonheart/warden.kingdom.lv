@@ -1,23 +1,11 @@
-import { readFile } from 'fs/promises';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import type { AgentContextFill } from '../../shared/openclawTypes.js';
 
 const execFileAsync = promisify(execFile);
 
-const AGENT_REGISTRY_PATH = '/home/forge/.openclaw/workspace/skills/gsd-code-skill/config/agent-registry.json';
 const OPENCLAW_BINARY_PATH = '/home/forge/.local/share/pnpm/openclaw';
 const CACHE_TTL_MS = 30_000;
-
-interface AgentRegistryEntry {
-  agent_id: string;
-  working_directory: string;
-  [key: string]: unknown;
-}
-
-interface AgentRegistryFile {
-  agents: AgentRegistryEntry[];
-}
 
 interface OpenClawSessionEntry {
   key: string;
@@ -34,50 +22,14 @@ interface OpenClawSessionsResponse {
 }
 
 class OpenClawSessionReader {
-  private cachedWorkingDirectories: Map<string, string> | null = null;
-  private workingDirectoriesLastReadAt = 0;
-
   private cachedContextFills: Map<string, AgentContextFill> | null = null;
   private contextFillsLastReadAt = 0;
 
   private hasLoggedCliWarning = false;
 
   clearCaches(): void {
-    this.cachedWorkingDirectories = null;
-    this.workingDirectoriesLastReadAt = 0;
     this.cachedContextFills = null;
     this.contextFillsLastReadAt = 0;
-  }
-
-  async getWorkingDirectories(): Promise<Map<string, string>> {
-    const now = Date.now();
-    if (this.cachedWorkingDirectories && now - this.workingDirectoriesLastReadAt < CACHE_TTL_MS) {
-      return this.cachedWorkingDirectories;
-    }
-
-    try {
-      const rawContent = await readFile(AGENT_REGISTRY_PATH, 'utf-8');
-      const registry = JSON.parse(rawContent) as AgentRegistryFile;
-      const directoryMap = new Map<string, string>();
-
-      for (const entry of registry.agents) {
-        if (entry.agent_id && entry.working_directory) {
-          directoryMap.set(entry.agent_id, entry.working_directory);
-        }
-      }
-
-      this.cachedWorkingDirectories = directoryMap;
-      this.workingDirectoriesLastReadAt = now;
-      return directoryMap;
-    } catch (error: any) {
-      if (error.code !== 'ENOENT') {
-        console.error('[OpenClawSessionReader] Failed to read agent registry:', error.message);
-      }
-      if (this.cachedWorkingDirectories) {
-        return this.cachedWorkingDirectories;
-      }
-      return new Map();
-    }
   }
 
   async getContextFills(): Promise<Map<string, AgentContextFill>> {

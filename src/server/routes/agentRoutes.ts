@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { openClawConfigReader } from '../services/OpenClawConfigReader.js';
 import { openClawSessionReader } from '../services/OpenClawSessionReader.js';
+import { gsdRegistryService } from '../services/GsdRegistryService.js';
 import { gatewayApiClient } from '../services/GatewayApiClient.js';
 
 export const agentRoutes = Router();
@@ -9,7 +10,7 @@ agentRoutes.get('/api/agents', async (_request, response) => {
   try {
     const [agents, workingDirectories, contextFills] = await Promise.all([
       openClawConfigReader.getAgents(),
-      openClawSessionReader.getWorkingDirectories(),
+      gsdRegistryService.getWorkingDirectories(),
       openClawSessionReader.getContextFills(),
     ]);
 
