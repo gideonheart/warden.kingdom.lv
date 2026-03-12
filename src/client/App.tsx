@@ -108,16 +108,13 @@ export function App() {
 
   // Memoize activeInstances so the array reference is stable when instances data is
   // unchanged. Without this, Array.filter() creates a new reference on every App render.
-  // Include all lifecycle states so transitional (starting/stopping) and stopped sessions
-  // remain visible in the tab bar with appropriate visual treatment.
+  // Only include live lifecycle states — stopped/error sessions disappear from tabs.
   const activeInstances = useMemo(
     () => instances.filter((instance) =>
       instance.status === 'active' ||
       instance.status === 'idle' ||
       instance.status === 'starting' ||
-      instance.status === 'stopping' ||
-      instance.status === 'stopped' ||
-      instance.status === 'error',
+      instance.status === 'stopping',
     ),
     [instances],
   );
