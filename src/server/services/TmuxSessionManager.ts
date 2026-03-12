@@ -1,6 +1,5 @@
 import { execFile } from 'child_process';
 import { promisify } from 'util';
-import crypto from 'crypto';
 import type { TmuxSessionInfo } from '../../shared/types.js';
 
 const execFileAsync = promisify(execFile);
@@ -174,9 +173,8 @@ export class TmuxSessionManager {
     return sessionName.split('-')[0];
   }
 
-  buildSessionName(agentId: string, projectSlug: string): string {
-    const shortId = crypto.randomUUID().slice(0, 4);
-    return `${agentId}-${projectSlug}-${shortId}`;
+  buildSessionName(agentId: string, projectSlug: string, sequenceNumber: number = 1): string {
+    return `${agentId}-${projectSlug}-${sequenceNumber}`;
   }
 
   private isAgentManagedSession(sessionName: string): boolean {

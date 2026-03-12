@@ -143,8 +143,14 @@ router.post('/api/instances/start', async (request, response) => {
   // Derive projectSlug from last path segment
   const projectSlug = path.basename(projectPath) || trimmedAgentId;
 
+  // Compute next sequential session number for this agent to ensure unique, readable names.
+  // Counts all historical instances (any status) to avoid reusing a number that was previously
+  // assigned, even if that session is now stopped or removed from the tab bar.
+  const existingStartCount = database.countAllInstancesByAgentId(trimmedAgentId);
+  const startSequenceNumber = existingStartCount + 1;
+
   // Build session name ahead of time for pre-registration
-  const tmuxSessionName = tmuxSessionManager.buildSessionName(trimmedAgentId, projectSlug);
+  const tmuxSessionName = tmuxSessionManager.buildSessionName(trimmedAgentId, projectSlug, startSequenceNumber);
 
   // Pre-register instance with 'starting' status for immediate UI visibility
   const newInstance = database.upsertInstance({
@@ -233,8 +239,13 @@ router.post('/api/instances/spawn', async (request, response) => {
   // Derive projectSlug from last path segment
   const projectSlug = path.basename(projectPath) || trimmedAgentId;
 
-  // Build session name — includes a random 4-char UUID, so it will NOT collide with existing sessions
-  const tmuxSessionName = tmuxSessionManager.buildSessionName(trimmedAgentId, projectSlug);
+  // Compute next sequential session number for this agent to ensure unique, readable names.
+  // Counts all historical instances (any status) to avoid reusing a previously-assigned number.
+  const existingSpawnCount = database.countAllInstancesByAgentId(trimmedAgentId);
+  const spawnSequenceNumber = existingSpawnCount + 1;
+
+  // Build session name with sequential suffix so it will not collide with existing sessions
+  const tmuxSessionName = tmuxSessionManager.buildSessionName(trimmedAgentId, projectSlug, spawnSequenceNumber);
 
   // Pre-register instance with 'starting' status for immediate UI visibility
   const newInstance = database.upsertInstance({
@@ -361,8 +372,12 @@ router.post('/api/instances/:id/restart', async (request, response) => {
   // Derive slug for new session
   const projectSlug = path.basename(projectPath) || agentId;
 
+  // Compute next sequential session number for this agent
+  const existingRestartCount = database.countAllInstancesByAgentId(agentId);
+  const restartSequenceNumber = existingRestartCount + 1;
+
   // Build new session name for fresh start
-  const tmuxSessionName = tmuxSessionManager.buildSessionName(agentId, projectSlug);
+  const tmuxSessionName = tmuxSessionManager.buildSessionName(agentId, projectSlug, restartSequenceNumber);
 
   // Pre-register the restarted session
   const newInstance = database.upsertInstance({

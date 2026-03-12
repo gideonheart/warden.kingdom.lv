@@ -67,7 +67,10 @@ export class AutoRestartService {
       }
     }
     const derivedProjectSlug = path.basename(projectPath) || projectSlug || agentId;
-    const newSessionName = tmuxSessionManager.buildSessionName(agentId, derivedProjectSlug);
+    // Compute next sequential session number to avoid name collisions with historical sessions
+    const existingAutoRestartCount = database.countAllInstancesByAgentId(agentId);
+    const autoRestartSequenceNumber = existingAutoRestartCount + 1;
+    const newSessionName = tmuxSessionManager.buildSessionName(agentId, derivedProjectSlug, autoRestartSequenceNumber);
 
     // Pre-register in DB as 'starting' so the UI can show the new tab immediately
     const agentName = agentId.charAt(0).toUpperCase() + agentId.slice(1);

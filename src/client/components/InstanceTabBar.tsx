@@ -21,6 +21,38 @@ function statusLabel(status: string): string {
   }
 }
 
+/**
+ * Builds a display label for each instance.
+ * When multiple instances share the same agentId, appends a sequential number
+ * (e.g., "Casper-1", "Casper-2") so they can be told apart in the tab bar.
+ * Single-agent sessions are shown without a number suffix.
+ */
+function buildDisplayLabels(instances: AgentInstance[]): Map<string, string> {
+  // Count how many instances share each agentId
+  const agentIdCounts = new Map<string, number>();
+  for (const instance of instances) {
+    agentIdCounts.set(instance.agentId, (agentIdCounts.get(instance.agentId) ?? 0) + 1);
+  }
+
+  // Assign sequential numbers to instances that share an agentId
+  const agentIdSequences = new Map<string, number>();
+  const labels = new Map<string, string>();
+
+  for (const instance of instances) {
+    const baseName = instance.agentName || instance.agentId;
+    const count = agentIdCounts.get(instance.agentId) ?? 1;
+    if (count > 1) {
+      const seq = (agentIdSequences.get(instance.agentId) ?? 0) + 1;
+      agentIdSequences.set(instance.agentId, seq);
+      labels.set(instance.tmuxSessionName, `${baseName}-${seq}`);
+    } else {
+      labels.set(instance.tmuxSessionName, baseName);
+    }
+  }
+
+  return labels;
+}
+
 export function InstanceTabBar({
   instances,
   selectedSessionName,
@@ -37,12 +69,14 @@ export function InstanceTabBar({
     );
   }
 
+  const displayLabels = buildDisplayLabels(visibleInstances);
+
   return (
     <div className="flex items-center gap-1 px-2 py-1.5 bg-warden-panel border-b border-warden-border overflow-x-auto touch-scroll">
       {visibleInstances.map((instance) => {
         const isSelected = instance.tmuxSessionName === selectedSessionName;
         const statusColor = STATUS_COLORS[instance.status] ?? 'bg-warden-idle';
-        const displayName = instance.agentName || instance.agentId;
+        const displayName = displayLabels.get(instance.tmuxSessionName) ?? (instance.agentName || instance.agentId);
 
         return (
           <div

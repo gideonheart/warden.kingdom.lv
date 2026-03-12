@@ -648,6 +648,17 @@ class DatabaseConnection {
   }
 
   /**
+   * Returns the count of all instances (any status) for the given agentId.
+   * Used to compute the next sequential session number for buildSessionName.
+   */
+  countAllInstancesByAgentId(agentId: string): number {
+    const row = this.db.prepare(
+      'SELECT COUNT(*) as count FROM instances WHERE agent_id = ?'
+    ).get(agentId) as { count: number };
+    return row.count;
+  }
+
+  /**
    * Returns a map of agentId -> most recent non-empty project_path.
    * Used by the quick-launch modal to pre-fill the project path field per agent.
    */
