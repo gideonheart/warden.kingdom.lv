@@ -103,6 +103,7 @@ export function App() {
   const [showSidebar, setShowSidebar] = useState(() => window.innerWidth >= 1024);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
+  const [isStoppingSession, setIsStoppingSession] = useState(false);
   const [currentView, setCurrentView] = useState<AppView>(() => parseHash().view);
 
   // Memoize activeInstances so the array reference is stable when instances data is
@@ -365,6 +366,11 @@ export function App() {
   // switches, passing a new function reference to TerminalView.
   const selectedInstanceRef = useRef<typeof selectedInstance>(selectedInstance);
   selectedInstanceRef.current = selectedInstance;
+  // Keep a stable ref to activeInstances so stop handler can find another active session
+  // to switch to without requiring activeInstances as a useCallback dependency.
+  const activeInstancesRef = useRef<typeof activeInstances>(activeInstances);
+  activeInstancesRef.current = activeInstances;
+
   const handleRestartSelectedInstance = useCallback(() => {
     const instance = selectedInstanceRef.current;
     if (instance) {
@@ -375,14 +381,27 @@ export function App() {
   const handleStopSelectedInstance = useCallback(async () => {
     const instance = selectedInstanceRef.current;
     if (!instance) return;
+    setIsStoppingSession(true);
     try {
       const response = await fetch(`/api/instances/${instance.id}/stop`, { method: 'POST' });
       if (!response.ok) console.error(`Stop failed: ${response.statusText}`);
+      // Auto-switch to the first other active/idle/starting session so the user
+      // isn't left watching the stopped session's "trying to restart" overlay.
+      const nextSession = activeInstancesRef.current.find(
+        (other) =>
+          other.tmuxSessionName !== instance.tmuxSessionName &&
+          (other.status === 'active' || other.status === 'idle' || other.status === 'starting'),
+      );
+      if (nextSession) {
+        selectSession(nextSession.tmuxSessionName);
+      }
       refetch();
     } catch (error) {
       console.error('Error stopping instance:', error);
+    } finally {
+      setIsStoppingSession(false);
     }
-  }, [refetch]);
+  }, [refetch, selectSession]);
 
   const handleForceKillSelectedInstance = useCallback(async () => {
     const instance = selectedInstanceRef.current;
@@ -620,6 +639,7 @@ export function App() {
                     agentName={selectedInstance?.agentName}
                     onRestart={selectedInstance ? handleRestartSelectedInstance : undefined}
                     onStop={selectedInstance ? handleStopSelectedInstance : undefined}
+                    isStoppingSession={isStoppingSession}
                     onForceKill={selectedInstance ? handleForceKillSelectedInstance : undefined}
                     onSpawnSession={selectedInstance ? handleSpawnSession : undefined}
                     agentId={selectedInstance?.agentId}

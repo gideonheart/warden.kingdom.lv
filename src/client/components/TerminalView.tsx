@@ -45,6 +45,8 @@ interface TerminalViewProps {
   onRotateComplete?: () => void;
   /** Callback to stop the current session. */
   onStop?: () => void;
+  /** Whether a stop operation is currently in progress. Shows spinner and disables the button. */
+  isStoppingSession?: boolean;
   /** Callback to force-kill a stopping session. */
   onForceKill?: () => void;
   /** Callback to spawn an additional session for the same agent. */
@@ -232,6 +234,7 @@ function TerminalViewInner({
   workingDirectory,
   onRotateComplete,
   onStop,
+  isStoppingSession = false,
   onForceKill,
   onSpawnSession,
 }: TerminalViewProps) {
@@ -875,10 +878,14 @@ function TerminalViewInner({
           {(instanceStatus === 'active' || instanceStatus === 'idle') && onStop && (
             <button
               onClick={onStop}
-              className="px-1.5 py-0.5 text-[10px] bg-warden-error/20 text-warden-error rounded hover:bg-warden-error/30 transition-colors"
-              title="Stop session"
+              disabled={isStoppingSession}
+              className="flex items-center gap-1 px-1.5 py-0.5 text-[10px] bg-warden-error/20 text-warden-error rounded hover:bg-warden-error/30 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              title={isStoppingSession ? 'Stopping...' : 'Stop session'}
             >
-              Stop
+              {isStoppingSession && (
+                <span className="w-2.5 h-2.5 border border-warden-error border-t-transparent rounded-full animate-spin flex-shrink-0" />
+              )}
+              {isStoppingSession ? 'Stopping...' : 'Stop'}
             </button>
           )}
           {instanceStatus === 'stopping' && onForceKill && (
