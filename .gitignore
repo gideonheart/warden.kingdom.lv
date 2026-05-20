@@ -6,6 +6,7 @@ data/warden.db-shm
 *.log
 .env
 .env.local
+.config/
 playwright-report/
 test-results/
 *.png
